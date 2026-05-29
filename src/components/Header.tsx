@@ -7,6 +7,7 @@ import GoogleSignInButton from './GoogleSignInButton';
 import DriveFolderPicker from './DriveFolderPicker';
 import HelpModal from './HelpModal';
 import ThemeToggle from './ThemeToggle';
+import { VIEWER_ONLY } from '@/lib/appMode';
 import { getTargetFolder, DriveFolder } from '@/lib/googleDrive';
 import { isGoogleConfigured, getAuthState } from '@/lib/googleAuth';
 
@@ -39,7 +40,7 @@ export default function Header() {
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-neutral-950 text-sm font-semibold tracking-wide text-white shadow-[0_10px_24px_rgba(0,0,0,0.16)]">
               H
             </span>
-            <span className="truncate text-[15px] font-semibold tracking-[0.08em]">MANUAL SYSTEM</span>
+            <span className="truncate text-[15px] font-semibold tracking-[0.08em]">{VIEWER_ONLY ? 'MANUAL VIEWER' : 'MANUAL SYSTEM'}</span>
           </Link>
 
           <nav className="hidden items-center gap-1.5 md:flex">

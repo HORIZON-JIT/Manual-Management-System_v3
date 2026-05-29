@@ -26,6 +26,7 @@ import {
 import { getTempData } from '@/lib/tempStorage';
 import ViewHistoryModal from '@/components/ViewHistoryModal';
 import FlowchartModal from '@/components/FlowchartModal';
+import { VIEWER_ONLY } from '@/lib/appMode';
 
 const DEFAULT_JUMP_VALUE = '__default__';
 
@@ -504,7 +505,7 @@ function InstructionViewContent() {
             印刷
           </button>
         )}
-        {!isSharedView && !isPreviewView && (
+        {!isSharedView && !isPreviewView && !VIEWER_ONLY && (
           <Link
             href={`/instructions/edit?id=${instruction.id}`}
             className="px-3 py-1.5 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-lg text-sm hover:from-blue-600 hover:to-indigo-600 transition shadow-sm"

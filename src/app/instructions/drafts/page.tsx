@@ -6,6 +6,8 @@ import Link from 'next/link';
 import { WorkInstruction, getCategoryLabel } from '@/types/instruction';
 import { getAllInstructions, deleteInstruction } from '@/lib/storage';
 import { setTempData } from '@/lib/tempStorage';
+import EditorOnlyNotice from '@/components/EditorOnlyNotice';
+import { VIEWER_ONLY } from '@/lib/appMode';
 
 function loadDrafts(): WorkInstruction[] {
   if (typeof window === 'undefined') return [];
@@ -15,6 +17,11 @@ function loadDrafts(): WorkInstruction[] {
 }
 
 export default function DraftsPage() {
+  if (VIEWER_ONLY) return <EditorOnlyNotice />;
+  return <DraftsPageContent />;
+}
+
+function DraftsPageContent() {
   const router = useRouter();
   const [drafts, setDrafts] = useState<WorkInstruction[]>(loadDrafts);
   const fileInputRef = useRef<HTMLInputElement>(null);

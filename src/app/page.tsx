@@ -7,7 +7,9 @@ import { WorkInstruction } from '@/types/instruction';
 import { isGoogleConfigured, getAuthState, signIn } from '@/lib/googleAuth';
 import { DriveFileInfo } from '@/lib/googleDrive';
 import DriveJsonFilePicker from '@/components/DriveJsonFilePicker';
+import InstructionLibrary from '@/components/InstructionLibrary';
 import { setTempData } from '@/lib/tempStorage';
+import { VIEWER_ONLY } from '@/lib/appMode';
 
 const actions = [
   {
@@ -30,6 +32,13 @@ const actions = [
 ];
 
 export default function HomePage() {
+  if (VIEWER_ONLY) {
+    return <InstructionLibrary />;
+  }
+  return <EditorHomePage />;
+}
+
+function EditorHomePage() {
   const router = useRouter();
   const [importError, setImportError] = useState<string | null>(null);
   const [showAuthPrompt, setShowAuthPrompt] = useState(false);
