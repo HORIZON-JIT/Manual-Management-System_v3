@@ -22,6 +22,8 @@ import {
   getViewStats,
   getMetaCache,
   saveMetaCache,
+  getSavedDepartment,
+  saveDepartment,
   CachedMeta,
   ViewStat,
 } from '@/lib/viewerLibrary';
@@ -55,6 +57,7 @@ export default function InstructionLibrary() {
   const [query, setQuery] = useState('');
   const [sortOrder, setSortOrder] = useState<SortOrder>('frequent');
   const [category, setCategory] = useState<string>(ALL);
+  const [department, setDepartment] = useState<string>(ALL);
   const [opening, setOpening] = useState<string | null>(null);
 
   const configured = isGoogleConfigured();
@@ -62,7 +65,15 @@ export default function InstructionLibrary() {
   useEffect(() => {
     setStats(getViewStats());
     setMeta(getMetaCache());
+    const saved = getSavedDepartment();
+    if (saved) setDepartment(saved);
   }, []);
+
+  // 部署フィルタは端末に記録し、次回以降は自動適用する
+  const handleDepartmentChange = (value: string) => {
+    setDepartment(value);
+    saveDepartment(value === ALL ? '' : value);
+  };
 
   useEffect(() => {
     if (!configured) return;
@@ -105,7 +116,10 @@ export default function InstructionLibrary() {
     if (files.length === 0) return;
     const cache = getMetaCache();
     const stale = files.filter(
-      (f) => !cache[f.id] || cache[f.id].modifiedTime !== f.modifiedTime,
+      (f) =>
+        !cache[f.id] ||
+        cache[f.id].modifiedTime !== f.modifiedTime ||
+        cache[f.id].department === undefined,
     );
     if (stale.length === 0) {
       setMeta(cache);
@@ -118,12 +132,13 @@ export default function InstructionLibrary() {
       stale.map(async (f) => {
         try {
           const content = await downloadDriveFile(f.id);
-          const json = JSON.parse(content) as { title?: string; category?: string };
+          const json = JSON.parse(content) as { title?: string; category?: string; department?: string };
           return {
             id: f.id,
             meta: {
               title: json.title?.trim() || f.name.replace(/\.json$/i, ''),
               category: json.category?.trim() || '',
+              department: json.department?.trim() || '',
               modifiedTime: f.modifiedTime,
             } as CachedMeta,
           };
@@ -133,6 +148,7 @@ export default function InstructionLibrary() {
             meta: {
               title: f.name.replace(/\.json$/i, ''),
               category: '',
+              department: '',
               modifiedTime: f.modifiedTime,
             } as CachedMeta,
           };
@@ -181,12 +197,22 @@ export default function InstructionLibrary() {
     ),
   ).sort((a, b) => a.localeCompare(b, 'ja'));
 
+  // 部署一覧（チップ用）
+  const departments = Array.from(
+    new Set(
+      files
+        .map((f) => meta[f.id]?.department)
+        .filter((d): d is string => !!d),
+    ),
+  ).sort((a, b) => a.localeCompare(b, 'ja'));
+
   const filteredFiles = [...files]
     .filter((f) => {
       const q = query.trim().toLowerCase();
       if (!q) return true;
       return displayName(f).toLowerCase().includes(q) || f.name.toLowerCase().includes(q);
     })
+    .filter((f) => (department === ALL ? true : meta[f.id]?.department === department))
     .filter((f) => (category === ALL ? true : meta[f.id]?.category === category))
     .sort((a, b) => {
       if (sortOrder === 'name-asc') return displayName(a).localeCompare(displayName(b), 'ja');
@@ -291,32 +317,69 @@ export default function InstructionLibrary() {
             </div>
           </section>
 
+          {/* 部署で絞り込み（選択は端末に記録され、次回以降も自動適用される） */}
+          {departments.length > 0 && (
+            <div className="mt-4">
+              <div className="mb-1.5 flex items-center gap-2">
+                <span className="text-xs font-semibold text-neutral-500">部署</span>
+                {department !== ALL && (
+                  <span className="inline-flex items-center gap-1 text-[11px] text-[#8a6a37]">
+                    <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                    この端末に記録中
+                  </span>
+                )}
+              </div>
+              <section className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
+                <button
+                  type="button"
+                  onClick={() => handleDepartmentChange(ALL)}
+                  className={`${chipBase} ${department === ALL ? chipActive : chipIdle}`}
+                >
+                  すべて
+                </button>
+                {departments.map((d) => (
+                  <button
+                    key={d}
+                    type="button"
+                    onClick={() => handleDepartmentChange(d)}
+                    className={`${chipBase} ${department === d ? chipActive : chipIdle}`}
+                  >
+                    {d}
+                  </button>
+                ))}
+              </section>
+            </div>
+          )}
+
           {/* カテゴリ絞り込みチップ */}
           {categories.length > 0 && (
-            <section className="mt-4 -mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
-              <button
-                type="button"
-                onClick={() => setCategory(ALL)}
-                className={`${chipBase} ${category === ALL ? chipActive : chipIdle}`}
-              >
-                すべて
-              </button>
-              {categories.map((c) => (
+            <div className="mt-3">
+              <span className="mb-1.5 block text-xs font-semibold text-neutral-500">カテゴリ</span>
+              <section className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
                 <button
-                  key={c}
                   type="button"
-                  onClick={() => setCategory(c)}
-                  className={`${chipBase} ${category === c ? chipActive : chipIdle}`}
+                  onClick={() => setCategory(ALL)}
+                  className={`${chipBase} ${category === ALL ? chipActive : chipIdle}`}
                 >
-                  {getCategoryLabel(c)}
+                  すべて
                 </button>
-              ))}
-            </section>
+                {categories.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => setCategory(c)}
+                    className={`${chipBase} ${category === c ? chipActive : chipIdle}`}
+                  >
+                    {getCategoryLabel(c)}
+                  </button>
+                ))}
+              </section>
+            </div>
           )}
 
           <div className="mt-3 flex items-center justify-between text-xs text-neutral-400">
             <span>{folderName && `フォルダ: ${folderName}`}</span>
-            <span>{metaLoading ? 'カテゴリを読み込み中...' : !loading && `${filteredFiles.length} 件`}</span>
+            <span>{metaLoading ? 'カテゴリ・部署を読み込み中...' : !loading && `${filteredFiles.length} 件`}</span>
           </div>
 
           <section className="mt-2 flex-1">
@@ -334,6 +397,7 @@ export default function InstructionLibrary() {
                   const updatedAt = formatDate(file.modifiedTime);
                   const isOpening = opening === file.id;
                   const cat = meta[file.id]?.category;
+                  const dept = meta[file.id]?.department;
                   const count = stats[file.id]?.count ?? 0;
                   return (
                     <li key={file.id}>
@@ -354,6 +418,11 @@ export default function InstructionLibrary() {
                         <div className="min-w-0 flex-1">
                           <p className="line-clamp-2 text-base font-semibold leading-6 text-neutral-900">{displayName(file)}</p>
                           <div className="mt-2 flex flex-wrap items-center gap-2">
+                            {dept && (
+                              <span className="rounded-full border border-[#e3d6bb] bg-[#f7f3ec] px-2.5 py-0.5 text-xs font-medium text-[#8a6a37]">
+                                {dept}
+                              </span>
+                            )}
                             {cat && (
                               <span className="rounded-full border border-neutral-200 bg-neutral-50 px-2.5 py-0.5 text-xs font-medium text-neutral-600">
                                 {getCategoryLabel(cat)}

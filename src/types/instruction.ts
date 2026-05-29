@@ -67,6 +67,14 @@ export type Category = string;
 
 export const DEFAULT_CATEGORIES = ['事務作業', '現場作業'] as const;
 
+/** 手順書を担当する部署の選択肢 */
+export const DEPARTMENT_OPTIONS = [
+  '生産管理課',
+  '資材課_資材係',
+  '資材課_部品統制係',
+  '資材課_物流係',
+] as const;
+
 export interface InstructionSnapshot {
   title: string;
   category: Category;
@@ -94,6 +102,8 @@ export interface WorkInstruction {
   id: string;
   title: string;
   category: Category;
+  /** 担当部署（DEPARTMENT_OPTIONS のいずれか） */
+  department?: string;
   description: string;
   steps: Step[];
   createdAt: string;
