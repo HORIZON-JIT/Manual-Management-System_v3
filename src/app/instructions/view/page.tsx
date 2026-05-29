@@ -540,6 +540,7 @@ function InstructionViewContent() {
         </div>
         {displayDescription && <p className="text-slate-600 mb-4">{displayDescription}</p>}
         <div className="text-xs text-slate-400 flex flex-wrap gap-4">
+          {instruction.department && <span>部署: {instruction.department}</span>}
           <span>
             作成日: {new Date(instruction.createdAt).toLocaleDateString('ja-JP')}
             {instruction.createdBy ? ` (${instruction.createdBy})` : ''}

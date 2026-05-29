@@ -8,6 +8,7 @@ import {
   Step,
   Condition,
   DEFAULT_CATEGORIES,
+  DEPARTMENT_OPTIONS,
   UpdateHistoryEntry,
   InstructionSnapshot,
   InstructionStatus,
@@ -63,6 +64,7 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
       ? initialData.category
       : '',
   );
+  const [department, setDepartment] = useState(initialData?.department || '');
   const [description, setDescription] = useState(initialData?.description || '');
   const [steps, setSteps] = useState<Step[]>(
     initialData?.steps?.length
@@ -247,6 +249,7 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
       id: initialData?.id || 'preview',
       title: title.trim() || '作成中の手順書',
       category,
+      department: department || undefined,
       description: description.trim(),
       steps,
       createdAt: initialData?.createdAt || now,
@@ -278,6 +281,10 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
       }
       if (!authorName.trim()) {
         alert(isEdit ? '更新者名を入力してください。' : '作成者名を入力してください。');
+        return null;
+      }
+      if (!department) {
+        alert('部署名を選択してください。');
         return null;
       }
     }
@@ -314,6 +321,7 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
       id: initialData?.id || uuidv4(),
       title: title.trim(),
       category,
+      department: department || undefined,
       description: description.trim(),
       steps,
       createdAt: initialData?.createdAt || now,
@@ -700,6 +708,24 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
                       </button>
                     </div>
                   )}
+                </div>
+
+                <div>
+                  <label className={labelClass}>
+                    部署名 <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={department}
+                    onChange={(event) => setDepartment(event.target.value)}
+                    className={`${fieldClass} h-12`}
+                  >
+                    <option value="">選択してください</option>
+                    {DEPARTMENT_OPTIONS.map((dept) => (
+                      <option key={dept} value={dept}>
+                        {dept}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div>
