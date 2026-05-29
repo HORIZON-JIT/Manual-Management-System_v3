@@ -236,6 +236,13 @@ export default function InstructionLibrary() {
   const displayName = (file: DriveFileInfo) =>
     meta[file.id]?.title || file.name.replace(/\.json$/i, '');
 
+  // 対象フォルダを Google Drive で開く（Drive内蔵のGeminiで質問・要約できる）
+  const openDriveGemini = () => {
+    const folder = getTargetFolder();
+    if (!folder) return;
+    window.open(`https://drive.google.com/drive/folders/${folder.id}`, '_blank', 'noopener,noreferrer');
+  };
+
   // カテゴリ一覧（チップ用）
   const categories = Array.from(
     new Set(
@@ -293,12 +300,29 @@ export default function InstructionLibrary() {
       <section className="border-b border-neutral-200 pb-5">
         <div className="mb-4 h-px w-16 bg-[#a48149]" />
         <p className="mb-2 text-xs font-semibold tracking-[0.28em] text-[#8a6a37]">HORIZON JIT</p>
-        <h1 className="text-3xl font-semibold leading-[1.05] tracking-[-0.02em] text-neutral-950 sm:text-4xl">
-          手順書ビューア
-        </h1>
-        <p className="mt-3 max-w-xl text-sm leading-7 text-neutral-600 sm:text-[15px]">
-          一覧から手順書を選んで閲覧できます。
-        </p>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h1 className="text-3xl font-semibold leading-[1.05] tracking-[-0.02em] text-neutral-950 sm:text-4xl">
+              手順書ビューア
+            </h1>
+            <p className="mt-3 max-w-xl text-sm leading-7 text-neutral-600 sm:text-[15px]">
+              一覧から手順書を選んで閲覧できます。
+            </p>
+          </div>
+          {folderName && (
+            <button
+              type="button"
+              onClick={openDriveGemini}
+              className="inline-flex shrink-0 items-center gap-2 rounded-full border border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 px-4 py-2.5 text-sm font-semibold text-blue-700 shadow-[0_8px_18px_rgba(37,99,235,0.08)] transition hover:border-blue-300 hover:from-blue-100 hover:to-indigo-100"
+              title="Google Drive を開いて、フォルダ内の手順書について Gemini に質問・要約できます"
+            >
+              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2c.4 4.6 3.4 7.6 8 8-4.6.4-7.6 3.4-8 8-.4-4.6-3.4-7.6-8-8 4.6-.4 7.6-3.4 8-8z" />
+              </svg>
+              Geminiに質問（Driveで開く）
+            </button>
+          )}
+        </div>
       </section>
 
       {needsSignIn ? (
