@@ -32,6 +32,40 @@ type SortOrder = 'frequent' | 'updated-desc' | 'name-asc';
 
 const ALL = '__all__';
 const FREQUENT_THRESHOLD = 3;
+const SEARCH_TEXT_LIMIT = 20000;
+
+/** 手順書JSONから検索用テキストを抽出する（画像などのデータは除外）。 */
+function buildSearchText(json: Record<string, unknown>): string {
+  const parts: string[] = [];
+  const push = (v: unknown) => {
+    if (typeof v === 'string' && v.trim()) parts.push(v);
+  };
+  push(json.title);
+  push(json.description);
+  if (Array.isArray(json.keywords)) json.keywords.forEach(push);
+  if (Array.isArray(json.conditions)) {
+    json.conditions.forEach((c) => push((c as { label?: unknown })?.label));
+  }
+  if (Array.isArray(json.steps)) {
+    json.steps.forEach((s) => {
+      const step = s as Record<string, unknown>;
+      push(step.title);
+      push(step.description);
+      push(step.caution);
+      if (Array.isArray(step.imageCaptions)) step.imageCaptions.forEach(push);
+      if (Array.isArray(step.checkItems)) {
+        step.checkItems.forEach((ci) => push((ci as { label?: unknown })?.label));
+      }
+      if (Array.isArray(step.links)) {
+        step.links.forEach((l) => push((l as { label?: unknown })?.label));
+      }
+      if (Array.isArray(step.jumps)) {
+        step.jumps.forEach((j) => push((j as { label?: unknown })?.label));
+      }
+    });
+  }
+  return parts.join('\n').slice(0, SEARCH_TEXT_LIMIT).toLowerCase();
+}
 
 function formatDate(value?: string): string | null {
   if (!value) return null;
@@ -58,6 +92,7 @@ export default function InstructionLibrary() {
   const [sortOrder, setSortOrder] = useState<SortOrder>('frequent');
   const [category, setCategory] = useState<string>(ALL);
   const [department, setDepartment] = useState<string>(ALL);
+  const [contentSearch, setContentSearch] = useState(false);
   const [opening, setOpening] = useState<string | null>(null);
 
   const configured = isGoogleConfigured();
@@ -119,7 +154,8 @@ export default function InstructionLibrary() {
       (f) =>
         !cache[f.id] ||
         cache[f.id].modifiedTime !== f.modifiedTime ||
-        cache[f.id].department === undefined,
+        cache[f.id].department === undefined ||
+        cache[f.id].searchText === undefined,
     );
     if (stale.length === 0) {
       setMeta(cache);
@@ -132,13 +168,14 @@ export default function InstructionLibrary() {
       stale.map(async (f) => {
         try {
           const content = await downloadDriveFile(f.id);
-          const json = JSON.parse(content) as { title?: string; category?: string; department?: string };
+          const json = JSON.parse(content) as Record<string, unknown>;
           return {
             id: f.id,
             meta: {
-              title: json.title?.trim() || f.name.replace(/\.json$/i, ''),
-              category: json.category?.trim() || '',
-              department: json.department?.trim() || '',
+              title: (json.title as string)?.trim() || f.name.replace(/\.json$/i, ''),
+              category: (json.category as string)?.trim() || '',
+              department: (json.department as string)?.trim() || '',
+              searchText: buildSearchText(json),
               modifiedTime: f.modifiedTime,
             } as CachedMeta,
           };
@@ -149,6 +186,7 @@ export default function InstructionLibrary() {
               title: f.name.replace(/\.json$/i, ''),
               category: '',
               department: '',
+              searchText: f.name.toLowerCase(),
               modifiedTime: f.modifiedTime,
             } as CachedMeta,
           };
@@ -210,7 +248,9 @@ export default function InstructionLibrary() {
     .filter((f) => {
       const q = query.trim().toLowerCase();
       if (!q) return true;
-      return displayName(f).toLowerCase().includes(q) || f.name.toLowerCase().includes(q);
+      if (displayName(f).toLowerCase().includes(q) || f.name.toLowerCase().includes(q)) return true;
+      // 「ファイル内容も検索」がONなら本文(手順の中身)も対象にする
+      return contentSearch && (meta[f.id]?.searchText?.includes(q) ?? false);
     })
     .filter((f) => (department === ALL ? true : meta[f.id]?.department === department))
     .filter((f) => (category === ALL ? true : meta[f.id]?.category === category))
@@ -278,19 +318,30 @@ export default function InstructionLibrary() {
       ) : (
         <>
           {/* 検索・並び替え（タッチ向けに大きめ） */}
-          <section className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
-            <label className="relative block w-full sm:max-w-md">
-              <svg className="pointer-events-none absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="m21 21-4.35-4.35m1.6-5.15a6.75 6.75 0 1 1-13.5 0 6.75 6.75 0 0 1 13.5 0Z" />
-              </svg>
-              <input
-                type="text"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="手順書をさがす"
-                className="h-12 w-full rounded-xl border border-neutral-200 bg-white pl-11 pr-3 text-base text-neutral-800 outline-none transition focus:border-[#c9b188]"
-              />
-            </label>
+          <section className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-start">
+            <div className="w-full sm:max-w-md">
+              <label className="relative block">
+                <svg className="pointer-events-none absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="m21 21-4.35-4.35m1.6-5.15a6.75 6.75 0 1 1-13.5 0 6.75 6.75 0 0 1 13.5 0Z" />
+                </svg>
+                <input
+                  type="text"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="手順書をさがす"
+                  className="h-12 w-full rounded-xl border border-neutral-200 bg-white pl-11 pr-3 text-base text-neutral-800 outline-none transition focus:border-[#c9b188]"
+                />
+              </label>
+              <label className="mt-2 flex cursor-pointer items-center gap-2 text-sm text-neutral-600">
+                <input
+                  type="checkbox"
+                  checked={contentSearch}
+                  onChange={(e) => setContentSearch(e.target.checked)}
+                  className="h-4 w-4 rounded border-neutral-300 accent-[#a48149]"
+                />
+                ファイル内容も検索（手順の中身も対象）
+              </label>
+            </div>
             <div className="flex items-center gap-2 sm:ml-auto">
               <select
                 value={sortOrder}

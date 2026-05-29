@@ -25,6 +25,8 @@ export interface CachedMeta {
   category: string;
   /** 担当部署 */
   department: string;
+  /** 本文検索用に抽出・小文字化したテキスト（画像データは含めない） */
+  searchText: string;
   /** Drive上の更新日時。これが変わったらキャッシュを無効化する */
   modifiedTime?: string;
 }
