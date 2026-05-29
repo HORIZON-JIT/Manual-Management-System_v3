@@ -6,6 +6,8 @@ import { useState } from 'react';
 import GoogleSignInButton from './GoogleSignInButton';
 import DriveFolderPicker from './DriveFolderPicker';
 import HelpModal from './HelpModal';
+import ThemeToggle from './ThemeToggle';
+import { DEPARTMENT } from '@/lib/appMode';
 import { getTargetFolder, DriveFolder } from '@/lib/googleDrive';
 import { isGoogleConfigured, getAuthState } from '@/lib/googleAuth';
 
@@ -38,7 +40,7 @@ export default function Header() {
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-neutral-950 text-sm font-semibold tracking-wide text-white shadow-[0_10px_24px_rgba(0,0,0,0.16)]">
               H
             </span>
-            <span className="truncate text-[15px] font-semibold tracking-[0.08em]">MANUAL SYSTEM</span>
+            <span className="truncate text-[15px] font-semibold tracking-[0.08em]">{DEPARTMENT.brandLabel}</span>
           </Link>
 
           <nav className="hidden items-center gap-1.5 md:flex">
@@ -55,6 +57,7 @@ export default function Header() {
                 </svg>
               </button>
             )}
+            <ThemeToggle />
             <button
               onClick={() => setShowHelp(true)}
               className="inline-flex h-9 w-9 items-center justify-center rounded-md text-neutral-500 transition hover:bg-neutral-100 hover:text-neutral-950"
@@ -97,6 +100,10 @@ export default function Header() {
 
         {menuOpen && (
           <nav className="space-y-1 border-t border-neutral-200 bg-white px-4 py-3 md:hidden">
+            <div className="flex items-center justify-between rounded-md px-3 py-2 text-sm font-medium text-neutral-600">
+              <span>テーマ切替</span>
+              <ThemeToggle />
+            </div>
             <button
               onClick={() => { setMenuOpen(false); setShowHelp(true); }}
               className="flex w-full items-center gap-2 rounded-md px-3 py-2.5 text-left text-sm font-medium text-neutral-600 transition hover:bg-neutral-100 hover:text-neutral-950"

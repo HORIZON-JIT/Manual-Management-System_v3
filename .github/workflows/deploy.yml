@@ -30,16 +30,36 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build
+      # 資材課版（フル機能）をサイトのルートにビルド
+      - name: Build materials edition (root)
         run: npm run build
         env:
           NEXT_PUBLIC_REPO_NAME: ${{ github.event.repository.name }}
           NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${{ vars.NEXT_PUBLIC_GOOGLE_CLIENT_ID }}
 
+      - name: Stage root output
+        run: |
+          mkdir -p site
+          cp -a out/. site/
+          touch site/.nojekyll
+
+      # 閲覧専用版を /viewer/ サブパスにビルド
+      - name: Build viewer edition (/viewer)
+        run: npm run build:viewer
+        env:
+          NEXT_PUBLIC_REPO_NAME: ${{ github.event.repository.name }}
+          NEXT_PUBLIC_BASE_SUBPATH: viewer
+          NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${{ vars.NEXT_PUBLIC_GOOGLE_CLIENT_ID }}
+
+      - name: Stage viewer output
+        run: |
+          mkdir -p site/viewer
+          cp -a out/. site/viewer/
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ./out
+          path: ./site
 
   deploy:
     environment:

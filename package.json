@@ -4,8 +4,11 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:viewer": "cross-env NEXT_PUBLIC_DEPARTMENT=viewer next dev",
     "build": "next build",
+    "build:viewer": "cross-env NEXT_PUBLIC_DEPARTMENT=viewer next build",
     "start": "next start",
+    "start:viewer": "cross-env NEXT_PUBLIC_DEPARTMENT=viewer next start",
     "lint": "eslint"
   },
   "dependencies": {
@@ -30,6 +33,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/uuid": "^10.0.0",
+    "cross-env": "^10.1.0",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
     "tailwindcss": "^4",
