@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { v4 as uuidv4 } from 'uuid';
 import {
@@ -20,6 +20,7 @@ import { uploadAsGoogleSheet, saveFileToDrive, getTargetFolder } from '@/lib/goo
 import { addStepNavLinks, addSheetCheckboxes, addResetScript } from '@/lib/sheetsNavLinks';
 import { getViewPageBaseUrl } from '@/lib/shareLink';
 import { isGoogleConfigured, getAuthState } from '@/lib/googleAuth';
+import { getCustomDepartments, addCustomDepartment } from '@/lib/customDepartments';
 import StepEditor from './StepEditor';
 import VersionHistoryModal from './VersionHistoryModal';
 import FlowchartModal from './FlowchartModal';
@@ -65,6 +66,9 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
       : '',
   );
   const [department, setDepartment] = useState(initialData?.department || '');
+  const [customDepartments, setCustomDepartments] = useState<string[]>([]);
+  const [showAddDepartment, setShowAddDepartment] = useState(false);
+  const [newDepartment, setNewDepartment] = useState('');
   const [description, setDescription] = useState(initialData?.description || '');
   const [steps, setSteps] = useState<Step[]>(
     initialData?.steps?.length
@@ -109,6 +113,28 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
   } | null>(null);
   const [viewUrlCopied, setViewUrlCopied] = useState(false);
   const [draftSaveMessage, setDraftSaveMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    setCustomDepartments(getCustomDepartments());
+  }, []);
+
+  // 既定の部署＋追加された部署＋編集中データの部署を重複なくまとめる
+  const departmentOptions = Array.from(
+    new Set(
+      [...DEPARTMENT_OPTIONS, ...customDepartments, initialData?.department].filter(
+        (d): d is string => !!d,
+      ),
+    ),
+  );
+
+  const handleAddDepartment = () => {
+    const name = newDepartment.trim();
+    if (!name) return;
+    setCustomDepartments(addCustomDepartment(name));
+    setDepartment(name);
+    setNewDepartment('');
+    setShowAddDepartment(false);
+  };
 
   const hasRestorableVersions =
     isEdit && initialData?.updateHistory?.some((entry) => !!entry.snapshot);
@@ -720,12 +746,55 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
                     className={`${fieldClass} h-12`}
                   >
                     <option value="">選択してください</option>
-                    {DEPARTMENT_OPTIONS.map((dept) => (
+                    {departmentOptions.map((dept) => (
                       <option key={dept} value={dept}>
                         {dept}
                       </option>
                     ))}
                   </select>
+                  {showAddDepartment ? (
+                    <div className="mt-2 flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={newDepartment}
+                        onChange={(event) => setNewDepartment(event.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter') {
+                            event.preventDefault();
+                            handleAddDepartment();
+                          }
+                        }}
+                        className={`${fieldClass} h-11`}
+                        placeholder="部署名を入力"
+                        autoFocus
+                      />
+                      <button
+                        type="button"
+                        onClick={handleAddDepartment}
+                        className="shrink-0 rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800"
+                      >
+                        追加
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowAddDepartment(false);
+                          setNewDepartment('');
+                        }}
+                        className="shrink-0 text-xs font-medium text-slate-500 transition hover:text-slate-950"
+                      >
+                        やめる
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setShowAddDepartment(true)}
+                      className="mt-2 text-xs font-medium text-slate-500 transition hover:text-slate-950"
+                    >
+                      + 部署を追加
+                    </button>
+                  )}
                 </div>
 
                 <div>
