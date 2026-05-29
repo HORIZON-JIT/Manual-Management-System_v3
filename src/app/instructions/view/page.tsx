@@ -63,6 +63,9 @@ function InstructionViewContent() {
   }, []);
 
   useEffect(() => {
+    // 再フェッチ中（ログイン状態の確定後の再実行など）に「見つかりません」が
+    // 一瞬表示されるのを防ぐため、毎回ローディングを立て直す
+    setLoading(true);
     setCheckStates({});
     setSelectedConditions({});
     setSelectedJumpTargets({});

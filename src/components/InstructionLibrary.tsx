@@ -24,6 +24,9 @@ import {
   saveMetaCache,
   getSavedDepartment,
   saveDepartment,
+  getSavedLayout,
+  saveLayout,
+  LibraryLayout,
   CachedMeta,
   ViewStat,
 } from '@/lib/viewerLibrary';
@@ -32,6 +35,40 @@ type SortOrder = 'frequent' | 'updated-desc' | 'name-asc';
 
 const ALL = '__all__';
 const FREQUENT_THRESHOLD = 3;
+const SEARCH_TEXT_LIMIT = 20000;
+
+/** 手順書JSONから検索用テキストを抽出する（画像などのデータは除外）。 */
+function buildSearchText(json: Record<string, unknown>): string {
+  const parts: string[] = [];
+  const push = (v: unknown) => {
+    if (typeof v === 'string' && v.trim()) parts.push(v);
+  };
+  push(json.title);
+  push(json.description);
+  if (Array.isArray(json.keywords)) json.keywords.forEach(push);
+  if (Array.isArray(json.conditions)) {
+    json.conditions.forEach((c) => push((c as { label?: unknown })?.label));
+  }
+  if (Array.isArray(json.steps)) {
+    json.steps.forEach((s) => {
+      const step = s as Record<string, unknown>;
+      push(step.title);
+      push(step.description);
+      push(step.caution);
+      if (Array.isArray(step.imageCaptions)) step.imageCaptions.forEach(push);
+      if (Array.isArray(step.checkItems)) {
+        step.checkItems.forEach((ci) => push((ci as { label?: unknown })?.label));
+      }
+      if (Array.isArray(step.links)) {
+        step.links.forEach((l) => push((l as { label?: unknown })?.label));
+      }
+      if (Array.isArray(step.jumps)) {
+        step.jumps.forEach((j) => push((j as { label?: unknown })?.label));
+      }
+    });
+  }
+  return parts.join('\n').slice(0, SEARCH_TEXT_LIMIT).toLowerCase();
+}
 
 function formatDate(value?: string): string | null {
   if (!value) return null;
@@ -58,6 +95,8 @@ export default function InstructionLibrary() {
   const [sortOrder, setSortOrder] = useState<SortOrder>('frequent');
   const [category, setCategory] = useState<string>(ALL);
   const [department, setDepartment] = useState<string>(ALL);
+  const [contentSearch, setContentSearch] = useState(false);
+  const [layout, setLayout] = useState<LibraryLayout>('grid');
   const [opening, setOpening] = useState<string | null>(null);
 
   const configured = isGoogleConfigured();
@@ -67,7 +106,13 @@ export default function InstructionLibrary() {
     setMeta(getMetaCache());
     const saved = getSavedDepartment();
     if (saved) setDepartment(saved);
+    setLayout(getSavedLayout());
   }, []);
+
+  const handleLayoutChange = (value: LibraryLayout) => {
+    setLayout(value);
+    saveLayout(value);
+  };
 
   // 部署フィルタは端末に記録し、次回以降は自動適用する
   const handleDepartmentChange = (value: string) => {
@@ -119,7 +164,8 @@ export default function InstructionLibrary() {
       (f) =>
         !cache[f.id] ||
         cache[f.id].modifiedTime !== f.modifiedTime ||
-        cache[f.id].department === undefined,
+        cache[f.id].department === undefined ||
+        cache[f.id].searchText === undefined,
     );
     if (stale.length === 0) {
       setMeta(cache);
@@ -132,13 +178,14 @@ export default function InstructionLibrary() {
       stale.map(async (f) => {
         try {
           const content = await downloadDriveFile(f.id);
-          const json = JSON.parse(content) as { title?: string; category?: string; department?: string };
+          const json = JSON.parse(content) as Record<string, unknown>;
           return {
             id: f.id,
             meta: {
-              title: json.title?.trim() || f.name.replace(/\.json$/i, ''),
-              category: json.category?.trim() || '',
-              department: json.department?.trim() || '',
+              title: (json.title as string)?.trim() || f.name.replace(/\.json$/i, ''),
+              category: (json.category as string)?.trim() || '',
+              department: (json.department as string)?.trim() || '',
+              searchText: buildSearchText(json),
               modifiedTime: f.modifiedTime,
             } as CachedMeta,
           };
@@ -149,6 +196,7 @@ export default function InstructionLibrary() {
               title: f.name.replace(/\.json$/i, ''),
               category: '',
               department: '',
+              searchText: f.name.toLowerCase(),
               modifiedTime: f.modifiedTime,
             } as CachedMeta,
           };
@@ -210,7 +258,9 @@ export default function InstructionLibrary() {
     .filter((f) => {
       const q = query.trim().toLowerCase();
       if (!q) return true;
-      return displayName(f).toLowerCase().includes(q) || f.name.toLowerCase().includes(q);
+      if (displayName(f).toLowerCase().includes(q) || f.name.toLowerCase().includes(q)) return true;
+      // 「ファイル内容も検索」がONなら本文(手順の中身)も対象にする
+      return contentSearch && (meta[f.id]?.searchText?.includes(q) ?? false);
     })
     .filter((f) => (department === ALL ? true : meta[f.id]?.department === department))
     .filter((f) => (category === ALL ? true : meta[f.id]?.category === category))
@@ -278,19 +328,30 @@ export default function InstructionLibrary() {
       ) : (
         <>
           {/* 検索・並び替え（タッチ向けに大きめ） */}
-          <section className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
-            <label className="relative block w-full sm:max-w-md">
-              <svg className="pointer-events-none absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="m21 21-4.35-4.35m1.6-5.15a6.75 6.75 0 1 1-13.5 0 6.75 6.75 0 0 1 13.5 0Z" />
-              </svg>
-              <input
-                type="text"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="手順書をさがす"
-                className="h-12 w-full rounded-xl border border-neutral-200 bg-white pl-11 pr-3 text-base text-neutral-800 outline-none transition focus:border-[#c9b188]"
-              />
-            </label>
+          <section className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-start">
+            <div className="w-full sm:max-w-md">
+              <label className="relative block">
+                <svg className="pointer-events-none absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="m21 21-4.35-4.35m1.6-5.15a6.75 6.75 0 1 1-13.5 0 6.75 6.75 0 0 1 13.5 0Z" />
+                </svg>
+                <input
+                  type="text"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="手順書をさがす"
+                  className="h-12 w-full rounded-xl border border-neutral-200 bg-white pl-11 pr-3 text-base text-neutral-800 outline-none transition focus:border-[#c9b188]"
+                />
+              </label>
+              <label className="mt-2 flex cursor-pointer items-center gap-2 text-sm text-neutral-600">
+                <input
+                  type="checkbox"
+                  checked={contentSearch}
+                  onChange={(e) => setContentSearch(e.target.checked)}
+                  className="h-4 w-4 rounded border-neutral-300 accent-[#a48149]"
+                />
+                ファイル内容も検索（手順の中身も対象）
+              </label>
+            </div>
             <div className="flex items-center gap-2 sm:ml-auto">
               <select
                 value={sortOrder}
@@ -302,6 +363,39 @@ export default function InstructionLibrary() {
                 <option value="updated-desc">更新が新しい順</option>
                 <option value="name-asc">名前順</option>
               </select>
+
+              {/* 表示レイアウト切替（リスト／グリッド） */}
+              <div className="flex h-12 shrink-0 items-center rounded-xl border border-neutral-200 bg-white p-1">
+                <button
+                  type="button"
+                  onClick={() => handleLayoutChange('list')}
+                  className={`flex h-10 w-10 items-center justify-center rounded-lg transition ${
+                    layout === 'list' ? 'bg-[#f0e9db] text-[#8a6a37]' : 'text-neutral-500 hover:text-neutral-950'
+                  }`}
+                  title="リスト表示"
+                  aria-label="リスト表示"
+                  aria-pressed={layout === 'list'}
+                >
+                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleLayoutChange('grid')}
+                  className={`flex h-10 w-10 items-center justify-center rounded-lg transition ${
+                    layout === 'grid' ? 'bg-[#f0e9db] text-[#8a6a37]' : 'text-neutral-500 hover:text-neutral-950'
+                  }`}
+                  title="グリッド表示"
+                  aria-label="グリッド表示"
+                  aria-pressed={layout === 'grid'}
+                >
+                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5h6v6H4zM14 5h6v6h-6zM4 15h6v6H4zM14 15h6v6h-6z" />
+                  </svg>
+                </button>
+              </div>
+
               <button
                 type="button"
                 onClick={loadFiles}
@@ -392,7 +486,7 @@ export default function InstructionLibrary() {
                 条件に合う手順書がありません
               </div>
             ) : (
-              <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <ul className={layout === 'grid' ? 'grid gap-3 sm:grid-cols-2 lg:grid-cols-3' : 'flex flex-col gap-2'}>
                 {filteredFiles.map((file) => {
                   const updatedAt = formatDate(file.modifiedTime);
                   const isOpening = opening === file.id;
@@ -404,7 +498,9 @@ export default function InstructionLibrary() {
                       <button
                         onClick={() => handleOpen(file)}
                         disabled={opening !== null}
-                        className="group flex h-full min-h-[96px] w-full items-start gap-4 rounded-xl border border-neutral-200 bg-white px-4 py-5 text-left shadow-[0_8px_18px_rgba(0,0,0,0.04)] transition active:scale-[0.99] hover:border-[#d7c29b] hover:bg-[#faf7f1] disabled:cursor-wait disabled:opacity-60"
+                        className={`group flex h-full w-full items-center gap-4 rounded-xl border border-neutral-200 bg-white text-left shadow-[0_8px_18px_rgba(0,0,0,0.04)] transition active:scale-[0.99] hover:border-[#d7c29b] hover:bg-[#faf7f1] disabled:cursor-wait disabled:opacity-60 ${
+                          layout === 'grid' ? 'min-h-[96px] items-start px-4 py-5' : 'px-4 py-3'
+                        }`}
                       >
                         <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-emerald-100 bg-emerald-50 text-emerald-600">
                           {isOpening ? (
@@ -416,7 +512,7 @@ export default function InstructionLibrary() {
                           )}
                         </div>
                         <div className="min-w-0 flex-1">
-                          <p className="line-clamp-2 text-base font-semibold leading-6 text-neutral-900">{displayName(file)}</p>
+                          <p className={`text-base font-semibold leading-6 text-neutral-900 ${layout === 'grid' ? 'line-clamp-2' : 'line-clamp-1'}`}>{displayName(file)}</p>
                           <div className="mt-2 flex flex-wrap items-center gap-2">
                             {dept && (
                               <span className="rounded-full border border-[#e3d6bb] bg-[#f7f3ec] px-2.5 py-0.5 text-xs font-medium text-[#8a6a37]">
