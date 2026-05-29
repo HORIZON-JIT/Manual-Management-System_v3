@@ -12,6 +12,9 @@
 const STATS_KEY = 'mms-viewer-stats';
 const META_KEY = 'mms-viewer-meta';
 const DEPT_FILTER_KEY = 'mms-viewer-dept';
+const LAYOUT_KEY = 'mms-viewer-layout';
+
+export type LibraryLayout = 'grid' | 'list';
 
 export interface ViewStat {
   /** 開いた回数 */
@@ -95,6 +98,26 @@ export function saveDepartment(value: string): void {
   try {
     if (value) window.localStorage.setItem(DEPT_FILTER_KEY, value);
     else window.localStorage.removeItem(DEPT_FILTER_KEY);
+  } catch {
+    // 容量超過などは無視
+  }
+}
+
+/* ---- 一覧レイアウト（グリッド／リスト）も端末に記録する ---- */
+
+export function getSavedLayout(): LibraryLayout {
+  if (typeof window === 'undefined') return 'grid';
+  try {
+    return window.localStorage.getItem(LAYOUT_KEY) === 'list' ? 'list' : 'grid';
+  } catch {
+    return 'grid';
+  }
+}
+
+export function saveLayout(value: LibraryLayout): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(LAYOUT_KEY, value);
   } catch {
     // 容量超過などは無視
   }

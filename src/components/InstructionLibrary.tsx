@@ -24,6 +24,9 @@ import {
   saveMetaCache,
   getSavedDepartment,
   saveDepartment,
+  getSavedLayout,
+  saveLayout,
+  LibraryLayout,
   CachedMeta,
   ViewStat,
 } from '@/lib/viewerLibrary';
@@ -93,6 +96,7 @@ export default function InstructionLibrary() {
   const [category, setCategory] = useState<string>(ALL);
   const [department, setDepartment] = useState<string>(ALL);
   const [contentSearch, setContentSearch] = useState(false);
+  const [layout, setLayout] = useState<LibraryLayout>('grid');
   const [opening, setOpening] = useState<string | null>(null);
 
   const configured = isGoogleConfigured();
@@ -102,7 +106,13 @@ export default function InstructionLibrary() {
     setMeta(getMetaCache());
     const saved = getSavedDepartment();
     if (saved) setDepartment(saved);
+    setLayout(getSavedLayout());
   }, []);
+
+  const handleLayoutChange = (value: LibraryLayout) => {
+    setLayout(value);
+    saveLayout(value);
+  };
 
   // 部署フィルタは端末に記録し、次回以降は自動適用する
   const handleDepartmentChange = (value: string) => {
@@ -353,6 +363,39 @@ export default function InstructionLibrary() {
                 <option value="updated-desc">更新が新しい順</option>
                 <option value="name-asc">名前順</option>
               </select>
+
+              {/* 表示レイアウト切替（リスト／グリッド） */}
+              <div className="flex h-12 shrink-0 items-center rounded-xl border border-neutral-200 bg-white p-1">
+                <button
+                  type="button"
+                  onClick={() => handleLayoutChange('list')}
+                  className={`flex h-10 w-10 items-center justify-center rounded-lg transition ${
+                    layout === 'list' ? 'bg-[#f0e9db] text-[#8a6a37]' : 'text-neutral-500 hover:text-neutral-950'
+                  }`}
+                  title="リスト表示"
+                  aria-label="リスト表示"
+                  aria-pressed={layout === 'list'}
+                >
+                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleLayoutChange('grid')}
+                  className={`flex h-10 w-10 items-center justify-center rounded-lg transition ${
+                    layout === 'grid' ? 'bg-[#f0e9db] text-[#8a6a37]' : 'text-neutral-500 hover:text-neutral-950'
+                  }`}
+                  title="グリッド表示"
+                  aria-label="グリッド表示"
+                  aria-pressed={layout === 'grid'}
+                >
+                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5h6v6H4zM14 5h6v6h-6zM4 15h6v6H4zM14 15h6v6h-6z" />
+                  </svg>
+                </button>
+              </div>
+
               <button
                 type="button"
                 onClick={loadFiles}
@@ -443,7 +486,7 @@ export default function InstructionLibrary() {
                 条件に合う手順書がありません
               </div>
             ) : (
-              <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <ul className={layout === 'grid' ? 'grid gap-3 sm:grid-cols-2 lg:grid-cols-3' : 'flex flex-col gap-2'}>
                 {filteredFiles.map((file) => {
                   const updatedAt = formatDate(file.modifiedTime);
                   const isOpening = opening === file.id;
@@ -455,7 +498,9 @@ export default function InstructionLibrary() {
                       <button
                         onClick={() => handleOpen(file)}
                         disabled={opening !== null}
-                        className="group flex h-full min-h-[96px] w-full items-start gap-4 rounded-xl border border-neutral-200 bg-white px-4 py-5 text-left shadow-[0_8px_18px_rgba(0,0,0,0.04)] transition active:scale-[0.99] hover:border-[#d7c29b] hover:bg-[#faf7f1] disabled:cursor-wait disabled:opacity-60"
+                        className={`group flex h-full w-full items-center gap-4 rounded-xl border border-neutral-200 bg-white text-left shadow-[0_8px_18px_rgba(0,0,0,0.04)] transition active:scale-[0.99] hover:border-[#d7c29b] hover:bg-[#faf7f1] disabled:cursor-wait disabled:opacity-60 ${
+                          layout === 'grid' ? 'min-h-[96px] items-start px-4 py-5' : 'px-4 py-3'
+                        }`}
                       >
                         <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-emerald-100 bg-emerald-50 text-emerald-600">
                           {isOpening ? (
@@ -467,7 +512,7 @@ export default function InstructionLibrary() {
                           )}
                         </div>
                         <div className="min-w-0 flex-1">
-                          <p className="line-clamp-2 text-base font-semibold leading-6 text-neutral-900">{displayName(file)}</p>
+                          <p className={`text-base font-semibold leading-6 text-neutral-900 ${layout === 'grid' ? 'line-clamp-2' : 'line-clamp-1'}`}>{displayName(file)}</p>
                           <div className="mt-2 flex flex-wrap items-center gap-2">
                             {dept && (
                               <span className="rounded-full border border-[#e3d6bb] bg-[#f7f3ec] px-2.5 py-0.5 text-xs font-medium text-[#8a6a37]">
