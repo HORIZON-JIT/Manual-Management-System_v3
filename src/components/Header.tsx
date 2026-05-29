@@ -6,6 +6,7 @@ import { useState } from 'react';
 import GoogleSignInButton from './GoogleSignInButton';
 import DriveFolderPicker from './DriveFolderPicker';
 import HelpModal from './HelpModal';
+import ThemeToggle from './ThemeToggle';
 import { getTargetFolder, DriveFolder } from '@/lib/googleDrive';
 import { isGoogleConfigured, getAuthState } from '@/lib/googleAuth';
 
@@ -55,6 +56,7 @@ export default function Header() {
                 </svg>
               </button>
             )}
+            <ThemeToggle />
             <button
               onClick={() => setShowHelp(true)}
               className="inline-flex h-9 w-9 items-center justify-center rounded-md text-neutral-500 transition hover:bg-neutral-100 hover:text-neutral-950"
@@ -97,6 +99,10 @@ export default function Header() {
 
         {menuOpen && (
           <nav className="space-y-1 border-t border-neutral-200 bg-white px-4 py-3 md:hidden">
+            <div className="flex items-center justify-between rounded-md px-3 py-2 text-sm font-medium text-neutral-600">
+              <span>テーマ切替</span>
+              <ThemeToggle />
+            </div>
             <button
               onClick={() => { setMenuOpen(false); setShowHelp(true); }}
               className="flex w-full items-center gap-2 rounded-md px-3 py-2.5 text-left text-sm font-medium text-neutral-600 transition hover:bg-neutral-100 hover:text-neutral-950"

@@ -52,3 +52,193 @@ select {
     display: none !important;
   }
 }
+
+/* =========================================================================
+   ダークテーマ（資材課エディション）
+   html.dark を起点に、ハードコードされた Tailwind ユーティリティを上書きする。
+   これらのルールはカスケードレイヤー外にあるため、@layer utilities 内の
+   生成済みユーティリティより常に優先される。
+   ========================================================================= */
+html.dark {
+  --background: #0f1115;
+  --foreground: #e6e8ec;
+  color-scheme: dark;
+}
+
+.dark body {
+  background:
+    linear-gradient(180deg, rgba(28, 32, 41, 0.96) 0, rgba(15, 17, 21, 0.98) 26rem),
+    var(--background);
+}
+
+.dark ::selection {
+  background: rgba(96, 165, 250, 0.32);
+}
+
+/* ---- 背景（サーフェス） ---- */
+.dark .bg-white { background-color: #161922; }
+.dark .bg-white\/90 { background-color: rgba(22, 25, 34, 0.9); }
+.dark .bg-white\/70 { background-color: rgba(22, 25, 34, 0.7); }
+.dark .bg-slate-50,
+.dark .bg-neutral-50,
+.dark .bg-gray-50 { background-color: #1c2029; }
+.dark .bg-slate-100,
+.dark .bg-neutral-100,
+.dark .bg-gray-100 { background-color: #232834; }
+.dark .bg-slate-200,
+.dark .bg-neutral-200 { background-color: #2b313d; }
+
+/* ---- 濃色ボタン系（ダークではアクセントブルーに） ---- */
+.dark .bg-slate-950,
+.dark .bg-neutral-950 { background-color: #2563eb; }
+.dark .bg-slate-900 { background-color: #1e40af; }
+.dark .bg-slate-800,
+.dark .bg-neutral-800 { background-color: #1d4ed8; }
+.dark .bg-slate-700 { background-color: #334155; }
+.dark .bg-slate-600 { background-color: #475569; }
+/* bg-gray-700/800/900/950 は画像ビューア等の意図的な暗色のため変更しない */
+
+/* ---- 背景の hover/focus ---- */
+.dark .hover\:bg-white:hover,
+.dark .focus\:bg-white:focus,
+.dark .hover\:bg-slate-50:hover,
+.dark .hover\:bg-neutral-50:hover { background-color: #232834; }
+.dark .hover\:bg-slate-100:hover,
+.dark .hover\:bg-neutral-100:hover,
+.dark .hover\:bg-gray-100:hover { background-color: #2b313d; }
+.dark .hover\:bg-slate-800:hover,
+.dark .hover\:bg-neutral-800:hover { background-color: #1e40af; }
+.dark .hover\:bg-slate-900:hover { background-color: #1e3a8a; }
+.dark .hover\:bg-slate-700:hover { background-color: #3a4150; }
+.dark .group-hover\:bg-slate-950:is(:where(.group):hover *) { background-color: #2563eb; }
+
+/* ---- 文字色 ---- */
+.dark .text-slate-950,
+.dark .text-slate-900,
+.dark .text-slate-800,
+.dark .text-neutral-950,
+.dark .text-neutral-900,
+.dark .text-neutral-800,
+.dark .text-gray-800 { color: #e6e8ec; }
+.dark .text-slate-700,
+.dark .text-slate-600,
+.dark .text-neutral-700,
+.dark .text-neutral-600,
+.dark .text-gray-700,
+.dark .text-gray-600 { color: #b6bcc7; }
+.dark .text-slate-500,
+.dark .text-slate-400,
+.dark .text-slate-300,
+.dark .text-neutral-500,
+.dark .text-neutral-400,
+.dark .text-neutral-300,
+.dark .text-gray-500,
+.dark .text-gray-400,
+.dark .text-gray-300 { color: #888fa0; }
+/* text-white はアクセントボタン上で使われるため変更しない */
+
+/* ---- 文字色の hover/group-hover ---- */
+.dark .hover\:text-slate-950:hover,
+.dark .hover\:text-slate-900:hover,
+.dark .hover\:text-neutral-950:hover,
+.dark .hover\:text-gray-800:hover { color: #f1f3f6; }
+.dark .hover\:text-slate-700:hover,
+.dark .hover\:text-neutral-800:hover,
+.dark .hover\:text-neutral-700:hover,
+.dark .hover\:text-gray-700:hover,
+.dark .hover\:text-gray-600:hover { color: #cfd4dd; }
+.dark .group-hover\:text-slate-950:is(:where(.group):hover *) { color: #f1f3f6; }
+
+/* ---- ボーダー ---- */
+.dark .border-slate-200,
+.dark .border-slate-100,
+.dark .border-neutral-200,
+.dark .border-gray-200,
+.dark .border-gray-100,
+.dark .border-white { border-color: #2a2f3a; }
+.dark .border-neutral-200\/80 { border-color: rgba(42, 47, 58, 0.8); }
+.dark .border-slate-300,
+.dark .border-neutral-300,
+.dark .border-gray-300 { border-color: #383f4d; }
+.dark .border-slate-400 { border-color: #474e5d; }
+.dark .border-slate-950 { border-color: #4a5160; }
+.dark .hover\:border-slate-400:hover,
+.dark .focus\:border-slate-400:focus { border-color: #5a6172; }
+.dark .hover\:border-slate-300:hover,
+.dark .hover\:border-neutral-300:hover,
+.dark .hover\:border-gray-300:hover { border-color: #474e5d; }
+
+/* ---- リング ---- */
+.dark .ring-neutral-200 { --tw-ring-color: #2a2f3a; }
+.dark .focus\:ring-blue-100:focus { --tw-ring-color: rgba(37, 99, 235, 0.25); }
+
+/* ---- アクセント（コールアウトの淡色背景 → 半透明ダーク） ---- */
+.dark .bg-blue-50,
+.dark .bg-blue-100,
+.dark .bg-blue-50\/50,
+.dark .bg-blue-50\/70 { background-color: rgba(37, 99, 235, 0.14); }
+.dark .hover\:bg-blue-50:hover { background-color: rgba(37, 99, 235, 0.2); }
+.dark .hover\:bg-blue-100:hover { background-color: rgba(37, 99, 235, 0.26); }
+.dark .bg-red-50 { background-color: rgba(220, 38, 38, 0.14); }
+.dark .hover\:bg-red-50:hover { background-color: rgba(220, 38, 38, 0.2); }
+.dark .bg-amber-50,
+.dark .bg-amber-100,
+.dark .bg-yellow-50,
+.dark .bg-yellow-100 { background-color: rgba(217, 119, 6, 0.16); }
+.dark .hover\:bg-amber-100:hover { background-color: rgba(217, 119, 6, 0.24); }
+.dark .bg-emerald-50,
+.dark .bg-emerald-100 { background-color: rgba(16, 185, 129, 0.14); }
+.dark .hover\:bg-emerald-50:hover { background-color: rgba(16, 185, 129, 0.2); }
+.dark .bg-orange-50 { background-color: rgba(234, 88, 12, 0.14); }
+.dark .bg-indigo-50 { background-color: rgba(99, 102, 241, 0.14); }
+.dark .bg-violet-100 { background-color: rgba(139, 92, 246, 0.16); }
+.dark .bg-rose-100 { background-color: rgba(244, 63, 94, 0.16); }
+.dark .bg-cyan-100 { background-color: rgba(8, 145, 178, 0.16); }
+
+/* ---- アクセント文字色（淡色背景上での可読性のため明色化） ---- */
+.dark .text-blue-900,
+.dark .text-blue-800,
+.dark .text-blue-700,
+.dark .text-blue-600 { color: #7eb3fb; }
+.dark .hover\:text-blue-900:hover,
+.dark .hover\:text-blue-800:hover,
+.dark .hover\:text-blue-700:hover,
+.dark .hover\:text-blue-600:hover { color: #bfdbfe; }
+.dark .text-red-800,
+.dark .text-red-700,
+.dark .text-red-600,
+.dark .text-red-500 { color: #fca5a5; }
+.dark .hover\:text-red-800:hover,
+.dark .hover\:text-red-700:hover,
+.dark .hover\:text-red-600:hover { color: #fecaca; }
+.dark .text-emerald-700,
+.dark .text-emerald-600 { color: #6ee7b7; }
+.dark .text-amber-800,
+.dark .text-amber-700,
+.dark .text-amber-600,
+.dark .text-yellow-800,
+.dark .text-yellow-700,
+.dark .text-yellow-500 { color: #fcd34d; }
+.dark .text-indigo-800,
+.dark .text-indigo-700,
+.dark .text-indigo-600 { color: #a5b4fc; }
+.dark .hover\:text-indigo-800:hover { color: #c7d2fe; }
+.dark .hover\:text-violet-900:hover { color: #ddd6fe; }
+.dark .text-orange-600 { color: #fdba74; }
+
+/* ---- アクセントボーダー ---- */
+.dark .border-blue-200,
+.dark .border-blue-300,
+.dark .border-blue-100,
+.dark .border-blue-400,
+.dark .border-blue-500 { border-color: rgba(96, 165, 250, 0.4); }
+.dark .hover\:border-blue-300:hover,
+.dark .hover\:border-blue-200:hover { border-color: rgba(96, 165, 250, 0.55); }
+.dark .border-amber-200,
+.dark .border-yellow-200 { border-color: rgba(251, 191, 36, 0.35); }
+.dark .border-red-200,
+.dark .border-red-100 { border-color: rgba(248, 113, 113, 0.35); }
+.dark .border-emerald-300,
+.dark .border-emerald-200,
+.dark .border-emerald-100 { border-color: rgba(52, 211, 153, 0.35); }
+.dark .border-indigo-200 { border-color: rgba(129, 140, 248, 0.35); }
