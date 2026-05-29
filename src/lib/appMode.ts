@@ -1,10 +1,13 @@
 /**
  * アプリの動作モード。
  *
- * NEXT_PUBLIC_VIEWER_ONLY=true でビルド/起動すると「閲覧専用エディション」になり、
- * 新規作成・編集・下書き機能が無効化され、ホームが手順書一覧（閲覧）になる。
- * 未設定（既定）では従来どおり作成・編集が可能な資材課エディションとして動作する。
- *
- * NEXT_PUBLIC_ プレフィックスのため、この値はビルド時にクライアントへ埋め込まれる。
+ * 実体は課別設定（src/config/departments.ts）に集約されており、
+ * ここではよく使う値を再エクスポートする薄いラッパー。
+ * どの課で動くかは環境変数 NEXT_PUBLIC_DEPARTMENT で決まる。
  */
-export const VIEWER_ONLY = process.env.NEXT_PUBLIC_VIEWER_ONLY === 'true';
+import { DEPARTMENT } from '@/config/departments';
+
+export { DEPARTMENT };
+
+/** 閲覧専用エディションか（作成・編集・下書きを無効化し、ホームを手順書一覧にする）。 */
+export const VIEWER_ONLY = DEPARTMENT.viewerOnly;
