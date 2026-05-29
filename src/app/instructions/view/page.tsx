@@ -478,7 +478,7 @@ function InstructionViewContent() {
       <main className="min-w-0 w-full max-w-4xl">
       <div className="flex flex-wrap items-center gap-2 mb-6 no-print">
         <div className="flex-1" />
-        {appViewUrl && (
+        {appViewUrl && !VIEWER_ONLY && (
           <button
             onClick={handleCopyViewUrl}
             className="px-3 py-1.5 bg-slate-50 border border-slate-200 text-slate-600 rounded-lg text-sm hover:bg-slate-100 transition"
