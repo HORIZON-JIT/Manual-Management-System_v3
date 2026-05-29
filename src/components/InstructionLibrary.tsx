@@ -236,11 +236,9 @@ export default function InstructionLibrary() {
   const displayName = (file: DriveFileInfo) =>
     meta[file.id]?.title || file.name.replace(/\.json$/i, '');
 
-  // 対象フォルダを Google Drive で開く（Drive内蔵のGeminiで質問・要約できる）
+  // Google Drive の Gemini 相談ページを開く（手順書について質問・要約できる）
   const openDriveGemini = () => {
-    const folder = getTargetFolder();
-    if (!folder) return;
-    window.open(`https://drive.google.com/drive/folders/${folder.id}`, '_blank', 'noopener,noreferrer');
+    window.open('https://drive.google.com/drive/ai', '_blank', 'noopener,noreferrer');
   };
 
   // カテゴリ一覧（チップ用）
@@ -314,12 +312,12 @@ export default function InstructionLibrary() {
               type="button"
               onClick={openDriveGemini}
               className="inline-flex shrink-0 items-center gap-2 rounded-full border border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 px-4 py-2.5 text-sm font-semibold text-blue-700 shadow-[0_8px_18px_rgba(37,99,235,0.08)] transition hover:border-blue-300 hover:from-blue-100 hover:to-indigo-100"
-              title="Google Drive を開いて、フォルダ内の手順書について Gemini に質問・要約できます"
+              title="Google Drive の Gemini 相談ページを開いて、手順書について質問・要約できます"
             >
               <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M12 2c.4 4.6 3.4 7.6 8 8-4.6.4-7.6 3.4-8 8-.4-4.6-3.4-7.6-8-8 4.6-.4 7.6-3.4 8-8z" />
               </svg>
-              Geminiに質問（Driveで開く）
+              Geminiに質問
             </button>
           )}
         </div>
