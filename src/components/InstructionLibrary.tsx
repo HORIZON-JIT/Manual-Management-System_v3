@@ -2,10 +2,12 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import { getCategoryLabel } from '@/types/instruction';
 import {
   DriveFileInfo,
   getTargetFolder,
   listJsonFilesInFolder,
+  downloadDriveFile,
 } from '@/lib/googleDrive';
 import {
   isGoogleConfigured,
@@ -15,8 +17,19 @@ import {
   signIn,
   initGoogleAuth,
 } from '@/lib/googleAuth';
+import {
+  recordView,
+  getViewStats,
+  getMetaCache,
+  saveMetaCache,
+  CachedMeta,
+  ViewStat,
+} from '@/lib/viewerLibrary';
 
-type SortOrder = 'updated-desc' | 'updated-asc' | 'name-asc';
+type SortOrder = 'frequent' | 'updated-desc' | 'name-asc';
+
+const ALL = '__all__';
+const FREQUENT_THRESHOLD = 3;
 
 function formatDate(value?: string): string | null {
   if (!value) return null;
@@ -26,8 +39,6 @@ function formatDate(value?: string): string | null {
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
   }).format(date);
 }
 
@@ -35,14 +46,23 @@ export default function InstructionLibrary() {
   const router = useRouter();
   const [auth, setAuth] = useState<GoogleAuthState>(getAuthState());
   const [files, setFiles] = useState<DriveFileInfo[]>([]);
+  const [meta, setMeta] = useState<Record<string, CachedMeta>>({});
+  const [stats, setStats] = useState<Record<string, ViewStat>>({});
   const [loading, setLoading] = useState(false);
+  const [metaLoading, setMetaLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [folderName, setFolderName] = useState('');
   const [query, setQuery] = useState('');
-  const [sortOrder, setSortOrder] = useState<SortOrder>('updated-desc');
+  const [sortOrder, setSortOrder] = useState<SortOrder>('frequent');
+  const [category, setCategory] = useState<string>(ALL);
   const [opening, setOpening] = useState<string | null>(null);
 
   const configured = isGoogleConfigured();
+
+  useEffect(() => {
+    setStats(getViewStats());
+    setMeta(getMetaCache());
+  }, []);
 
   useEffect(() => {
     if (!configured) return;
@@ -80,36 +100,128 @@ export default function InstructionLibrary() {
     loadFiles();
   }, [configured, auth.isSignedIn, loadFiles]);
 
+  // 一覧取得後、各手順書のタイトル・カテゴリを取得（キャッシュ優先）
+  useEffect(() => {
+    if (files.length === 0) return;
+    const cache = getMetaCache();
+    const stale = files.filter(
+      (f) => !cache[f.id] || cache[f.id].modifiedTime !== f.modifiedTime,
+    );
+    if (stale.length === 0) {
+      setMeta(cache);
+      return;
+    }
+
+    let cancelled = false;
+    setMetaLoading(true);
+    Promise.all(
+      stale.map(async (f) => {
+        try {
+          const content = await downloadDriveFile(f.id);
+          const json = JSON.parse(content) as { title?: string; category?: string };
+          return {
+            id: f.id,
+            meta: {
+              title: json.title?.trim() || f.name.replace(/\.json$/i, ''),
+              category: json.category?.trim() || '',
+              modifiedTime: f.modifiedTime,
+            } as CachedMeta,
+          };
+        } catch {
+          return {
+            id: f.id,
+            meta: {
+              title: f.name.replace(/\.json$/i, ''),
+              category: '',
+              modifiedTime: f.modifiedTime,
+            } as CachedMeta,
+          };
+        }
+      }),
+    )
+      .then((results) => {
+        if (cancelled) return;
+        const next = { ...cache };
+        results.forEach((r) => {
+          next[r.id] = r.meta;
+        });
+        // 一覧に無いファイルのキャッシュは掃除する
+        const validIds = new Set(files.map((f) => f.id));
+        Object.keys(next).forEach((id) => {
+          if (!validIds.has(id)) delete next[id];
+        });
+        setMeta(next);
+        saveMetaCache(next);
+      })
+      .finally(() => {
+        if (!cancelled) setMetaLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [files]);
+
   const handleOpen = (file: DriveFileInfo) => {
+    recordView(file.id);
+    setStats(getViewStats());
     setOpening(file.id);
     router.push(`/instructions/view?driveFileId=${file.id}`);
   };
 
+  const displayName = (file: DriveFileInfo) =>
+    meta[file.id]?.title || file.name.replace(/\.json$/i, '');
+
+  // カテゴリ一覧（チップ用）
+  const categories = Array.from(
+    new Set(
+      files
+        .map((f) => meta[f.id]?.category)
+        .filter((c): c is string => !!c),
+    ),
+  ).sort((a, b) => a.localeCompare(b, 'ja'));
+
   const filteredFiles = [...files]
-    .filter((file) => {
+    .filter((f) => {
       const q = query.trim().toLowerCase();
       if (!q) return true;
-      return file.name.toLowerCase().includes(q);
+      return displayName(f).toLowerCase().includes(q) || f.name.toLowerCase().includes(q);
     })
+    .filter((f) => (category === ALL ? true : meta[f.id]?.category === category))
     .sort((a, b) => {
-      if (sortOrder === 'name-asc') return a.name.localeCompare(b.name, 'ja');
-      const aTime = a.modifiedTime ? new Date(a.modifiedTime).getTime() : 0;
-      const bTime = b.modifiedTime ? new Date(b.modifiedTime).getTime() : 0;
-      return sortOrder === 'updated-desc' ? bTime - aTime : aTime - bTime;
+      if (sortOrder === 'name-asc') return displayName(a).localeCompare(displayName(b), 'ja');
+      if (sortOrder === 'frequent') {
+        const sa = stats[a.id];
+        const sb = stats[b.id];
+        const ca = sa?.count ?? 0;
+        const cb = sb?.count ?? 0;
+        if (cb !== ca) return cb - ca;
+        const la = sa?.lastViewedAt ?? 0;
+        const lb = sb?.lastViewedAt ?? 0;
+        if (lb !== la) return lb - la;
+      }
+      const at = a.modifiedTime ? new Date(a.modifiedTime).getTime() : 0;
+      const bt = b.modifiedTime ? new Date(b.modifiedTime).getTime() : 0;
+      return bt - at;
     });
 
   const needsSignIn = configured && !auth.isSignedIn;
 
+  const chipBase =
+    'inline-flex min-h-11 shrink-0 items-center rounded-full border px-4 text-sm font-medium transition';
+  const chipActive = 'border-[#a48149] bg-[#f7f3ec] text-[#8a6a37]';
+  const chipIdle = 'border-neutral-200 bg-white text-neutral-600 hover:border-neutral-300';
+
   return (
-    <div className="mx-auto flex min-h-[calc(100vh-76px)] max-w-7xl flex-col px-6 py-8 lg:py-10">
-      <section className="border-b border-neutral-200 pb-6">
-        <div className="mb-5 h-px w-16 bg-[#a48149]" />
-        <p className="mb-3 text-xs font-semibold tracking-[0.28em] text-[#8a6a37]">HORIZON JIT</p>
+    <div className="mx-auto flex min-h-[calc(100vh-76px)] max-w-7xl flex-col px-4 py-6 sm:px-6 lg:py-8">
+      <section className="border-b border-neutral-200 pb-5">
+        <div className="mb-4 h-px w-16 bg-[#a48149]" />
+        <p className="mb-2 text-xs font-semibold tracking-[0.28em] text-[#8a6a37]">HORIZON JIT</p>
         <h1 className="text-3xl font-semibold leading-[1.05] tracking-[-0.02em] text-neutral-950 sm:text-4xl">
           手順書ビューア
         </h1>
-        <p className="mt-4 max-w-xl text-[15px] leading-7 text-neutral-600">
-          一覧から手順書を選んで閲覧できます。閲覧専用のため作成・編集はできません。
+        <p className="mt-3 max-w-xl text-sm leading-7 text-neutral-600 sm:text-[15px]">
+          一覧から手順書を選んで閲覧できます。
         </p>
       </section>
 
@@ -125,9 +237,9 @@ export default function InstructionLibrary() {
             <button
               type="button"
               onClick={signIn}
-              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-neutral-200 bg-neutral-950 px-5 text-sm font-semibold text-white shadow-[0_12px_28px_rgba(0,0,0,0.16)] transition hover:bg-neutral-800"
+              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-md border border-neutral-200 bg-neutral-950 px-6 text-base font-semibold text-white shadow-[0_12px_28px_rgba(0,0,0,0.16)] transition hover:bg-neutral-800"
             >
-              <svg className="h-4 w-4" viewBox="0 0 24 24">
+              <svg className="h-5 w-5" viewBox="0 0 24 24">
                 <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" />
                 <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
                 <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
@@ -139,57 +251,81 @@ export default function InstructionLibrary() {
         </section>
       ) : (
         <>
-          <section className="mt-7 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-            <label className="block w-full sm:max-w-sm">
-              <span className="mb-1.5 block text-xs font-medium text-neutral-500">手順書を検索</span>
+          {/* 検索・並び替え（タッチ向けに大きめ） */}
+          <section className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
+            <label className="relative block w-full sm:max-w-md">
+              <svg className="pointer-events-none absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="m21 21-4.35-4.35m1.6-5.15a6.75 6.75 0 1 1-13.5 0 6.75 6.75 0 0 1 13.5 0Z" />
+              </svg>
               <input
                 type="text"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="タイトルで検索"
-                className="w-full rounded-lg border border-neutral-200 bg-white px-3 py-2.5 text-sm text-neutral-800 outline-none transition focus:border-[#c9b188]"
+                placeholder="手順書をさがす"
+                className="h-12 w-full rounded-xl border border-neutral-200 bg-white pl-11 pr-3 text-base text-neutral-800 outline-none transition focus:border-[#c9b188]"
               />
             </label>
-            <div className="flex items-center gap-3">
-              <label className="block">
-                <span className="mb-1.5 block text-xs font-medium text-neutral-500">並び替え</span>
-                <select
-                  value={sortOrder}
-                  onChange={(e) => setSortOrder(e.target.value as SortOrder)}
-                  className="rounded-lg border border-neutral-200 bg-white px-3 py-2.5 text-sm text-neutral-800 outline-none transition focus:border-[#c9b188]"
-                >
-                  <option value="updated-desc">更新が新しい順</option>
-                  <option value="updated-asc">更新が古い順</option>
-                  <option value="name-asc">名前順</option>
-                </select>
-              </label>
+            <div className="flex items-center gap-2 sm:ml-auto">
+              <select
+                value={sortOrder}
+                onChange={(e) => setSortOrder(e.target.value as SortOrder)}
+                className="h-12 rounded-xl border border-neutral-200 bg-white px-3 text-base text-neutral-800 outline-none transition focus:border-[#c9b188]"
+                aria-label="並び替え"
+              >
+                <option value="frequent">よく見る順</option>
+                <option value="updated-desc">更新が新しい順</option>
+                <option value="name-asc">名前順</option>
+              </select>
               <button
                 type="button"
                 onClick={loadFiles}
                 disabled={loading}
-                className="mt-5 inline-flex h-11 items-center gap-1.5 rounded-lg border border-neutral-200 bg-white px-4 text-sm font-medium text-neutral-600 transition hover:border-neutral-300 hover:text-neutral-950 disabled:opacity-50"
+                className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-neutral-200 bg-white text-neutral-600 transition hover:border-neutral-300 hover:text-neutral-950 disabled:opacity-50"
                 title="一覧を再読み込み"
+                aria-label="一覧を再読み込み"
               >
-                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                 </svg>
-                更新
               </button>
             </div>
           </section>
 
+          {/* カテゴリ絞り込みチップ */}
+          {categories.length > 0 && (
+            <section className="mt-4 -mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
+              <button
+                type="button"
+                onClick={() => setCategory(ALL)}
+                className={`${chipBase} ${category === ALL ? chipActive : chipIdle}`}
+              >
+                すべて
+              </button>
+              {categories.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => setCategory(c)}
+                  className={`${chipBase} ${category === c ? chipActive : chipIdle}`}
+                >
+                  {getCategoryLabel(c)}
+                </button>
+              ))}
+            </section>
+          )}
+
           <div className="mt-3 flex items-center justify-between text-xs text-neutral-400">
             <span>{folderName && `フォルダ: ${folderName}`}</span>
-            <span>{!loading && `${filteredFiles.length} 件`}</span>
+            <span>{metaLoading ? 'カテゴリを読み込み中...' : !loading && `${filteredFiles.length} 件`}</span>
           </div>
 
-          <section className="mt-3 flex-1">
+          <section className="mt-2 flex-1">
             {loading ? (
-              <div className="flex h-56 items-center justify-center rounded-lg border border-dashed border-neutral-200 bg-white text-sm text-neutral-400">
+              <div className="flex h-56 items-center justify-center rounded-xl border border-dashed border-neutral-200 bg-white text-sm text-neutral-400">
                 読み込み中...
               </div>
             ) : filteredFiles.length === 0 && !error ? (
-              <div className="flex h-56 items-center justify-center rounded-lg border border-dashed border-neutral-200 bg-white text-sm text-neutral-400">
+              <div className="flex h-56 items-center justify-center rounded-xl border border-dashed border-neutral-200 bg-white text-sm text-neutral-400">
                 条件に合う手順書がありません
               </div>
             ) : (
@@ -197,15 +333,16 @@ export default function InstructionLibrary() {
                 {filteredFiles.map((file) => {
                   const updatedAt = formatDate(file.modifiedTime);
                   const isOpening = opening === file.id;
-                  const displayName = file.name.replace(/\.json$/i, '');
+                  const cat = meta[file.id]?.category;
+                  const count = stats[file.id]?.count ?? 0;
                   return (
                     <li key={file.id}>
                       <button
                         onClick={() => handleOpen(file)}
                         disabled={opening !== null}
-                        className="group flex h-full w-full items-start gap-3 rounded-lg border border-neutral-200 bg-white px-4 py-4 text-left shadow-[0_8px_18px_rgba(0,0,0,0.04)] transition hover:border-[#d7c29b] hover:bg-[#faf7f1] disabled:cursor-wait disabled:opacity-60"
+                        className="group flex h-full min-h-[96px] w-full items-start gap-4 rounded-xl border border-neutral-200 bg-white px-4 py-5 text-left shadow-[0_8px_18px_rgba(0,0,0,0.04)] transition active:scale-[0.99] hover:border-[#d7c29b] hover:bg-[#faf7f1] disabled:cursor-wait disabled:opacity-60"
                       >
-                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-emerald-100 bg-emerald-50 text-emerald-600">
+                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-emerald-100 bg-emerald-50 text-emerald-600">
                           {isOpening ? (
                             <span className="inline-block h-5 w-5 rounded-full border-2 border-emerald-300 border-t-emerald-600 animate-spin" />
                           ) : (
@@ -215,9 +352,25 @@ export default function InstructionLibrary() {
                           )}
                         </div>
                         <div className="min-w-0 flex-1">
-                          <p className="line-clamp-2 text-[15px] font-semibold leading-6 text-neutral-900">{displayName}</p>
-                          {updatedAt && <p className="mt-1 text-xs text-neutral-400">更新: {updatedAt}</p>}
+                          <p className="line-clamp-2 text-base font-semibold leading-6 text-neutral-900">{displayName(file)}</p>
+                          <div className="mt-2 flex flex-wrap items-center gap-2">
+                            {cat && (
+                              <span className="rounded-full border border-neutral-200 bg-neutral-50 px-2.5 py-0.5 text-xs font-medium text-neutral-600">
+                                {getCategoryLabel(cat)}
+                              </span>
+                            )}
+                            {count >= FREQUENT_THRESHOLD && (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-[#f7f3ec] px-2.5 py-0.5 text-xs font-medium text-[#8a6a37]">
+                                <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 24 24"><path d="m12 17.27 6.18 3.73-1.64-7.03L22 9.24l-7.19-.62L12 2 9.19 8.62 2 9.24l5.46 4.73L5.82 21z" /></svg>
+                                よく見る
+                              </span>
+                            )}
+                            {updatedAt && <span className="text-xs text-neutral-400">更新: {updatedAt}</span>}
+                          </div>
                         </div>
+                        <svg className="mt-1 h-5 w-5 shrink-0 text-neutral-300 transition group-hover:text-[#9a7a45]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
                       </button>
                     </li>
                   );
