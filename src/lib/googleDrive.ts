@@ -296,6 +296,7 @@ export async function saveFileToDrive(
   buffer: ArrayBuffer,
   fileName: string,
   mimeType: string,
+  options?: { modifiedTime?: string },
 ): Promise<string> {
   const token = gapi.client.getToken()?.access_token;
   if (!token) throw new Error('Google認証が必要です');
@@ -315,9 +316,11 @@ export async function saveFileToDrive(
   });
   const existingFileId = existingRes.result.files.length > 0 ? existingRes.result.files[0].id : null;
 
-  const metadata = existingFileId
+  const metadata: Record<string, unknown> = existingFileId
     ? { name: fileName, mimeType }
     : { name: fileName, mimeType, parents: [folderId] };
+  // 更新日時を据え置きたい場合は明示指定する（指定しないとDriveが現在時刻に更新する）
+  if (options?.modifiedTime) metadata.modifiedTime = options.modifiedTime;
 
   // Use resumable upload for reliability with large files
   // For new files, include fields=id so the upload response returns the file ID

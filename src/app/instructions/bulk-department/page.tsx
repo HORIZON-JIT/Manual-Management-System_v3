@@ -27,6 +27,7 @@ interface Row {
   name: string;
   title: string;
   department: string;
+  modifiedTime?: string;
   selected: boolean;
 }
 
@@ -76,7 +77,14 @@ function BulkDepartmentTool() {
             } catch {
               // ignore parse errors; keep filename
             }
-            return { id: f.id, name: f.name, title, department: dept, selected: false } as Row;
+            return {
+              id: f.id,
+              name: f.name,
+              title,
+              department: dept,
+              modifiedTime: f.modifiedTime,
+              selected: false,
+            } as Row;
           }),
         );
         setRows(loaded);
@@ -124,7 +132,8 @@ function BulkDepartmentTool() {
         const json = JSON.parse(await downloadDriveFile(row.id)) as WorkInstruction;
         json.department = department;
         const buffer = new TextEncoder().encode(JSON.stringify(json)).buffer;
-        await saveFileToDrive(buffer, row.name, 'application/json');
+        // 更新日時は据え置く（部署付与だけのため）
+        await saveFileToDrive(buffer, row.name, 'application/json', { modifiedTime: row.modifiedTime });
         ok += 1;
         setRows((prev) =>
           prev.map((r) => (r.id === row.id ? { ...r, department, selected: false } : r)),
