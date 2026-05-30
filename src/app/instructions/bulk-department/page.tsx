@@ -18,7 +18,7 @@ import {
   signIn,
   initGoogleAuth,
 } from '@/lib/googleAuth';
-import { getCustomDepartments } from '@/lib/customDepartments';
+import { getCustomDepartments, addCustomDepartment } from '@/lib/customDepartments';
 import { VIEWER_ONLY } from '@/lib/appMode';
 import EditorOnlyNotice from '@/components/EditorOnlyNotice';
 
@@ -27,6 +27,7 @@ interface Row {
   name: string;
   title: string;
   department: string;
+  modifiedTime?: string;
   selected: boolean;
 }
 
@@ -40,11 +41,27 @@ function BulkDepartmentTool() {
   const [applying, setApplying] = useState(false);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
   const [result, setResult] = useState<{ ok: number; ng: number } | null>(null);
+  const [customDepartments, setCustomDepartments] = useState<string[]>([]);
+  const [showAddDepartment, setShowAddDepartment] = useState(false);
+  const [newDepartment, setNewDepartment] = useState('');
 
   const configured = isGoogleConfigured();
   const departmentOptions = Array.from(
-    new Set([...DEPARTMENT_OPTIONS, ...getCustomDepartments()]),
+    new Set([...DEPARTMENT_OPTIONS, ...customDepartments]),
   );
+
+  useEffect(() => {
+    setCustomDepartments(getCustomDepartments());
+  }, []);
+
+  const handleAddDepartment = () => {
+    const name = newDepartment.trim();
+    if (!name) return;
+    setCustomDepartments(addCustomDepartment(name));
+    setDepartment(name);
+    setNewDepartment('');
+    setShowAddDepartment(false);
+  };
 
   useEffect(() => {
     if (!configured) return;
@@ -76,7 +93,14 @@ function BulkDepartmentTool() {
             } catch {
               // ignore parse errors; keep filename
             }
-            return { id: f.id, name: f.name, title, department: dept, selected: false } as Row;
+            return {
+              id: f.id,
+              name: f.name,
+              title,
+              department: dept,
+              modifiedTime: f.modifiedTime,
+              selected: false,
+            } as Row;
           }),
         );
         setRows(loaded);
@@ -124,7 +148,8 @@ function BulkDepartmentTool() {
         const json = JSON.parse(await downloadDriveFile(row.id)) as WorkInstruction;
         json.department = department;
         const buffer = new TextEncoder().encode(JSON.stringify(json)).buffer;
-        await saveFileToDrive(buffer, row.name, 'application/json');
+        // 更新日時は据え置く（部署付与だけのため）
+        await saveFileToDrive(buffer, row.name, 'application/json', { modifiedTime: row.modifiedTime });
         ok += 1;
         setRows((prev) =>
           prev.map((r) => (r.id === row.id ? { ...r, department, selected: false } : r)),
@@ -169,15 +194,45 @@ function BulkDepartmentTool() {
       ) : (
         <>
           <div className="mt-6 flex flex-wrap items-end gap-3 rounded-lg border border-slate-200 bg-white p-4">
-            <label className="block">
+            <div>
               <span className="mb-1.5 block text-xs font-medium text-slate-500">割り当てる部署</span>
-              <select value={department} onChange={(e) => setDepartment(e.target.value)} className={`${fieldClass} h-11`}>
-                <option value="">選択してください</option>
-                {departmentOptions.map((d) => (
-                  <option key={d} value={d}>{d}</option>
-                ))}
-              </select>
-            </label>
+              {showAddDepartment ? (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={newDepartment}
+                    onChange={(e) => setNewDepartment(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleAddDepartment();
+                      }
+                    }}
+                    placeholder="部署名を入力"
+                    autoFocus
+                    className={`${fieldClass} h-11`}
+                  />
+                  <button onClick={handleAddDepartment} className="shrink-0 rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800">追加</button>
+                  <button onClick={() => { setShowAddDepartment(false); setNewDepartment(''); }} className="shrink-0 text-xs font-medium text-slate-500 transition hover:text-slate-950">やめる</button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <select value={department} onChange={(e) => setDepartment(e.target.value)} className={`${fieldClass} h-11`}>
+                    <option value="">選択してください</option>
+                    {departmentOptions.map((d) => (
+                      <option key={d} value={d}>{d}</option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddDepartment(true)}
+                    className="shrink-0 whitespace-nowrap text-xs font-medium text-slate-500 transition hover:text-slate-950"
+                  >
+                    + 部署を追加
+                  </button>
+                </div>
+              )}
+            </div>
             <div className="flex flex-wrap gap-2">
               <button onClick={() => setAll(true)} className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50">全選択</button>
               <button onClick={() => setAll(false)} className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50">全解除</button>
