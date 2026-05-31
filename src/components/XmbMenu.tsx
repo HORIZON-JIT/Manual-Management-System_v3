@@ -129,9 +129,7 @@ export default function XmbMenu({
               onFocus={() => setItem(i)}
               onClick={() => activate(it)}
               className={`group flex min-h-14 w-full items-center gap-4 rounded-xl border border-transparent px-3 py-3 text-left transition sm:px-4 ${
-                active
-                  ? 'sm:border-[#d7c29b] sm:bg-white sm:shadow-[0_8px_18px_rgba(0,0,0,0.06)]'
-                  : 'sm:opacity-60 sm:hover:opacity-100'
+                active ? 'xmb-item-active' : 'xmb-item-idle'
               }`}
             >
               <span
