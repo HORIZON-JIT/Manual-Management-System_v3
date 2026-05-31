@@ -230,7 +230,7 @@ function EditorHomePage() {
     },
     {
       key: 'bulk',
-      label: '管理',
+      label: '一括設定',
       icon: (
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3l8 4-8 4-8-4 8-4zM4 12l8 4 8-4M4 17l8 4 8-4" />
       ),
@@ -238,6 +238,15 @@ function EditorHomePage() {
         { ...find('/instructions/bulk-department'), description: '複数の手順書の部署をまとめて設定します。' },
         { ...find('/instructions/bulk-category'), description: '複数の手順書のカテゴリをまとめて設定します。' },
         { ...find('/instructions/bulk-sequential'), description: '読み飛ばし防止の設定をまとめて変更します。' },
+      ],
+    },
+    {
+      key: 'output',
+      label: '出力・保存',
+      icon: (
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+      ),
+      items: [
         { ...find('/instructions/backup'), description: '手順書のバックアップをDriveに作成します。' },
         {
           title: 'Excelで出力',
