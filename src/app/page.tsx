@@ -229,7 +229,7 @@ function EditorHomePage() {
         <p className="text-sm font-semibold text-neutral-500">Manual Management</p>
       </div>
 
-      <XmbMenu categories={categories} className="flex-1" />
+      <XmbMenu categories={categories} className="flex-none sm:flex-1" />
 
       {showAuthPrompt && (
         <section className="mt-6 rounded-lg border border-neutral-200 bg-white px-5 py-5 shadow-[0_18px_44px_rgba(0,0,0,0.06)]">
