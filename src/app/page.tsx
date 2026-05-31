@@ -205,12 +205,11 @@ function EditorHomePage() {
           ),
           onClick: handlePreviewClick,
         },
-        { ...find('/instructions/backup'), description: '手順書のバックアップをDriveに作成します。' },
       ],
     },
     {
       key: 'bulk',
-      label: '一括設定',
+      label: '管理',
       icon: (
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3l8 4-8 4-8-4 8-4zM4 12l8 4 8-4M4 17l8 4 8-4" />
       ),
@@ -218,6 +217,7 @@ function EditorHomePage() {
         { ...find('/instructions/bulk-department'), description: '複数の手順書の部署をまとめて設定します。' },
         { ...find('/instructions/bulk-category'), description: '複数の手順書のカテゴリをまとめて設定します。' },
         { ...find('/instructions/bulk-sequential'), description: '読み飛ばし防止の設定をまとめて変更します。' },
+        { ...find('/instructions/backup'), description: '手順書のバックアップをDriveに作成します。' },
       ],
     },
   ];
