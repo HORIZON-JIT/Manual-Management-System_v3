@@ -32,6 +32,8 @@ interface SharedDriveList {
   drives: SharedDrive[];
 }
 
+const childFolderRequests = new Map<string, Promise<DriveFolder>>();
+
 // --- Target folder management ---
 
 export function getTargetFolder(): DriveFolder | null {
@@ -127,20 +129,34 @@ export async function createNewFolder(name: string, parentId?: string): Promise<
 }
 
 export async function findOrCreateChildFolder(parentId: string, name: string): Promise<DriveFolder> {
-  const escapedName = name.replace(/'/g, "\\'");
-  const res = await gapi.client.request<DriveFileList>({
-    path: 'https://www.googleapis.com/drive/v3/files',
-    params: {
-      q: `name='${escapedName}' and '${parentId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
-      fields: 'files(id,name)',
-      pageSize: '1',
-      supportsAllDrives: 'true',
-      includeItemsFromAllDrives: 'true',
-    },
-  });
-  const existing = res.result.files[0];
-  if (existing) return { id: existing.id, name: existing.name };
-  return createNewFolder(name, parentId);
+  const key = `${parentId}:${name}`;
+  const pending = childFolderRequests.get(key);
+  if (pending) return pending;
+
+  const request = (async () => {
+    const escapedName = name.replace(/'/g, "\\'");
+    const res = await gapi.client.request<DriveFileList>({
+      path: 'https://www.googleapis.com/drive/v3/files',
+      params: {
+        q: `name='${escapedName}' and '${parentId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
+        fields: 'files(id,name)',
+        pageSize: '1',
+        supportsAllDrives: 'true',
+        includeItemsFromAllDrives: 'true',
+      },
+    });
+    const existing = res.result.files[0];
+    if (existing) return { id: existing.id, name: existing.name };
+    return createNewFolder(name, parentId);
+  })();
+
+  childFolderRequests.set(key, request);
+  try {
+    return await request;
+  } catch (error) {
+    childFolderRequests.delete(key);
+    throw error;
+  }
 }
 
 export async function copyDriveFile(

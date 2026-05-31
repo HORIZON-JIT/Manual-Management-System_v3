@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
   copyDriveFile,
@@ -42,6 +42,7 @@ function BackupTool() {
   const [progress, setProgress] = useState({ done: 0, total: 0 });
   const [result, setResult] = useState<{ ok: number; ng: number; path: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const applyingRef = useRef(false);
 
   const configured = isGoogleConfigured();
   const selectedRows = rows.filter((row) => row.selected);
@@ -91,11 +92,13 @@ function BackupTool() {
     setRows((prev) => prev.map((row) => ({ ...row, selected })));
 
   const apply = async () => {
+    if (applyingRef.current) return;
     const targetFolder = getTargetFolder();
     if (!targetFolder) return alert('保存先の Drive フォルダを設定してください。');
     if (selectedRows.length === 0) return alert('バックアップする JSON を選択してください。');
     if (!confirm(`選択した ${selectedRows.length} 件を「バックアップ/${dateFolderName}」へコピーします。更新日は保持します。よろしいですか？`)) return;
 
+    applyingRef.current = true;
     setApplying(true);
     setResult(null);
     setProgress({ done: 0, total: selectedRows.length });
@@ -126,6 +129,7 @@ function BackupTool() {
       console.error('Failed to prepare backup folder', err);
       setError('バックアップ先フォルダを作成できませんでした。Drive の権限を確認してください。');
     } finally {
+      applyingRef.current = false;
       setApplying(false);
     }
   };
