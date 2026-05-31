@@ -78,7 +78,7 @@ export default function XmbMenu({
 
   return (
     <div
-      className={`xmb-bg flex flex-col items-center justify-center rounded-2xl border border-neutral-200 px-4 py-10 ${className}`}
+      className={`xmb-bg flex flex-col items-center justify-start rounded-2xl border border-neutral-200 px-4 py-8 sm:justify-center sm:py-10 ${className}`}
     >
       {/* 横軸：カテゴリ */}
       <div className="flex w-full max-w-3xl items-end justify-start gap-6 overflow-x-auto pb-2 sm:justify-center sm:gap-12">
