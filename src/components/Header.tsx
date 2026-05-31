@@ -7,9 +7,11 @@ import GoogleSignInButton from './GoogleSignInButton';
 import DriveFolderPicker from './DriveFolderPicker';
 import HelpModal from './HelpModal';
 import ThemeToggle from './ThemeToggle';
-import { DEPARTMENT } from '@/lib/appMode';
+import { DEPARTMENT, VIEWER_ONLY } from '@/lib/appMode';
 import { getTargetFolder, DriveFolder } from '@/lib/googleDrive';
 import { isGoogleConfigured, getAuthState } from '@/lib/googleAuth';
+
+const VIEWER_URL = 'https://horizon-jit.github.io/Manual-Management-System_v3/viewer/';
 
 export default function Header() {
   const pathname = usePathname();
@@ -57,6 +59,16 @@ export default function Header() {
                 </svg>
               </button>
             )}
+            {!VIEWER_ONLY && (
+              <a
+                href={VIEWER_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex h-9 items-center justify-center rounded-md border border-neutral-200 bg-white px-3 text-sm font-semibold text-neutral-600 shadow-[0_6px_16px_rgba(0,0,0,0.04)] transition hover:border-neutral-300 hover:bg-neutral-50 hover:text-neutral-950"
+              >
+                Viwer
+              </a>
+            )}
             <ThemeToggle />
             <button
               onClick={() => setShowHelp(true)}
@@ -73,7 +85,7 @@ export default function Header() {
             </div>
             <button
               onClick={handleFolderClick}
-              className="flex max-w-[220px] items-center gap-2 rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-600 shadow-[0_8px_18px_rgba(0,0,0,0.06)] transition hover:border-[#a48149]/40 hover:bg-[#fbfaf7]"
+              className="brand-hover-border brand-hover-surface flex max-w-[220px] items-center gap-2 rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-600 shadow-[0_8px_18px_rgba(0,0,0,0.06)] transition"
               title={currentFolder ? `保存先: ${currentFolder.name}` : 'Driveフォルダを指定'}
             >
               <svg className="h-4 w-4 shrink-0 text-[#a48149]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -110,6 +122,16 @@ export default function Header() {
             >
               使い方
             </button>
+            {!VIEWER_ONLY && (
+              <a
+                href={VIEWER_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex w-full items-center gap-2 rounded-md px-3 py-2.5 text-sm font-medium text-neutral-600 transition hover:bg-neutral-100 hover:text-neutral-950"
+              >
+                Viwer
+              </a>
+            )}
             <div className="px-3 py-2">
               <GoogleSignInButton />
             </div>

@@ -184,10 +184,10 @@ export default function DriveJsonFilePicker({ open, onClose, onFileLoaded }: Dri
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-3 sm:p-6">
-      <div className="flex max-h-[88vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-neutral-200 bg-[#fcfbf8] shadow-[0_28px_80px_rgba(15,23,42,0.18)]">
+      <div className="brand-panel flex max-h-[88vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-neutral-200 shadow-[0_28px_80px_rgba(15,23,42,0.18)]">
         <div className="flex items-start justify-between gap-6 border-b border-neutral-200 px-6 py-5 sm:px-7">
           <div>
-            <p className="text-[11px] font-semibold tracking-[0.22em] text-[#9a7a45]">DRIVE FILES</p>
+            <p className="brand-text-muted text-[11px] font-semibold tracking-[0.22em]">DRIVE FILES</p>
             <h3 className="mt-2 text-2xl font-semibold tracking-tight text-neutral-950">手順書ファイルを選択</h3>
             {folderName && (
               <p className="mt-2 text-sm text-neutral-500">
@@ -217,7 +217,7 @@ export default function DriveJsonFilePicker({ open, onClose, onFileLoaded }: Dri
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder="ファイル名を入力"
-                  className="w-full rounded-xl border border-neutral-200 bg-[#fcfbf8] px-3 py-2.5 text-sm text-neutral-800 outline-none transition focus:border-[#c9b188] focus:bg-white"
+                  className="brand-panel w-full rounded-xl border border-neutral-200 px-3 py-2.5 text-sm text-neutral-800 outline-none transition focus:border-[#c9b188] focus:bg-white"
                 />
               </label>
 
@@ -226,7 +226,7 @@ export default function DriveJsonFilePicker({ open, onClose, onFileLoaded }: Dri
                 <select
                   value={sortOrder}
                   onChange={(e) => setSortOrder(e.target.value as SortOrder)}
-                  className="w-full rounded-xl border border-neutral-200 bg-[#fcfbf8] px-3 py-2.5 text-sm text-neutral-800 outline-none transition focus:border-[#c9b188] focus:bg-white"
+                  className="brand-panel w-full rounded-xl border border-neutral-200 px-3 py-2.5 text-sm text-neutral-800 outline-none transition focus:border-[#c9b188] focus:bg-white"
                 >
                   <option value="updated-desc">新しい順</option>
                   <option value="updated-asc">古い順</option>
@@ -238,7 +238,7 @@ export default function DriveJsonFilePicker({ open, onClose, onFileLoaded }: Dri
                 <select
                   value={createdByFilter}
                   onChange={(e) => setCreatedByFilter(e.target.value)}
-                  className="w-full rounded-xl border border-neutral-200 bg-[#fcfbf8] px-3 py-2.5 text-sm text-neutral-800 outline-none transition focus:border-[#c9b188] focus:bg-white"
+                  className="brand-panel w-full rounded-xl border border-neutral-200 px-3 py-2.5 text-sm text-neutral-800 outline-none transition focus:border-[#c9b188] focus:bg-white"
                 >
                   <option value="all">すべて</option>
                   {createdByOptions.map((name) => (
@@ -254,7 +254,7 @@ export default function DriveJsonFilePicker({ open, onClose, onFileLoaded }: Dri
                 <select
                   value={updatedByFilter}
                   onChange={(e) => setUpdatedByFilter(e.target.value)}
-                  className="w-full rounded-xl border border-neutral-200 bg-[#fcfbf8] px-3 py-2.5 text-sm text-neutral-800 outline-none transition focus:border-[#c9b188] focus:bg-white"
+                  className="brand-panel w-full rounded-xl border border-neutral-200 px-3 py-2.5 text-sm text-neutral-800 outline-none transition focus:border-[#c9b188] focus:bg-white"
                 >
                   <option value="all">すべて</option>
                   {updatedByOptions.map((name) => (
@@ -292,7 +292,7 @@ export default function DriveJsonFilePicker({ open, onClose, onFileLoaded }: Dri
                     <button
                       onClick={() => handleFileSelect(file)}
                       disabled={downloading !== null}
-                      className="group flex w-full items-center gap-4 rounded-2xl border border-neutral-200 bg-white px-4 py-4 text-left transition hover:border-[#d7c29b] hover:bg-[#faf7f1] disabled:cursor-wait disabled:opacity-60"
+                      className="brand-hover-border brand-hover-surface group flex w-full items-center gap-4 rounded-2xl border border-neutral-200 bg-white px-4 py-4 text-left transition disabled:cursor-wait disabled:opacity-60"
                     >
                       <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-emerald-100 bg-emerald-50 text-emerald-600">
                         {isLoading ? (
@@ -314,7 +314,7 @@ export default function DriveJsonFilePicker({ open, onClose, onFileLoaded }: Dri
                         </div>
                       </div>
 
-                      <div className="shrink-0 text-neutral-300 transition group-hover:text-[#9a7a45]">
+                      <div className="group-hover-brand-text shrink-0 text-neutral-300 transition">
                         <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                         </svg>

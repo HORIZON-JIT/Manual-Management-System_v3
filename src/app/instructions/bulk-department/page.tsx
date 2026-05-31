@@ -4,7 +4,6 @@ import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { WorkInstruction, DEPARTMENT_OPTIONS } from '@/types/instruction';
 import {
-  DriveFileInfo,
   getTargetFolder,
   listJsonFilesInFolder,
   downloadDriveFile,
@@ -51,7 +50,7 @@ function BulkDepartmentTool() {
   );
 
   useEffect(() => {
-    setCustomDepartments(getCustomDepartments());
+    queueMicrotask(() => setCustomDepartments(getCustomDepartments()));
   }, []);
 
   const handleAddDepartment = () => {
@@ -112,7 +111,7 @@ function BulkDepartmentTool() {
 
   useEffect(() => {
     if (configured && !auth.isSignedIn) return;
-    load();
+    queueMicrotask(load);
   }, [configured, auth.isSignedIn, load]);
 
   const toggle = (id: string) =>

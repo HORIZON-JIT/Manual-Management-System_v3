@@ -8,8 +8,10 @@ export default function ThemeToggle() {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setThemeState(resolveInitialTheme());
-    setMounted(true);
+    queueMicrotask(() => {
+      setThemeState(resolveInitialTheme());
+      setMounted(true);
+    });
   }, []);
 
   const toggle = () => {

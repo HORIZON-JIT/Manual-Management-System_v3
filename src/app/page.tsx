@@ -94,19 +94,6 @@ function EditorHomePage() {
   const [showJsonPicker, setShowJsonPicker] = useState(false);
   const [showPreviewPicker, setShowPreviewPicker] = useState(false);
   const [showExcelPicker, setShowExcelPicker] = useState(false);
-  const [version, setVersion] = useState('');
-
-  useEffect(() => {
-    fetch('https://api.github.com/repos/HORIZON-JIT/FC/pulls?state=closed&per_page=1', {
-      headers: { Accept: 'application/vnd.github.v3+json' },
-    })
-      .then((res) => {
-        const link = res.headers.get('Link') ?? '';
-        const match = link.match(/[?&]page=(\d+)>;\s*rel="last"/);
-        if (match) setVersion(`1.${match[1]}`);
-      })
-      .catch(() => {});
-  }, []);
 
   useEffect(() => {
     if (!importError) return;
@@ -274,7 +261,7 @@ function EditorHomePage() {
   return (
     <div className="mx-auto flex min-h-[calc(100vh-76px)] max-w-7xl flex-col px-6 py-8 lg:py-10">
       <div className="mb-4 flex items-baseline justify-between">
-        <p className="text-xs font-semibold tracking-[0.28em] text-[#8a6a37]">HORIZON JIT</p>
+        <p className="brand-text text-xs font-semibold tracking-[0.28em]">HORIZON JIT</p>
         <p className="text-sm font-semibold text-neutral-500">Manual Management</p>
       </div>
 
@@ -328,7 +315,7 @@ function EditorHomePage() {
         <p>Developed by Yuma Tani</p>
         <div className="flex items-center gap-3">
           <span>Build 2026</span>
-          {version && <span>Version {version}</span>}
+          <span>Version 3.1</span>
         </div>
       </footer>
 

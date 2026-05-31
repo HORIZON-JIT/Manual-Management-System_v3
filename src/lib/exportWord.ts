@@ -11,8 +11,6 @@
   BorderStyle,
   AlignmentType,
   ShadingType,
-  HeadingLevel,
-  ExternalHyperlink,
 } from 'docx';
 import { saveAs } from 'file-saver';
 import { WorkInstruction, getCategoryLabel, getStepImages, getImageCaption } from '@/types/instruction';
@@ -137,13 +135,13 @@ export async function exportToWord(instruction: WorkInstruction): Promise<void> 
       shading: { type: ShadingType.SOLID, color: COLORS.grayLight },
       children: [
         new TextRun({
-          text: `繧ｫ繝・ざ繝ｪ・・{getCategoryLabel(instruction.category)}`,
+          text: `カテゴリ: ${getCategoryLabel(instruction.category)}`,
           size: 20,
           color: COLORS.dark,
           font: 'Arial',
         }),
         new TextRun({
-          text: `縲縲菴懈・・・{new Date(instruction.createdAt).toLocaleDateString('ja-JP')}縲譖ｴ譁ｰ・・{new Date(instruction.updatedAt).toLocaleDateString('ja-JP')}`,
+          text: `  作成: ${new Date(instruction.createdAt).toLocaleDateString('ja-JP')}  更新: ${new Date(instruction.updatedAt).toLocaleDateString('ja-JP')}`,
           size: 18,
           color: COLORS.gray,
           font: 'Arial',

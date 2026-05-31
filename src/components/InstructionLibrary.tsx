@@ -102,11 +102,13 @@ export default function InstructionLibrary() {
   const configured = isGoogleConfigured();
 
   useEffect(() => {
-    setStats(getViewStats());
-    setMeta(getMetaCache());
-    const saved = getSavedDepartment();
-    if (saved) setDepartment(saved);
-    setLayout(getSavedLayout());
+    queueMicrotask(() => {
+      setStats(getViewStats());
+      setMeta(getMetaCache());
+      const saved = getSavedDepartment();
+      if (saved) setDepartment(saved);
+      setLayout(getSavedLayout());
+    });
   }, []);
 
   const handleLayoutChange = (value: LibraryLayout) => {
@@ -153,7 +155,7 @@ export default function InstructionLibrary() {
 
   useEffect(() => {
     if (configured && !auth.isSignedIn) return;
-    loadFiles();
+    queueMicrotask(loadFiles);
   }, [configured, auth.isSignedIn, loadFiles]);
 
   // 一覧取得後、各手順書のタイトル・カテゴリを取得（キャッシュ優先）
@@ -168,12 +170,14 @@ export default function InstructionLibrary() {
         cache[f.id].searchText === undefined,
     );
     if (stale.length === 0) {
-      setMeta(cache);
+      queueMicrotask(() => setMeta(cache));
       return;
     }
 
     let cancelled = false;
-    setMetaLoading(true);
+    queueMicrotask(() => {
+      if (!cancelled) setMetaLoading(true);
+    });
     Promise.all(
       stale.map(async (f) => {
         try {
@@ -285,14 +289,14 @@ export default function InstructionLibrary() {
 
   const chipBase =
     'inline-flex min-h-11 shrink-0 items-center rounded-full border px-4 text-sm font-medium transition';
-  const chipActive = 'border-[#a48149] bg-[#f7f3ec] text-[#8a6a37]';
+  const chipActive = 'brand-border brand-surface brand-text';
   const chipIdle = 'border-neutral-200 bg-white text-neutral-600 hover:border-neutral-300';
 
   return (
     <div className="mx-auto flex min-h-[calc(100vh-76px)] max-w-7xl flex-col px-4 py-6 sm:px-6 lg:py-8">
       <section className="border-b border-neutral-200 pb-5">
         <div className="mb-4 h-px w-16 bg-[#a48149]" />
-        <p className="mb-2 text-xs font-semibold tracking-[0.28em] text-[#8a6a37]">HORIZON JIT</p>
+        <p className="brand-text mb-2 text-xs font-semibold tracking-[0.28em]">HORIZON JIT</p>
         <h1 className="text-3xl font-semibold leading-[1.05] tracking-[-0.02em] text-neutral-950 sm:text-4xl">
           手順書ビューア
         </h1>
@@ -370,7 +374,7 @@ export default function InstructionLibrary() {
                   type="button"
                   onClick={() => handleLayoutChange('list')}
                   className={`flex h-10 w-10 items-center justify-center rounded-lg transition ${
-                    layout === 'list' ? 'bg-[#f0e9db] text-[#8a6a37]' : 'text-neutral-500 hover:text-neutral-950'
+                    layout === 'list' ? 'brand-surface-strong brand-text' : 'text-neutral-500 hover:text-neutral-950'
                   }`}
                   title="リスト表示"
                   aria-label="リスト表示"
@@ -384,7 +388,7 @@ export default function InstructionLibrary() {
                   type="button"
                   onClick={() => handleLayoutChange('grid')}
                   className={`flex h-10 w-10 items-center justify-center rounded-lg transition ${
-                    layout === 'grid' ? 'bg-[#f0e9db] text-[#8a6a37]' : 'text-neutral-500 hover:text-neutral-950'
+                    layout === 'grid' ? 'brand-surface-strong brand-text' : 'text-neutral-500 hover:text-neutral-950'
                   }`}
                   title="グリッド表示"
                   aria-label="グリッド表示"
@@ -417,7 +421,7 @@ export default function InstructionLibrary() {
               <div className="mb-1.5 flex items-center gap-2">
                 <span className="text-xs font-semibold text-neutral-500">部署</span>
                 {department !== ALL && (
-                  <span className="inline-flex items-center gap-1 text-[11px] text-[#8a6a37]">
+                  <span className="brand-text inline-flex items-center gap-1 text-[11px]">
                     <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
                     この端末に記録中
                   </span>
@@ -498,7 +502,7 @@ export default function InstructionLibrary() {
                       <button
                         onClick={() => handleOpen(file)}
                         disabled={opening !== null}
-                        className={`group flex h-full w-full items-center gap-4 rounded-xl border border-neutral-200 bg-white text-left shadow-[0_8px_18px_rgba(0,0,0,0.04)] transition active:scale-[0.99] hover:border-[#d7c29b] hover:bg-[#faf7f1] disabled:cursor-wait disabled:opacity-60 ${
+                        className={`brand-hover-border brand-hover-surface group flex h-full w-full items-center gap-4 rounded-xl border border-neutral-200 bg-white text-left shadow-[0_8px_18px_rgba(0,0,0,0.04)] transition active:scale-[0.99] disabled:cursor-wait disabled:opacity-60 ${
                           layout === 'grid' ? 'min-h-[96px] items-start px-4 py-5' : 'px-4 py-3'
                         }`}
                       >
@@ -515,7 +519,7 @@ export default function InstructionLibrary() {
                           <p className={`text-base font-semibold leading-6 text-neutral-900 ${layout === 'grid' ? 'line-clamp-2' : 'line-clamp-1'}`}>{displayName(file)}</p>
                           <div className="mt-2 flex flex-wrap items-center gap-2">
                             {dept && (
-                              <span className="rounded-full border border-[#e3d6bb] bg-[#f7f3ec] px-2.5 py-0.5 text-xs font-medium text-[#8a6a37]">
+                              <span className="brand-border-soft brand-surface brand-text rounded-full border px-2.5 py-0.5 text-xs font-medium">
                                 {dept}
                               </span>
                             )}
@@ -525,7 +529,7 @@ export default function InstructionLibrary() {
                               </span>
                             )}
                             {count >= FREQUENT_THRESHOLD && (
-                              <span className="inline-flex items-center gap-1 rounded-full bg-[#f7f3ec] px-2.5 py-0.5 text-xs font-medium text-[#8a6a37]">
+                              <span className="brand-surface brand-text inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium">
                                 <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 24 24"><path d="m12 17.27 6.18 3.73-1.64-7.03L22 9.24l-7.19-.62L12 2 9.19 8.62 2 9.24l5.46 4.73L5.82 21z" /></svg>
                                 よく見る
                               </span>
@@ -533,7 +537,7 @@ export default function InstructionLibrary() {
                             {updatedAt && <span className="text-xs text-neutral-400">更新: {updatedAt}</span>}
                           </div>
                         </div>
-                        <svg className="mt-1 h-5 w-5 shrink-0 text-neutral-300 transition group-hover:text-[#9a7a45]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="group-hover-brand-text mt-1 h-5 w-5 shrink-0 text-neutral-300 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                         </svg>
                       </button>

@@ -25,7 +25,13 @@ export function generateShareUrl(
   // Fallback: strip images
   const stripped: WorkInstruction = {
     ...instruction,
-    steps: instruction.steps.map(({ imageDataUrl, imageDataUrls, imageCaptions, ...rest }) => rest),
+    steps: instruction.steps.map((step) => {
+      const strippedStep = { ...step };
+      delete strippedStep.imageDataUrl;
+      delete strippedStep.imageDataUrls;
+      delete strippedStep.imageCaptions;
+      return strippedStep;
+    }),
   };
   const strippedJson = JSON.stringify(stripped);
   const strippedCompressed = compressToEncodedURIComponent(strippedJson);

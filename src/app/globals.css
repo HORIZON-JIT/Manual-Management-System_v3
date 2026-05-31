@@ -63,6 +63,15 @@ select {
     border-color: rgba(164, 129, 73, 0.5);
     box-shadow: 0 8px 18px rgba(0, 0, 0, 0.45);
   }
+  .xmb-item-icon-active {
+    border-color: rgba(164, 129, 73, 0.6);
+    color: #8a6a37;
+    box-shadow: 0 0 0 3px rgba(164, 129, 73, 0.18);
+  }
+  .dark .xmb-item-icon-active {
+    border-color: rgba(215, 183, 124, 0.55);
+    color: #d7b77c;
+  }
   .xmb-item-idle {
     opacity: 0.6;
   }
@@ -114,6 +123,29 @@ html.dark {
   background-color: #ffffff;
   color: #0a0a0a;
 }
+
+/* ---- ブランドカラー ---- */
+.brand-panel { background-color: #fcfbf8; }
+.brand-surface { background-color: #f7f3ec; }
+.brand-surface-strong { background-color: #f0e9db; }
+.brand-text { color: #8a6a37; }
+.brand-text-muted { color: #9a7a45; }
+.brand-border { border-color: #a48149; }
+.brand-border-soft { border-color: #e3d6bb; }
+.brand-hover-surface:hover { background-color: #faf7f1; }
+.brand-hover-border:hover { border-color: #d7c29b; }
+
+.dark .brand-panel { background-color: #161922; }
+.dark .brand-surface,
+.dark .brand-surface-strong { background-color: #232834; }
+.dark .brand-text,
+.dark .brand-text-muted { color: #d7b77c; }
+.dark .brand-border { border-color: rgba(215, 183, 124, 0.7); }
+.dark .brand-border-soft { border-color: rgba(215, 183, 124, 0.35); }
+.dark .brand-hover-surface:hover { background-color: #232834; }
+.dark .brand-hover-border:hover { border-color: rgba(215, 183, 124, 0.55); }
+.group:hover .group-hover-brand-text { color: #9a7a45; }
+.dark .group:hover .group-hover-brand-text { color: #d7b77c; }
 
 /* ---- 背景（サーフェス） ---- */
 .dark .bg-white { background-color: #161922; }
@@ -208,9 +240,15 @@ html.dark {
 .dark .hover\:border-neutral-300:hover,
 .dark .hover\:border-gray-300:hover { border-color: #474e5d; }
 
+/* ---- 区切り線 ---- */
+.dark .divide-slate-100 > :not(:last-child),
+.dark .divide-neutral-100 > :not(:last-child),
+.dark .divide-gray-100 > :not(:last-child) { border-color: #2a2f3a; }
+
 /* ---- リング ---- */
 .dark .ring-neutral-200 { --tw-ring-color: #2a2f3a; }
 .dark .focus\:ring-blue-100:focus { --tw-ring-color: rgba(37, 99, 235, 0.25); }
+.dark .placeholder\:text-slate-400::placeholder { color: #888fa0; }
 
 /* ---- アクセント（コールアウトの淡色背景 → 半透明ダーク） ---- */
 .dark .bg-blue-50,
@@ -263,8 +301,18 @@ html.dark {
 .dark .text-indigo-700,
 .dark .text-indigo-600 { color: #a5b4fc; }
 .dark .hover\:text-indigo-800:hover { color: #c7d2fe; }
+.dark .text-violet-700,
+.dark .text-cyan-700,
+.dark .text-rose-700,
 .dark .hover\:text-violet-900:hover { color: #ddd6fe; }
 .dark .text-orange-600 { color: #fdba74; }
+
+/* ---- グラデーション ---- */
+.dark .from-slate-50 {
+  --tw-gradient-from: #1c2029;
+  --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-position), var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
+}
+.dark .to-blue-50\/50 { --tw-gradient-to: rgba(37, 99, 235, 0.14); }
 
 /* ---- アクセントボーダー ---- */
 .dark .border-blue-200,

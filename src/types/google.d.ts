@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-namespace */
-
 // Google Identity Services (GIS) Token Model
 declare namespace google.accounts.oauth2 {
   interface TokenClient {
