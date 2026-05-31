@@ -46,6 +46,11 @@ select {
   background: rgba(164, 129, 73, 0.18);
 }
 
+/* XMBメニューの没入グラデ背景（ライト/ダーク） */
+.xmb-bg {
+  background: radial-gradient(130% 90% at 18% 22%, #ffffff 0, #f6f3ec 55%, #efe9dc 100%);
+}
+
 @media print {
   header,
   .no-print {
@@ -73,6 +78,10 @@ html.dark {
 
 .dark ::selection {
   background: rgba(96, 165, 250, 0.32);
+}
+
+.dark .xmb-bg {
+  background: radial-gradient(130% 90% at 18% 22%, #1a1e27 0, #12151b 55%, #0c0e12 100%);
 }
 
 /* ---- 背景（サーフェス） ---- */

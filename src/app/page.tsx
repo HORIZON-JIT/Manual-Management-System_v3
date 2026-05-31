@@ -1,13 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { WorkInstruction } from '@/types/instruction';
 import { isGoogleConfigured, getAuthState, signIn } from '@/lib/googleAuth';
 import { DriveFileInfo } from '@/lib/googleDrive';
 import DriveJsonFilePicker from '@/components/DriveJsonFilePicker';
 import InstructionLibrary from '@/components/InstructionLibrary';
+import XmbMenu, { XmbCategory } from '@/components/XmbMenu';
 import { setTempData } from '@/lib/tempStorage';
 import { VIEWER_ONLY } from '@/lib/appMode';
 
@@ -168,70 +168,68 @@ function EditorHomePage() {
     }
   };
 
-  return (
-    <div className="mx-auto flex min-h-[calc(100vh-76px)] max-w-7xl flex-col px-6 py-8 lg:py-10">
-      <section className="border-b border-neutral-200 pb-8">
-        <div className="max-w-3xl">
-          <div className="mb-5 h-px w-16 bg-[#a48149]" />
-          <p className="mb-4 text-xs font-semibold tracking-[0.28em] text-[#8a6a37]">HORIZON JIT</p>
-          <h1 className="max-w-2xl text-4xl font-semibold leading-[1.03] tracking-[-0.03em] text-neutral-950 sm:text-5xl">
-            Manual Management
-          </h1>
-          <p className="mt-5 max-w-xl text-[15px] leading-7 text-neutral-600">
-            業務手順を、作成から保存・共有まで整えるためのワークスペースです。
-          </p>
-        </div>
-      </section>
-
-      <section className="mt-7 grid w-full flex-none gap-2 self-start rounded-lg border border-neutral-200 bg-white/70 p-2 shadow-[0_18px_44px_rgba(0,0,0,0.06)] sm:grid-cols-2 lg:grid-cols-4">
-        {actions.map((action) => (
-          <Link
-            key={action.title}
-            href={action.href}
-            className="group flex min-h-24 items-center gap-4 rounded-md px-4 py-4 transition hover:bg-[#f7f3ec]"
-          >
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-neutral-200 bg-white text-neutral-700 transition group-hover:border-[#a48149]/50 group-hover:text-[#8a6a37]">
-              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                {action.icon}
-              </svg>
-            </div>
-            <h2 className="text-base font-semibold leading-6 text-neutral-950">{action.title}</h2>
-          </Link>
-        ))}
-
-        <button
-          type="button"
-          onClick={handleUpdateClick}
-          className="group flex min-h-24 items-center gap-4 rounded-md px-4 py-4 text-left transition hover:bg-[#f7f3ec]"
-        >
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-neutral-200 bg-white text-neutral-700 transition group-hover:border-[#a48149]/50 group-hover:text-[#8a6a37]">
-            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-            </svg>
-          </div>
-          <h2 className="text-base font-semibold leading-6 text-neutral-950">
-            <span className="block">Driveの手順書を</span>
-            <span className="block">編集</span>
-          </h2>
-        </button>
-
-        <button
-          type="button"
-          onClick={handlePreviewClick}
-          className="group flex min-h-24 items-center gap-4 rounded-md px-4 py-4 text-left transition hover:bg-[#f7f3ec]"
-        >
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-neutral-200 bg-white text-neutral-700 transition group-hover:border-[#a48149]/50 group-hover:text-[#8a6a37]">
-            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+  const find = (href: string) => actions.find((a) => a.href === href)!;
+  const categories: XmbCategory[] = [
+    {
+      key: 'create',
+      label: '作成・編集',
+      icon: (
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 4H4v16h16v-7M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
+      ),
+      items: [
+        { ...find('/instructions/new'), description: '空のテンプレートから手順書を作成します。' },
+        { ...find('/instructions/drafts'), description: '保存済みの下書きを開いて編集します。' },
+      ],
+    },
+    {
+      key: 'bulk',
+      label: '一括設定',
+      icon: (
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3l8 4-8 4-8-4 8-4zM4 12l8 4 8-4M4 17l8 4 8-4" />
+      ),
+      items: [
+        { ...find('/instructions/bulk-department'), description: '複数の手順書の部署をまとめて設定します。' },
+        { ...find('/instructions/bulk-category'), description: '複数の手順書のカテゴリをまとめて設定します。' },
+        { ...find('/instructions/bulk-sequential'), description: '読み飛ばし防止の設定をまとめて変更します。' },
+      ],
+    },
+    {
+      key: 'drive',
+      label: 'Drive',
+      icon: (
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 15a4 4 0 004 4h10a4 4 0 000-8 5 5 0 00-9.584-1.5A3.5 3.5 0 003 15z" />
+      ),
+      items: [
+        {
+          title: 'Driveの手順書を編集',
+          description: 'Drive上のJSONを読み込んで編集します。',
+          icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />,
+          onClick: handleUpdateClick,
+        },
+        {
+          title: 'Driveの手順書を表示',
+          description: 'Drive上のJSONをそのまま表示します。',
+          icon: (
+            <>
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-            </svg>
-          </div>
-          <h2 className="text-base font-semibold leading-6 text-neutral-950">
-            <span className="block">Driveの手順書を</span>
-            <span className="block">表示</span>
-          </h2>
-        </button>
-      </section>
+            </>
+          ),
+          onClick: handlePreviewClick,
+        },
+        { ...find('/instructions/backup'), description: '手順書のバックアップをDriveに作成します。' },
+      ],
+    },
+  ];
+
+  return (
+    <div className="mx-auto flex min-h-[calc(100vh-76px)] max-w-7xl flex-col px-6 py-8 lg:py-10">
+      <div className="mb-4 flex items-baseline justify-between">
+        <p className="text-xs font-semibold tracking-[0.28em] text-[#8a6a37]">HORIZON JIT</p>
+        <p className="text-sm font-semibold text-neutral-500">Manual Management</p>
+      </div>
+
+      <XmbMenu categories={categories} className="flex-1" />
 
       {showAuthPrompt && (
         <section className="mt-6 rounded-lg border border-neutral-200 bg-white px-5 py-5 shadow-[0_18px_44px_rgba(0,0,0,0.06)]">
