@@ -81,7 +81,7 @@ export default function XmbMenu({
       className={`xmb-bg flex flex-col items-center justify-start rounded-2xl border border-neutral-200 px-4 py-8 sm:justify-center sm:py-10 ${className}`}
     >
       {/* 横軸：カテゴリ */}
-      <div className="flex w-full max-w-3xl items-end justify-start gap-6 overflow-x-auto pb-2 sm:justify-center sm:gap-12">
+      <div className="flex w-full max-w-3xl items-end justify-start gap-6 overflow-x-auto px-1 pb-2 pt-3 sm:justify-center sm:gap-12">
         {categories.map((c, i) => {
           const active = i === cat;
           return (
@@ -118,7 +118,7 @@ export default function XmbMenu({
       <div className="my-6 h-px w-full max-w-md bg-neutral-200" />
 
       {/* 縦軸：アクティブカテゴリの項目（最小高さを確保してカテゴリ位置が動かないようにする） */}
-      <div className="flex w-full max-w-md flex-col gap-2 min-h-[228px]">
+      <div className="flex w-full max-w-md flex-col gap-2 sm:min-h-[228px]">
         {items.map((it, i) => {
           const active = i === item;
           return (
@@ -128,17 +128,15 @@ export default function XmbMenu({
               onMouseEnter={() => setItem(i)}
               onFocus={() => setItem(i)}
               onClick={() => activate(it)}
-              className={`group flex min-h-14 w-full items-center gap-4 rounded-xl border px-4 py-3 text-left transition ${
+              className={`group flex min-h-14 w-full items-center gap-4 rounded-xl border border-transparent px-3 py-3 text-left transition sm:px-4 ${
                 active
-                  ? 'border-[#d7c29b] bg-white shadow-[0_8px_18px_rgba(0,0,0,0.06)]'
-                  : 'border-transparent bg-transparent opacity-60 hover:opacity-100'
+                  ? 'sm:border-[#d7c29b] sm:bg-white sm:shadow-[0_8px_18px_rgba(0,0,0,0.06)]'
+                  : 'sm:opacity-60 sm:hover:opacity-100'
               }`}
             >
               <span
-                className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border bg-white transition ${
-                  active
-                    ? 'border-[#a48149]/60 text-[#8a6a37] shadow-[0_0_0_3px_rgba(164,129,73,0.18)]'
-                    : 'border-neutral-200 text-neutral-500'
+                className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-neutral-200 bg-white text-neutral-500 transition ${
+                  active ? 'sm:border-[#a48149]/60 sm:text-[#8a6a37] sm:shadow-[0_0_0_3px_rgba(164,129,73,0.18)]' : ''
                 }`}
               >
                 <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -148,9 +146,7 @@ export default function XmbMenu({
               <span className="min-w-0">
                 <span className="block text-[15px] font-semibold leading-6 text-neutral-950">{it.title}</span>
                 {it.description && (
-                  <span className={`block text-[13px] leading-5 text-neutral-500 ${active ? '' : 'hidden sm:block'}`}>
-                    {it.description}
-                  </span>
+                  <span className="hidden text-[13px] leading-5 text-neutral-500 sm:block">{it.description}</span>
                 )}
               </span>
             </button>
