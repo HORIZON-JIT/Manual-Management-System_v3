@@ -860,3 +860,107 @@ export async function buildAllExcelBuffer(instructions: WorkInstruction[]): Prom
   const buffer = await wb.xlsx.writeBuffer();
   return buffer as ArrayBuffer;
 }
+
+// ============================================================
+// Instruction list with details (作成者/更新者/作成日/更新日/改版)
+// ============================================================
+
+function fmtDate(value?: string): string {
+  if (!value) return '';
+  const d = new Date(value);
+  return isNaN(d.getTime()) ? '' : d.toLocaleDateString('ja-JP');
+}
+
+export async function buildInstructionListExcel(instructions: WorkInstruction[]): Promise<ArrayBuffer> {
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet('手順書一覧', { properties: { showGridLines: false } });
+
+  ws.columns = [
+    { width: 5 },   // No.
+    { width: 32 },  // タイトル
+    { width: 14 },  // カテゴリ
+    { width: 14 },  // 部署
+    { width: 9 },   // 状態
+    { width: 16 },  // 作成者
+    { width: 16 },  // 更新者
+    { width: 13 },  // 作成日
+    { width: 13 },  // 更新日
+    { width: 7 },   // 改版
+  ];
+  const COLS = 10;
+  let row = 1;
+
+  ws.getRow(row).height = 40;
+  mergeStyled(ws, row, 1, row, COLS, '手順書一覧', {
+    font: { bold: true, size: 18, color: { argb: C.white } },
+    fill: solidFill(C.primary),
+    alignment: { horizontal: 'center' },
+    border: { top: NO_BORDER, bottom: NO_BORDER, left: NO_BORDER, right: NO_BORDER },
+  });
+  row++;
+
+  const headers = ['No.', 'タイトル', 'カテゴリ', '部署', '状態', '作成者', '更新者', '作成日', '更新日', '改版'];
+  ws.getRow(row).height = 26;
+  headers.forEach((h, i) => {
+    const cell = ws.getCell(row, i + 1);
+    cell.value = h;
+    cell.font = { name: 'Arial', bold: true, size: 10, color: { argb: C.dark } };
+    cell.fill = solidFill(C.headerBg);
+    cell.alignment = { horizontal: 'center', vertical: 'middle' };
+    setBoxBorder(cell, {
+      top: { style: 'medium', color: { argb: C.borderBlue } },
+      bottom: { style: 'medium', color: { argb: C.borderBlue } },
+      left: THIN_BORDER,
+      right: THIN_BORDER,
+    });
+  });
+  row++;
+
+  instructions.forEach((inst, i) => {
+    const bgColor = i % 2 === 0 ? C.white : C.grayLight;
+    const lastHist = inst.updateHistory?.[inst.updateHistory.length - 1];
+    const updater = inst.updatedBy || lastHist?.updatedBy || '';
+    const revision = inst.updateHistory?.length ?? 0;
+    const statusLabel = inst.status === 'draft' ? '下書き' : inst.status === 'completed' ? '完成' : '';
+    const values: (string | number)[] = [
+      i + 1,
+      inst.title || '',
+      getCategoryLabel(inst.category),
+      inst.department || '',
+      statusLabel,
+      inst.createdBy || '',
+      updater,
+      fmtDate(inst.createdAt),
+      fmtDate(inst.updatedAt),
+      revision,
+    ];
+    ws.getRow(row).height = 22;
+    values.forEach((v, ci) => {
+      const cell = ws.getCell(row, ci + 1);
+      cell.value = v;
+      cell.font = { name: 'Arial', size: 10, color: { argb: C.dark } };
+      cell.fill = solidFill(bgColor);
+      cell.alignment = { vertical: 'middle', wrapText: true, horizontal: ci === 1 ? 'left' : 'center' };
+      setBoxBorder(cell);
+    });
+    row++;
+  });
+
+  row++;
+  mergeStyled(ws, row, 1, row, COLS, `合計: ${instructions.length} 件`, {
+    font: { size: 9, italic: true, color: { argb: C.gray } },
+    alignment: { horizontal: 'right' },
+    border: { top: NO_BORDER, bottom: NO_BORDER, left: NO_BORDER, right: NO_BORDER },
+  });
+
+  const buffer = await wb.xlsx.writeBuffer();
+  return buffer as ArrayBuffer;
+}
+
+export async function exportInstructionList(
+  instructions: WorkInstruction[],
+  filename = '手順書一覧.xlsx',
+): Promise<void> {
+  const buffer = await buildInstructionListExcel(instructions);
+  downloadBuffer(buffer, filename);
+}
