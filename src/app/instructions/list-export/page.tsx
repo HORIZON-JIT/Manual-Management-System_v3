@@ -94,7 +94,7 @@ function ListExportTool() {
         setResult({ message: `${instructions.length} 件をローカルにダウンロードしました。` });
       } else {
         const buffer = await buildInstructionListExcel(instructions);
-        const fileId = await saveFileToDrive(buffer, filename, XLSX_MIME);
+        await saveFileToDrive(buffer, filename, XLSX_MIME);
         const folder = getTargetFolder();
         const url = folder?.id ? `https://drive.google.com/drive/folders/${folder.id}` : undefined;
         setResult({ message: `${instructions.length} 件を Google ドライブに保存しました（${filename}）。`, url });

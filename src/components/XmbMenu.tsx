@@ -95,7 +95,7 @@ export default function XmbMenu({
               <span
                 className={`flex h-14 w-14 items-center justify-center rounded-2xl border bg-white transition-all duration-200 ${
                   active
-                    ? 'scale-110 border-[#a48149] text-[#8a6a37] shadow-[0_0_0_4px_rgba(164,129,73,0.18)]'
+                    ? 'brand-border brand-text scale-110 shadow-[0_0_0_4px_rgba(164,129,73,0.18)]'
                     : 'border-neutral-200 text-neutral-400 hover:text-neutral-700'
                 }`}
               >
@@ -105,7 +105,7 @@ export default function XmbMenu({
               </span>
               <span
                 className={`whitespace-nowrap text-xs font-semibold tracking-wide transition ${
-                  active ? 'text-[#8a6a37]' : 'text-neutral-400'
+                  active ? 'brand-text' : 'text-neutral-400'
                 }`}
               >
                 {c.label}
@@ -117,8 +117,8 @@ export default function XmbMenu({
 
       <div className="my-6 h-px w-full max-w-md bg-neutral-200" />
 
-      {/* 縦軸：アクティブカテゴリの項目（最小高さを確保してカテゴリ位置が動かないようにする） */}
-      <div className="flex w-full max-w-md flex-col gap-2">
+      {/* 最大3項目分の高さを確保し、カテゴリ切替時にパネル全体が上下しないようにする。 */}
+      <div className="flex w-full max-w-md flex-col gap-2 sm:min-h-72">
         {items.map((it, i) => {
           const active = i === item;
           return (
@@ -134,7 +134,7 @@ export default function XmbMenu({
             >
               <span
                 className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-neutral-200 bg-white text-neutral-500 transition ${
-                  active ? 'sm:border-[#a48149]/60 sm:text-[#8a6a37] sm:shadow-[0_0_0_3px_rgba(164,129,73,0.18)]' : ''
+                  active ? 'xmb-item-icon-active' : ''
                 }`}
               >
                 <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
