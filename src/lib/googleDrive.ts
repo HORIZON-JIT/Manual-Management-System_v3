@@ -126,6 +126,50 @@ export async function createNewFolder(name: string, parentId?: string): Promise<
   return { id: res.result.id, name: res.result.name };
 }
 
+export async function findOrCreateChildFolder(parentId: string, name: string): Promise<DriveFolder> {
+  const escapedName = name.replace(/'/g, "\\'");
+  const res = await gapi.client.request<DriveFileList>({
+    path: 'https://www.googleapis.com/drive/v3/files',
+    params: {
+      q: `name='${escapedName}' and '${parentId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
+      fields: 'files(id,name)',
+      pageSize: '1',
+      supportsAllDrives: 'true',
+      includeItemsFromAllDrives: 'true',
+    },
+  });
+  const existing = res.result.files[0];
+  if (existing) return { id: existing.id, name: existing.name };
+  return createNewFolder(name, parentId);
+}
+
+export async function copyDriveFile(
+  fileId: string,
+  parentId: string,
+  options: { name: string; modifiedTime?: string },
+): Promise<DriveFileInfo> {
+  const body: Record<string, unknown> = {
+    name: options.name,
+    parents: [parentId],
+  };
+  if (options.modifiedTime) body.modifiedTime = options.modifiedTime;
+
+  const res = await gapi.client.request<DriveFile>({
+    path: `https://www.googleapis.com/drive/v3/files/${fileId}/copy`,
+    method: 'POST',
+    params: {
+      fields: 'id,name,modifiedTime',
+      supportsAllDrives: 'true',
+    },
+    body,
+  });
+  return {
+    id: res.result.id,
+    name: res.result.name,
+    modifiedTime: res.result.modifiedTime,
+  };
+}
+
 // --- Internal helpers ---
 
 async function findDefaultFolder(): Promise<string | null> {
