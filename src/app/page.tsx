@@ -250,6 +250,14 @@ function EditorHomePage() {
           ),
           onClick: handleExcelExportClick,
         },
+        {
+          title: '手順書一覧出力',
+          description: '作成者・更新者・作成日・更新日・改版などの一覧をExcel形式で出力します。',
+          href: '/instructions/list-export',
+          icon: (
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-6h6v6m-9 4h12a2 2 0 002-2V7a2 2 0 00-2-2h-1.586a1 1 0 01-.707-.293l-1.121-1.121A1 1 0 0013.172 3h-2.344a1 1 0 00-.707.293L9 4.414A1 1 0 018.293 4.707L8 5H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          ),
+        },
       ],
     },
   ];
