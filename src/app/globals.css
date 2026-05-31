@@ -51,6 +51,26 @@ select {
   background: radial-gradient(130% 90% at 18% 22%, #ffffff 0, #f6f3ec 55%, #efe9dc 100%);
 }
 
+/* XMBの項目カード（PCのみ枠付き。ダークはダークサーフェスにして文字が読めるように） */
+@media (min-width: 640px) {
+  .xmb-item-active {
+    background-color: #ffffff;
+    border-color: #d7c29b;
+    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.06);
+  }
+  .dark .xmb-item-active {
+    background-color: #1c2230;
+    border-color: rgba(164, 129, 73, 0.5);
+    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.45);
+  }
+  .xmb-item-idle {
+    opacity: 0.6;
+  }
+  .xmb-item-idle:hover {
+    opacity: 1;
+  }
+}
+
 /* ヘッダーのロゴバッジ：ライトは黒地白字、ダークは白地黒字 */
 .app-logo {
   background-color: #0a0a0a;
