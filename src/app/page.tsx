@@ -41,6 +41,30 @@ const actions = [
       />
     ),
   },
+  {
+    href: '/instructions/bulk-category',
+    title: 'カテゴリを一括設定',
+    icon: (
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M7 7h.01M7 3h5.172a2 2 0 011.414.586l6.828 6.828a2 2 0 010 2.828l-7.172 7.172a2 2 0 01-2.828 0L3.586 13.586A2 2 0 013 12.172V7a4 4 0 014-4z"
+      />
+    ),
+  },
+  {
+    href: '/instructions/bulk-sequential',
+    title: '読み飛ばし防止を一括変更',
+    icon: (
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M10.5 6h9.75M10.5 12h9.75M10.5 18h9.75M3.75 6h.008v.008H3.75V6zm0 6h.008v.008H3.75V12zm0 6h.008v.008H3.75V18z"
+      />
+    ),
+  },
 ];
 
 export default function HomePage() {
