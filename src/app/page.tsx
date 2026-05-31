@@ -8,6 +8,7 @@ import { DriveFileInfo } from '@/lib/googleDrive';
 import DriveJsonFilePicker from '@/components/DriveJsonFilePicker';
 import InstructionLibrary from '@/components/InstructionLibrary';
 import XmbMenu, { XmbCategory } from '@/components/XmbMenu';
+import { exportToExcel } from '@/lib/exportSpreadsheet';
 import { setTempData } from '@/lib/tempStorage';
 import { VIEWER_ONLY } from '@/lib/appMode';
 
@@ -92,6 +93,7 @@ function EditorHomePage() {
   const [showAuthPrompt, setShowAuthPrompt] = useState(false);
   const [showJsonPicker, setShowJsonPicker] = useState(false);
   const [showPreviewPicker, setShowPreviewPicker] = useState(false);
+  const [showExcelPicker, setShowExcelPicker] = useState(false);
   const [version, setVersion] = useState('');
 
   useEffect(() => {
@@ -131,6 +133,25 @@ function EditorHomePage() {
 
   const handlePreviewClick = () => {
     if (ensureDriveReady()) setShowPreviewPicker(true);
+  };
+
+  const handleExcelExportClick = () => {
+    if (ensureDriveReady()) setShowExcelPicker(true);
+  };
+
+  const handleExcelFileLoaded = async (content: string, file: DriveFileInfo) => {
+    try {
+      const json = JSON.parse(content);
+      if (!json.id || !json.title || !json.steps || !Array.isArray(json.steps)) {
+        throw new Error('有効な手順書データではありません。');
+      }
+      setShowExcelPicker(false);
+      await exportToExcel(json as WorkInstruction);
+    } catch (err) {
+      setImportError(
+        err instanceof Error ? err.message : `${file.name} の読み込みに失敗しました。`,
+      );
+    }
   };
 
   const handlePreviewFileLoaded = async (content: string, file: DriveFileInfo) => {
@@ -218,6 +239,17 @@ function EditorHomePage() {
         { ...find('/instructions/bulk-category'), description: '複数の手順書のカテゴリをまとめて設定します。' },
         { ...find('/instructions/bulk-sequential'), description: '読み飛ばし防止の設定をまとめて変更します。' },
         { ...find('/instructions/backup'), description: '手順書のバックアップをDriveに作成します。' },
+        {
+          title: 'Excelで出力',
+          description: '選択したJSONからExcel形式の手順書を出力します。',
+          icon: (
+            <>
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 13h6m-6 4h6m2 4H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 3v5a1 1 0 001 1h5" />
+            </>
+          ),
+          onClick: handleExcelExportClick,
+        },
       ],
     },
   ];
@@ -229,7 +261,7 @@ function EditorHomePage() {
         <p className="text-sm font-semibold text-neutral-500">Manual Management</p>
       </div>
 
-      <XmbMenu categories={categories} className="flex-none sm:flex-1" />
+      <XmbMenu categories={categories} className="flex-none" />
 
       {showAuthPrompt && (
         <section className="mt-6 rounded-lg border border-neutral-200 bg-white px-5 py-5 shadow-[0_18px_44px_rgba(0,0,0,0.06)]">
@@ -292,6 +324,11 @@ function EditorHomePage() {
         open={showPreviewPicker}
         onClose={() => setShowPreviewPicker(false)}
         onFileLoaded={handlePreviewFileLoaded}
+      />
+      <DriveJsonFilePicker
+        open={showExcelPicker}
+        onClose={() => setShowExcelPicker(false)}
+        onFileLoaded={handleExcelFileLoaded}
       />
     </div>
   );

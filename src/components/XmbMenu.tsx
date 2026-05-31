@@ -78,7 +78,7 @@ export default function XmbMenu({
 
   return (
     <div
-      className={`xmb-bg flex flex-col items-center justify-start rounded-2xl border border-neutral-200 px-4 py-8 sm:justify-center sm:py-10 ${className}`}
+      className={`xmb-bg flex flex-col items-center justify-start rounded-2xl border border-neutral-200 px-4 py-8 sm:py-12 ${className}`}
     >
       {/* 横軸：カテゴリ */}
       <div className="flex w-full max-w-3xl items-end justify-start gap-6 overflow-x-auto px-1 pb-2 pt-3 sm:justify-center sm:gap-12">
@@ -118,7 +118,7 @@ export default function XmbMenu({
       <div className="my-6 h-px w-full max-w-md bg-neutral-200" />
 
       {/* 縦軸：アクティブカテゴリの項目（最小高さを確保してカテゴリ位置が動かないようにする） */}
-      <div className="flex w-full max-w-md flex-col gap-2 sm:min-h-[300px]">
+      <div className="flex w-full max-w-md flex-col gap-2">
         {items.map((it, i) => {
           const active = i === item;
           return (
