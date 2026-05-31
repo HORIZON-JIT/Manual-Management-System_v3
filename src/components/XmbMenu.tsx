@@ -117,8 +117,8 @@ export default function XmbMenu({
 
       <div className="my-6 h-px w-full max-w-md bg-neutral-200" />
 
-      {/* 縦軸：アクティブカテゴリの項目 */}
-      <div className="flex w-full max-w-md flex-col gap-2">
+      {/* 縦軸：アクティブカテゴリの項目（最小高さを確保してカテゴリ位置が動かないようにする） */}
+      <div className="flex w-full max-w-md flex-col gap-2 min-h-[228px]">
         {items.map((it, i) => {
           const active = i === item;
           return (
