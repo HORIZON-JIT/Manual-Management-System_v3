@@ -24,7 +24,6 @@ import { getCustomDepartments, addCustomDepartment } from '@/lib/customDepartmen
 import StepEditor from './StepEditor';
 import VersionHistoryModal from './VersionHistoryModal';
 import FlowchartModal from './FlowchartModal';
-import FlowPreview from './FlowPreview';
 
 const LAST_AUTHOR_KEY = 'last_author_name';
 const fieldClass =
@@ -85,7 +84,6 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
   const [excelNavMode, setExcelNavMode] = useState<ExcelNavMode>('none');
   const [showVersionHistory, setShowVersionHistory] = useState(false);
   const [showFlowchart, setShowFlowchart] = useState(false);
-  const [showLivePreview, setShowLivePreview] = useState(true);
   const [showStepIndex, setShowStepIndex] = useState(false);
   const [showDescriptionGuide, setShowDescriptionGuide] = useState(false);
   const [showSidebarConditions, setShowSidebarConditions] = useState(false);
@@ -959,28 +957,6 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
           </div>
 
           <aside className="h-fit space-y-4 lg:sticky lg:top-24">
-            <section className="rounded-lg border border-slate-200 bg-white shadow-sm">
-              <button
-                type="button"
-                onClick={() => setShowLivePreview((prev) => !prev)}
-                className="flex w-full items-center justify-between px-4 py-3 text-left"
-              >
-                <span className="text-sm font-semibold text-slate-800">フロー図プレビュー</span>
-                <svg
-                  className={`h-5 w-5 text-slate-400 transition ${showLivePreview ? 'rotate-180' : ''}`}
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </button>
-              {showLivePreview && (
-                <div className="border-t border-slate-200 p-3">
-                  <FlowPreview instruction={buildPreviewInstruction()} onNodeClick={scrollToEditStep} />
-                </div>
-              )}
-            </section>
             <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm lg:hidden">
               <h2 className="text-base font-semibold text-slate-950">保存設定</h2>
 

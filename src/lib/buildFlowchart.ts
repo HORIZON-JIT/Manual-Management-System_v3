@@ -1,4 +1,4 @@
-import { WorkInstruction, Step, Condition, getStepConditionIds, END_JUMP_TARGET } from '@/types/instruction';
+import { WorkInstruction, Step, Condition, getStepConditionIds } from '@/types/instruction';
 
 function esc(text: string): string {
   return text.replace(/\"/g, '#quot;').replace(/[[\\]{}()]/g, '');
@@ -112,10 +112,6 @@ function buildLinear(steps: Step[], stepNum: Map<string, number>, stepIndex: Map
     }
 
     for (const jump of step.jumps ?? []) {
-      if (jump.targetStepId === END_JUMP_TARGET) {
-        lines.push(`  ${id} -- \"${esc(jump.label)}\" --> END`);
-        continue;
-      }
       const targetId = nodeIds.get(jump.targetStepId);
       if (targetId) lines.push(`  ${id} -- \"${esc(jump.label)}\" --> ${targetId}`);
     }
@@ -239,10 +235,6 @@ export function buildFlowchartDefinition(instruction: WorkInstruction): string {
     const id = nodeIds.get(step.id)!;
 
     for (const jump of step.jumps ?? []) {
-      if (jump.targetStepId === END_JUMP_TARGET) {
-        lines.push(`  ${id} -- \"${esc(jump.label)}\" --> END`);
-        continue;
-      }
       const targetId = nodeIds.get(jump.targetStepId);
       if (targetId) lines.push(`  ${id} -- \"${esc(jump.label)}\" --> ${targetId}`);
     }
@@ -263,20 +255,4 @@ export function buildFlowchartDefinition(instruction: WorkInstruction): string {
   }
 
   return lines.join('\n');
-}
-
-/**
- * フロー図の定義に加えて、Mermaid ノードID（s{index}）→ step.id の対応表を返す。
- * ライブプレビューでノードをクリックして該当ステップへ移動するために使う。
- */
-export function buildFlowchart(instruction: WorkInstruction): {
-  definition: string;
-  nodeStepIds: Record<string, string>;
-} {
-  const { steps } = buildStepMaps(instruction);
-  const nodeStepIds: Record<string, string> = {};
-  steps.forEach((step, index) => {
-    nodeStepIds[`s${index}`] = step.id;
-  });
-  return { definition: buildFlowchartDefinition(instruction), nodeStepIds };
 }
