@@ -11,7 +11,6 @@ import {
   getImageCaption,
   getStepConditionIds,
   getStepImages,
-  END_JUMP_TARGET,
 } from '@/types/instruction';
 import { getInstruction } from '@/lib/storage';
 import { getViewPageBaseUrl, parseShareData } from '@/lib/shareLink';
@@ -368,7 +367,6 @@ function InstructionViewContent() {
 
       let nextStep: Step | null = null;
       if (jumpOptions.length > 0 && selectedJumpTarget !== DEFAULT_JUMP_VALUE) {
-        if (selectedJumpTarget === END_JUMP_TARGET) break;
         nextStep = stepById.get(selectedJumpTarget) ?? null;
         if (!nextStep) break;
       } else {
@@ -678,7 +676,7 @@ function InstructionViewContent() {
 
                   {step.jumps && step.jumps.length > 0 && (
                     <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-4">
-                      <p className="text-sm font-semibold text-slate-800">{step.branchQuestion || '次の進行を選択'}</p>
+                      <p className="text-sm font-semibold text-slate-800">次の進行を選択</p>
                       <p className="mt-1 text-xs text-slate-500">該当する内容を選ぶと、その先の手順を表示します。</p>
                       <div className="mt-3 grid gap-2 sm:grid-cols-2">
                       {step.jumps.map((jump) => {
