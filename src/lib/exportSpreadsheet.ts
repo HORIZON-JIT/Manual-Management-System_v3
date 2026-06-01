@@ -100,35 +100,6 @@ function setBoxBorder(cell: ExcelJS.Cell, options?: {
   };
 }
 
-/** Apply style to a range of cells in a row */
-function styleRange(
-  ws: ExcelJS.Worksheet,
-  row: number,
-  colStart: number,
-  colEnd: number,
-  opts: {
-    font?: Partial<ExcelJS.Font>;
-    fill?: ExcelJS.Fill;
-    alignment?: Partial<ExcelJS.Alignment>;
-    border?: {
-      top?: Partial<ExcelJS.Border>;
-      bottom?: Partial<ExcelJS.Border>;
-      left?: Partial<ExcelJS.Border>;
-      right?: Partial<ExcelJS.Border>;
-    };
-  },
-) {
-  for (let c = colStart; c <= colEnd; c++) {
-    const cell = ws.getCell(row, c);
-    cell.font = { name: 'Arial', ...opts.font };
-    if (opts.fill) cell.fill = opts.fill;
-    if (opts.alignment) cell.alignment = opts.alignment;
-    if (opts.border) {
-      setBoxBorder(cell, opts.border);
-    }
-  }
-}
-
 /** Merge cells and set value with styling */
 function mergeStyled(
   ws: ExcelJS.Worksheet,

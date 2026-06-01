@@ -34,7 +34,6 @@ const BLUE_BG = { red: 0.145, green: 0.388, blue: 0.922 };
 const BTN_BG = { red: 0.231, green: 0.510, blue: 0.965 };  // primaryLight
 const WHITE = { red: 1.0, green: 1.0, blue: 1.0 };
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function linkCellRequest(
   sheetId: number,
   rowIndex: number,

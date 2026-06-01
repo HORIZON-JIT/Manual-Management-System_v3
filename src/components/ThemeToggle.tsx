@@ -10,10 +10,11 @@ export default function ThemeToggle() {
   useEffect(() => {
     // 保存済みテーマを毎回再適用する。ハイドレーション等で <html> の dark クラスが
     // 剥がれても、各ページのマウント時に確実に元のテーマへ戻す。
-    const resolved = resolveInitialTheme();
-    applyTheme(resolved);
-    setThemeState(resolved);
-    setMounted(true);
+    applyTheme(resolveInitialTheme());
+    queueMicrotask(() => {
+      setThemeState(resolveInitialTheme());
+      setMounted(true);
+    });
   }, []);
 
   const toggle = () => {
