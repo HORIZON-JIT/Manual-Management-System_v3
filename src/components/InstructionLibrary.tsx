@@ -308,19 +308,8 @@ export default function InstructionLibrary() {
 
   return (
     <div className="mx-auto flex min-h-[calc(100vh-76px)] max-w-7xl flex-col px-4 py-6 sm:px-6 lg:py-8">
-      <section className="border-b border-neutral-200 pb-5">
-        <div className="mb-4 h-px w-16 bg-[#a48149]" />
-        <p className="brand-text mb-2 text-xs font-semibold tracking-[0.28em]">HORIZON JIT</p>
-        <h1 className="text-3xl font-semibold leading-[1.05] tracking-[-0.02em] text-neutral-950 sm:text-4xl">
-          手順書ビューア
-        </h1>
-        <p className="mt-3 max-w-xl text-sm leading-7 text-neutral-600 sm:text-[15px]">
-          一覧から手順書を選んで閲覧できます。
-        </p>
-      </section>
-
       {needsSignIn ? (
-        <section className="mt-8 rounded-lg border border-neutral-200 bg-white px-5 py-6 shadow-[0_18px_44px_rgba(0,0,0,0.06)]">
+        <section className="rounded-lg border border-neutral-200 bg-white px-5 py-6 shadow-[0_18px_44px_rgba(0,0,0,0.06)]">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-sm font-semibold text-neutral-950">手順書を表示するにはログインしてください</p>
@@ -346,7 +335,7 @@ export default function InstructionLibrary() {
       ) : (
         <>
           {/* 検索・並び替え（タッチ向けに大きめ） */}
-          <section className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-start">
+          <section className="flex flex-col gap-3 sm:flex-row sm:items-start">
             <div className="w-full sm:max-w-md">
               <label className="relative block">
                 <svg className="pointer-events-none absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
