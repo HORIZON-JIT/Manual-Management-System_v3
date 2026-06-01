@@ -98,7 +98,8 @@ export default function InstructionLibrary() {
   const [contentSearch, setContentSearch] = useState(false);
   const [layout, setLayout] = useState<LibraryLayout>('grid');
   const [opening, setOpening] = useState<string | null>(null);
-  const forceMetaRef = useRef(false);
+  // 起動時は必ず全スキャン（キャッシュを無視してカテゴリ/部署を読み直す）。以降はキャッシュ優先。
+  const forceMetaRef = useRef(true);
 
   const configured = isGoogleConfigured();
 
