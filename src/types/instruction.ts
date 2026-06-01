@@ -18,6 +18,9 @@ export interface StepJump {
   targetStepId: string;
 }
 
+/** 「ここで終了」を表す選択肢の進み先センチネル（StepJump.targetStepId に使う）。 */
+export const END_JUMP_TARGET = '__END__';
+
 export interface Condition {
   id: string;
   label: string;
@@ -41,6 +44,8 @@ export interface Step {
   links?: StepLink[];
   jumps?: StepJump[];
   jumpDefaultLabel?: string;
+  /** 初心者向け分岐の質問文（選択肢ボタンの見出し）。 */
+  branchQuestion?: string;
   nextStepId?: string;
   endsBranch?: boolean;
 }

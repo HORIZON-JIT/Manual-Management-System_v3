@@ -10,6 +10,7 @@ import {
   Condition,
   getStepConditionIds,
   getStepImages,
+  END_JUMP_TARGET,
 } from '@/types/instruction';
 import { getAllInstructions } from '@/lib/storage';
 import { compressImage } from '@/lib/compressImage';
@@ -33,6 +34,9 @@ const labelClass = 'mb-1.5 block text-sm font-semibold text-slate-700';
 const AUTO_NEXT_VALUE = '__auto__';
 const END_NEXT_VALUE = '__end__';
 
+/** 初心者向け分岐の選択肢（編集用）。dest は AUTO_NEXT_VALUE / END_JUMP_TARGET / stepId / ''（未選択）。 */
+type BranchChoice = { id: string; label: string; dest: string };
+
 export default function StepEditor({
   step,
   index,
@@ -47,17 +51,27 @@ export default function StepEditor({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [annotatingIdx, setAnnotatingIdx] = useState<number | null>(null);
-  const [showJumpForm, setShowJumpForm] = useState(false);
-  const [jumpLabel, setJumpLabel] = useState('');
-  const [jumpTargetId, setJumpTargetId] = useState('');
-  const [showConditions, setShowConditions] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [branchOpen, setBranchOpen] = useState(
+    () => (step.jumps?.length ?? 0) > 0 || !!step.jumpDefaultLabel || !!step.branchQuestion,
+  );
+  const [branchChoices, setBranchChoices] = useState<BranchChoice[]>(() => {
+    const list: BranchChoice[] = (step.jumps ?? []).map((jump) => ({
+      id: jump.id,
+      label: jump.label,
+      dest: jump.targetStepId,
+    }));
+    if (step.jumpDefaultLabel) {
+      list.push({ id: '__default__', label: step.jumpDefaultLabel, dest: AUTO_NEXT_VALUE });
+    }
+    return list;
+  });
 
   const images = getStepImages(step);
   const stepRef = useRef(step);
   const imagesRef = useRef(images);
   const selectedConditionIds = getStepConditionIds(step);
   const selectedConditionSet = new Set(selectedConditionIds);
-  const isConditionalStep = selectedConditionIds.length > 0;
   const hasConditionGroups = (conditions?.length ?? 0) > 0;
   const selectedConditionLabels = (conditions ?? [])
     .filter((condition) => selectedConditionSet.has(condition.id))
@@ -267,6 +281,40 @@ export default function StepEditor({
     });
   };
 
+  // --- 初心者向け分岐（質問 → 選択肢 → 進み先） ---
+  const otherSteps = (allSteps ?? []).filter((item) => item.id !== step.id);
+  const stepNumberOf = (id: string) => (allSteps ?? []).findIndex((item) => item.id === id) + 1;
+
+  const commitChoices = (next: BranchChoice[]) => {
+    setBranchChoices(next);
+    const jumps: StepJump[] = next
+      .filter((choice) => choice.dest && choice.dest !== AUTO_NEXT_VALUE)
+      .map((choice) => ({
+        id: choice.id === '__default__' ? uuidv4() : choice.id,
+        label: choice.label.trim() || '選択肢',
+        targetStepId: choice.dest,
+      }));
+    const autoChoice = next.find((choice) => choice.dest === AUTO_NEXT_VALUE);
+    onChange({
+      ...step,
+      jumps: jumps.length > 0 ? jumps : undefined,
+      jumpDefaultLabel: autoChoice ? autoChoice.label.trim() || '次へ' : undefined,
+    });
+  };
+
+  const toggleBranch = () => {
+    if (branchOpen) {
+      setBranchOpen(false);
+      setBranchChoices([]);
+      onChange({ ...step, jumps: undefined, jumpDefaultLabel: undefined, branchQuestion: undefined });
+    } else {
+      setBranchOpen(true);
+      if (branchChoices.length === 0) {
+        setBranchChoices([{ id: uuidv4(), label: '', dest: '' }]);
+      }
+    }
+  };
+
   return (
     <section
       ref={containerRef}
@@ -336,19 +384,21 @@ export default function StepEditor({
       </div>
 
       <div className="space-y-5 p-5">
-        {conditions && conditions.length > 0 && (
+        {hasConditionGroups && (
           <div>
             <button
               type="button"
-              onClick={() => setShowConditions((prev) => !prev)}
+              onClick={() => setShowAdvanced((prev) => !prev)}
               className="flex w-full items-start justify-between rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-left transition hover:bg-slate-100"
             >
               <div>
-                <p className="text-sm font-semibold text-slate-700">表示条件</p>
-                <p className="mt-1 text-xs leading-5 text-slate-500">{conditionSummary}</p>
+                <p className="text-sm font-semibold text-slate-700">上級者向け（詳細な条件分岐）</p>
+                <p className="mt-1 text-xs leading-5 text-slate-500">
+                  複数条件の組み合わせやグループ分岐・合流先の指定。表示条件: {conditionSummary}
+                </p>
               </div>
               <svg
-                className={`mt-0.5 h-5 w-5 text-slate-400 transition ${showConditions ? 'rotate-180' : ''}`}
+                className={`mt-0.5 h-5 w-5 text-slate-400 transition ${showAdvanced ? 'rotate-180' : ''}`}
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -362,8 +412,9 @@ export default function StepEditor({
               </svg>
             </button>
 
-            {showConditions && (
+            {showAdvanced && (
               <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
+                <p className="mb-3 text-xs font-semibold text-slate-600">表示条件</p>
                 <button
                   type="button"
                   onClick={() => updateSelectedConditions([])}
@@ -417,6 +468,31 @@ export default function StepEditor({
                 <p className="mt-3 text-xs leading-5 text-slate-500">
                   複数選ぶと、選んだ条件すべてでこのステップを表示します。何も選ばない場合は共通ステップとして扱います。
                 </p>
+
+                <div className="mt-4 border-t border-slate-200 pt-4">
+                  <label className={labelClass}>通常の次に進む先</label>
+                  <select
+                    value={nextStepSelectionValue}
+                    onChange={(e) => handleNextStepSelection(e.target.value)}
+                    className={inputClass}
+                  >
+                    <option value={AUTO_NEXT_VALUE}>自動判定</option>
+                    <option value={END_NEXT_VALUE}>ここで終了</option>
+                    {(allSteps ?? [])
+                      .filter((item) => item.id !== step.id)
+                      .map((item) => {
+                        const realIndex = (allSteps ?? []).findIndex((candidate) => candidate.id === item.id);
+                        return (
+                          <option key={item.id} value={item.id}>
+                            {realIndex + 1}. {item.title || '(未入力)'}
+                          </option>
+                        );
+                      })}
+                  </select>
+                  <p className="mt-2 text-xs leading-5 text-slate-500">
+                    条件分岐の合流先などを明示したい場合に使います。自動判定は並び順に沿って進み、終了はこのステップでフローを終えます。
+                  </p>
+                </div>
               </div>
             )}
           </div>
@@ -455,40 +531,103 @@ export default function StepEditor({
           />
         </div>
 
-        {hasConditionGroups && <div>
-          <label className={labelClass}>通常の次に進む先</label>
-          <select
-            value={nextStepSelectionValue}
-            onChange={(e) => handleNextStepSelection(e.target.value)}
-            className={inputClass}
-          >
-            <option value={AUTO_NEXT_VALUE}>自動判定</option>
-            <option value={END_NEXT_VALUE}>ここで終了</option>
-            {(allSteps ?? [])
-              .filter((item) => item.id !== step.id)
-              .map((item) => {
-                const realIndex = (allSteps ?? []).findIndex((candidate) => candidate.id === item.id);
-                return (
-                  <option key={item.id} value={item.id}>
-                    {realIndex + 1}. {item.title || '(未入力)'}
-                  </option>
-                );
-              })}
-          </select>
-          <p className="mt-2 text-xs leading-5 text-slate-500">
-            選択肢による分岐を使わない場合の進行先です。自動判定は並び順に沿って進み、終了はこのステップでフローを終えます。
-            {isConditionalStep ? ' 条件付きステップでは、この設定を使って分岐後の合流先を明示できます。' : ''}
-          </p>
-          {allSteps && allSteps.length > 1 && (
-            <button
-              type="button"
-              onClick={() => document.getElementById(`jump-settings-${step.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
-              className="mt-3 text-sm font-medium text-blue-700 transition hover:text-blue-900"
-            >
-              + 選択肢別の進み先を設定
-            </button>
-          )}
-        </div>}
+        {(allSteps?.length ?? 0) >= 2 && (
+          <div className="rounded-lg border border-slate-200 p-4">
+            <label className="flex cursor-pointer items-start gap-2">
+              <input
+                type="checkbox"
+                checked={branchOpen}
+                onChange={toggleBranch}
+                className="mt-0.5 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+              />
+              <span>
+                <span className="block text-sm font-semibold text-slate-800">このステップで分岐する（質問して進み先を変える）</span>
+                <span className="mt-0.5 block text-xs leading-5 text-slate-500">
+                  質問に対する答えごとに、次に進むステップを決められます。
+                </span>
+              </span>
+            </label>
+
+            {branchOpen && (
+              <div className="mt-4 space-y-3">
+                <div>
+                  <label className={labelClass}>質問文</label>
+                  <input
+                    type="text"
+                    value={step.branchQuestion || ''}
+                    onChange={(e) => onChange({ ...step, branchQuestion: e.target.value || undefined })}
+                    className={inputClass}
+                    placeholder="例: 検査結果は合格ですか？"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  {branchChoices.map((choice, choiceIndex) => (
+                    <div key={choice.id} className="space-y-2 rounded-lg bg-slate-50 p-3">
+                      <div className="flex items-center gap-2">
+                        <span className="shrink-0 text-xs font-semibold text-slate-500">選択肢{choiceIndex + 1}</span>
+                        <input
+                          type="text"
+                          value={choice.label}
+                          onChange={(e) =>
+                            commitChoices(
+                              branchChoices.map((item) =>
+                                item.id === choice.id ? { ...item, label: e.target.value } : item,
+                              ),
+                            )
+                          }
+                          className={`${inputClass} flex-1`}
+                          placeholder="答え（例: 合格 / 不合格）"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => commitChoices(branchChoices.filter((item) => item.id !== choice.id))}
+                          className="shrink-0 text-sm text-red-500 hover:text-red-700"
+                        >
+                          削除
+                        </button>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="shrink-0 text-xs text-slate-500">進み先</span>
+                        <select
+                          value={choice.dest}
+                          onChange={(e) =>
+                            commitChoices(
+                              branchChoices.map((item) =>
+                                item.id === choice.id ? { ...item, dest: e.target.value } : item,
+                              ),
+                            )
+                          }
+                          className={`${inputClass} flex-1`}
+                        >
+                          <option value="">選択してください…</option>
+                          <option value={AUTO_NEXT_VALUE}>次のステップへ進む</option>
+                          {otherSteps.map((item) => (
+                            <option key={item.id} value={item.id}>
+                              {stepNumberOf(item.id)}. {item.title || '(未入力)'}
+                            </option>
+                          ))}
+                          <option value={END_JUMP_TARGET}>ここで終了</option>
+                        </select>
+                      </div>
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => commitChoices([...branchChoices, { id: uuidv4(), label: '', dest: '' }])}
+                    className="text-sm font-medium text-blue-700 transition hover:text-blue-900"
+                  >
+                    + 選択肢を追加
+                  </button>
+                </div>
+
+                <p className="text-xs leading-5 text-slate-500">
+                  閲覧時はこの質問が表示され、選んだ答えに応じて進み先が切り替わります。
+                </p>
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
@@ -600,20 +739,6 @@ export default function StepEditor({
           )}
         </div>
 
-        {hasConditionGroups && <div>
-          <label className={labelClass}>通常ルートの選択肢名（任意）</label>
-          <input
-            type="text"
-            value={step.jumpDefaultLabel || ''}
-            onChange={(e) =>
-              onChange({ ...step, jumpDefaultLabel: e.target.value || undefined })
-            }
-            className={inputClass}
-            placeholder={step.endsBranch ? 'このステップを終了設定中は使用しません' : '例: 問題なし、合格'}
-            disabled={!!step.endsBranch}
-          />
-        </div>}
-
         <div className="grid gap-5 md:grid-cols-2">
           <div className="rounded-lg border border-slate-200 p-4 md:col-span-2">
             <p className="mb-3 text-sm font-semibold text-slate-800">関連リンク</p>
@@ -687,123 +812,6 @@ export default function StepEditor({
               </button>
             </div>
           </div>
-
-          {hasConditionGroups && <div id={`jump-settings-${step.id}`} className="rounded-lg border border-slate-200 p-4">
-            <p className="mb-3 text-sm font-semibold text-slate-800">選択肢別の進み先</p>
-            {allSteps && allSteps.length > 1 ? (
-              <div className="space-y-2">
-                {(step.jumps ?? []).map((jump) => {
-                  const targetStep = allSteps.find((item) => item.id === jump.targetStepId);
-                  const targetIndex = allSteps.findIndex(
-                    (item) => item.id === jump.targetStepId,
-                  );
-
-                  return (
-                    <div
-                      key={jump.id}
-                      className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700"
-                    >
-                      <div className="flex gap-2">
-                        <span className="flex-1 truncate">
-                          {jump.label} →{' '}
-                          {targetIndex >= 0
-                            ? `${targetIndex + 1}. ${targetStep?.title || '(未入力)'}`
-                            : '(対象なし)'}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            onChange({
-                              ...step,
-                              jumps: (step.jumps ?? []).filter((item) => item.id !== jump.id),
-                            })
-                          }
-                          className="text-red-500"
-                        >
-                          削除
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-
-                {showJumpForm ? (
-                  <div className="space-y-2 rounded-lg bg-slate-50 p-3">
-                    <input
-                      type="text"
-                      value={jumpLabel}
-                      onChange={(e) => setJumpLabel(e.target.value)}
-                      className={inputClass}
-                      placeholder="選択肢名（例: 不合格、やり直す）"
-                    />
-                    <select
-                      value={jumpTargetId}
-                      onChange={(e) => setJumpTargetId(e.target.value)}
-                      className={inputClass}
-                    >
-                      <option value="">進み先を選択...</option>
-                      {allSteps
-                        .filter((item) => item.id !== step.id)
-                        .map((item) => {
-                          const realIndex = allSteps.findIndex((s) => s.id === item.id);
-                          return (
-                            <option key={item.id} value={item.id}>
-                              {realIndex + 1}. {item.title || '(未入力)'}
-                            </option>
-                          );
-                        })}
-                    </select>
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        disabled={!jumpLabel.trim() || !jumpTargetId}
-                        onClick={() => {
-                          const newJump: StepJump = {
-                            id: uuidv4(),
-                            label: jumpLabel.trim(),
-                            targetStepId: jumpTargetId,
-                          };
-                          onChange({
-                            ...step,
-                            jumps: [...(step.jumps ?? []), newJump],
-                          });
-                          setJumpLabel('');
-                          setJumpTargetId('');
-                          setShowJumpForm(false);
-                        }}
-                        className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50"
-                      >
-                        追加
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowJumpForm(false);
-                          setJumpLabel('');
-                          setJumpTargetId('');
-                        }}
-                        className="rounded-lg px-3 py-1.5 text-xs text-slate-600 hover:bg-white"
-                      >
-                        キャンセル
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => setShowJumpForm(true)}
-                    className="text-sm font-medium text-blue-700 hover:text-blue-900"
-                  >
-                    + 進み先を追加
-                  </button>
-                )}
-              </div>
-            ) : (
-              <p className="text-sm text-slate-500">
-                ステップが2件以上あると設定できます。
-              </p>
-            )}
-          </div>}
 
           <div className="rounded-lg border border-slate-200 p-4">
             <p className="mb-3 text-sm font-semibold text-slate-800">チェック項目</p>
