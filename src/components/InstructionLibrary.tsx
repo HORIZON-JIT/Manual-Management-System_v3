@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { getCategoryLabel } from '@/types/instruction';
 import {
@@ -98,6 +98,7 @@ export default function InstructionLibrary() {
   const [contentSearch, setContentSearch] = useState(false);
   const [layout, setLayout] = useState<LibraryLayout>('grid');
   const [opening, setOpening] = useState<string | null>(null);
+  const forceMetaRef = useRef(false);
 
   const configured = isGoogleConfigured();
 
@@ -156,17 +157,29 @@ export default function InstructionLibrary() {
     loadFiles();
   }, [configured, auth.isSignedIn, loadFiles]);
 
+  // 再読み込みボタン: キャッシュを無視してカテゴリ/部署を全件読み直す
+  const handleRefresh = useCallback(() => {
+    forceMetaRef.current = true;
+    loadFiles();
+  }, [loadFiles]);
+
   // 一覧取得後、各手順書のタイトル・カテゴリを取得（キャッシュ優先）
   useEffect(() => {
     if (files.length === 0) return;
     const cache = getMetaCache();
-    const stale = files.filter(
-      (f) =>
-        !cache[f.id] ||
-        cache[f.id].modifiedTime !== f.modifiedTime ||
-        cache[f.id].department === undefined ||
-        cache[f.id].searchText === undefined,
-    );
+    // 強制再読み込み時はキャッシュを無視して全件読み直す（一括設定は更新日時を保持するため、
+    // 更新日時ベースのキャッシュ判定だけではカテゴリ/部署の変更を検知できないことがある）
+    const force = forceMetaRef.current;
+    forceMetaRef.current = false;
+    const stale = force
+      ? files
+      : files.filter(
+          (f) =>
+            !cache[f.id] ||
+            cache[f.id].modifiedTime !== f.modifiedTime ||
+            cache[f.id].department === undefined ||
+            cache[f.id].searchText === undefined,
+        );
     if (stale.length === 0) {
       setMeta(cache);
       return;
@@ -398,10 +411,10 @@ export default function InstructionLibrary() {
 
               <button
                 type="button"
-                onClick={loadFiles}
-                disabled={loading}
+                onClick={handleRefresh}
+                disabled={loading || metaLoading}
                 className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-neutral-200 bg-white text-neutral-600 transition hover:border-neutral-300 hover:text-neutral-950 disabled:opacity-50"
-                title="一覧を再読み込み"
+                title="一覧を再読み込み（カテゴリ・部署を再スキャン）"
                 aria-label="一覧を再読み込み"
               >
                 <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
