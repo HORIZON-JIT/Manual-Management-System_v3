@@ -1,14 +1,18 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Theme, resolveInitialTheme, setTheme as persistTheme } from '@/lib/theme';
+import { Theme, resolveInitialTheme, applyTheme, setTheme as persistTheme } from '@/lib/theme';
 
 export default function ThemeToggle() {
   const [theme, setThemeState] = useState<Theme>('light');
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setThemeState(resolveInitialTheme());
+    // 保存済みテーマを毎回再適用する。ハイドレーション等で <html> の dark クラスが
+    // 剥がれても、各ページのマウント時に確実に元のテーマへ戻す。
+    const resolved = resolveInitialTheme();
+    applyTheme(resolved);
+    setThemeState(resolved);
     setMounted(true);
   }, []);
 
