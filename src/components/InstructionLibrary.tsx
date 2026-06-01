@@ -92,7 +92,7 @@ export default function InstructionLibrary() {
   const [error, setError] = useState<string | null>(null);
   const [folderName, setFolderName] = useState('');
   const [query, setQuery] = useState('');
-  const [sortOrder, setSortOrder] = useState<SortOrder>('frequent');
+  const [sortOrder, setSortOrder] = useState<SortOrder>('name-asc');
   const [category, setCategory] = useState<string>(ALL);
   const [department, setDepartment] = useState<string>(ALL);
   const [contentSearch, setContentSearch] = useState(false);
