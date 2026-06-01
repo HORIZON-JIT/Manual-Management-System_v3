@@ -1,5 +1,7 @@
 'use client';
 
+import { VIEWER_ONLY } from '@/lib/appMode';
+
 interface HelpModalProps {
   open: boolean;
   onClose: () => void;
@@ -156,8 +158,88 @@ const sections = [
   },
 ];
 
+// 閲覧専用ビューア向けのヘルプ内容
+const viewerSections = [
+  {
+    id: 'v-overview',
+    badge: '1',
+    color: 'bg-blue-100 text-blue-700',
+    title: 'このビューアでできること',
+    items: [
+      'Google Drive 上に保存された手順書を、一覧から選んで閲覧できます。',
+      '閲覧専用のため、手順書の作成・編集はできません（編集は手順書作成システムで行います）。',
+      'ファイル名や本文での検索、部署・カテゴリでの絞り込み、並び替え、表示形式の切り替えができます。',
+    ],
+  },
+  {
+    id: 'v-login',
+    badge: '2',
+    color: 'bg-amber-100 text-amber-700',
+    title: 'ログインと保存先フォルダ',
+    items: [
+      '右上の「サインイン」から Google アカウントでログインします。手順書の読み込みに必要です。',
+      'ログイン後、右上のフォルダボタンで閲覧する手順書フォルダを選択します。',
+      '一度選んだフォルダはこの端末に記録され、次回も同じフォルダが開きます。',
+    ],
+  },
+  {
+    id: 'v-list',
+    badge: '3',
+    color: 'bg-emerald-100 text-emerald-700',
+    title: '一覧の使い方',
+    items: [
+      '「手順書をさがす」: ファイル名で検索します。「ファイル内容も検索」を有効にすると手順の中身も対象になります。',
+      '部署・カテゴリのボタン: 押すとその分類で絞り込めます。「すべて」で解除します。',
+      '並び順: 名前順・更新が新しい順・よく見る順から選べます（初期は名前順）。',
+      '表示形式: 右上のボタンでリスト表示とグリッド表示を切り替えられます。',
+      '再読み込み（↻）: カテゴリ・部署を最新の内容で読み直します。分類を変更した直後に反映されます。',
+    ],
+  },
+  {
+    id: 'v-view',
+    badge: '4',
+    color: 'bg-violet-100 text-violet-700',
+    title: '閲覧画面の使い方',
+    items: [
+      '一覧で手順書を選ぶと、概要・条件分岐・各ステップ・関連リンク・チェック項目を確認できます。',
+      '条件分岐がある手順書は、選択に応じて表示されるステップが切り替わります。',
+      '読み飛ばし防止モードの手順書は、「次へ」で 1 ステップずつ進みます。',
+      '上部の検索ボタンで、非表示のステップも含めて手順書全体を検索できます。',
+      'フローチャート表示や印刷も利用できます。',
+    ],
+  },
+  {
+    id: 'v-theme',
+    badge: '5',
+    color: 'bg-cyan-100 text-cyan-700',
+    title: '画面まわりの操作',
+    items: [
+      '左上のロゴ: 手順書の一覧（トップ）へ戻ります。',
+      '月・太陽のボタン: ライトモードとダークモードを切り替えます。設定は次回以降も保持されます。',
+      '「?」ボタン: この使い方ガイドを開きます。',
+    ],
+  },
+  {
+    id: 'v-tips',
+    badge: '6',
+    color: 'bg-neutral-200 text-neutral-700',
+    title: '困ったときの確認ポイント',
+    items: [
+      '手順書が表示されない場合は、先に「サインイン」でログインし、保存先フォルダを選んでください。',
+      '一覧が空のときは、選択中のフォルダに手順書（JSON）があるか確認してください。',
+      'カテゴリや部署を変更したのに反映されない場合は、再読み込み（↻）を押してください。',
+    ],
+  },
+];
+
 export default function HelpModal({ open, onClose }: HelpModalProps) {
   if (!open) return null;
+
+  const sectionsToShow = VIEWER_ONLY ? viewerSections : sections;
+  const guideTitle = VIEWER_ONLY ? '手順書ビューア 使い方ガイド' : '手順書作成システム 使い方ガイド';
+  const guideSubtitle = VIEWER_ONLY
+    ? 'ログイン、一覧での検索・絞り込み、手順書の閲覧方法をまとめています。'
+    : '作成、Drive 連携、一括設定、出力、閲覧専用ビューアまで、現在利用できる機能をまとめています。';
 
   return (
     <div
@@ -175,10 +257,10 @@ export default function HelpModal({ open, onClose }: HelpModalProps) {
                 HELP GUIDE
               </p>
               <h2 className="mt-2 text-2xl font-semibold tracking-tight text-neutral-950">
-                手順書作成システム 使い方ガイド
+                {guideTitle}
               </h2>
               <p className="mt-2 text-sm leading-6 text-neutral-500">
-                作成、Drive 連携、一括設定、出力、閲覧専用ビューアまで、現在利用できる機能をまとめています。
+                {guideSubtitle}
               </p>
             </div>
             <button
@@ -195,7 +277,7 @@ export default function HelpModal({ open, onClose }: HelpModalProps) {
 
         <div className="overflow-y-auto px-5 py-5 sm:px-8 sm:py-6">
           <div className="grid gap-4 lg:grid-cols-2">
-            {sections.map((section) => (
+            {sectionsToShow.map((section) => (
               <section
                 key={section.id}
                 className="rounded-2xl border border-neutral-200 bg-white px-5 py-5 shadow-sm"
