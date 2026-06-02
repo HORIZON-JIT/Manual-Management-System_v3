@@ -13,6 +13,8 @@ import {
 } from '@/types/instruction';
 import { getAllInstructions } from '@/lib/storage';
 import { compressImage } from '@/lib/compressImage';
+import { setTempData, getTempData, removeTempData } from '@/lib/tempStorage';
+import { getInstructionsBaseUrl } from '@/lib/shareLink';
 import ImageAnnotationEditor from './ImageAnnotationEditor';
 
 interface StepEditorProps {
@@ -47,6 +49,8 @@ export default function StepEditor({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [annotatingIdx, setAnnotatingIdx] = useState<number | null>(null);
+  const [popupSupported, setPopupSupported] = useState(false);
+  const pendingPopups = useRef<Map<string, number>>(new Map());
   const [showJumpForm, setShowJumpForm] = useState(false);
   const [jumpLabel, setJumpLabel] = useState('');
   const [jumpTargetId, setJumpTargetId] = useState('');
@@ -70,6 +74,117 @@ export default function StepEditor({
     stepRef.current = step;
     imagesRef.current = images;
   }, [step, images]);
+
+  // 注釈結果を step に反映する（インライン・別ウィンドウ両方で共用）
+  const applyAnnotationSave = useCallback(
+    (idx: number, url: string) => {
+      const s = stepRef.current;
+      const imgs = imagesRef.current;
+      if (idx < 0 || idx >= imgs.length) return;
+      const updated = [...imgs];
+      const originals = [...(s.originalImageDataUrls ?? [])];
+      while (originals.length <= idx) originals.push('');
+      if (!originals[idx]) originals[idx] = imgs[idx];
+      updated[idx] = url;
+      onChange({
+        ...s,
+        imageDataUrl: undefined,
+        imageDataUrls: updated,
+        originalImageDataUrls: originals,
+      });
+    },
+    [onChange],
+  );
+
+  const applyAnnotationRestore = useCallback(
+    (idx: number) => {
+      const s = stepRef.current;
+      const imgs = imagesRef.current;
+      if (idx < 0 || idx >= imgs.length) return;
+      const originals = s.originalImageDataUrls ?? [];
+      if (!originals[idx]) return;
+      const updated = [...imgs];
+      updated[idx] = originals[idx];
+      const newOriginals = [...originals];
+      newOriginals[idx] = '';
+      onChange({
+        ...s,
+        imageDataUrl: undefined,
+        imageDataUrls: updated,
+        originalImageDataUrls: newOriginals.some((item) => item) ? newOriginals : undefined,
+      });
+    },
+    [onChange],
+  );
+
+  // 別ウィンドウ（ポップアップ）対応可否
+  useEffect(() => {
+    setPopupSupported(typeof window !== 'undefined' && typeof BroadcastChannel !== 'undefined');
+  }, []);
+
+  // 別ウィンドウからの完了通知を受け取り、step に反映する
+  useEffect(() => {
+    if (typeof BroadcastChannel === 'undefined') return;
+    const ch = new BroadcastChannel('mms-annotate');
+    ch.onmessage = async (event) => {
+      const token: string | undefined = event.data?.token;
+      if (!token || !pendingPopups.current.has(token)) return;
+      const idx = pendingPopups.current.get(token)!;
+      pendingPopups.current.delete(token);
+      let res: { action?: string; url?: string } | null = null;
+      if (!event.data?.fallbackCancel) {
+        const raw = await getTempData('annotate_res_' + token);
+        if (raw) {
+          try {
+            res = JSON.parse(raw);
+          } catch {
+            res = null;
+          }
+        }
+      }
+      if (res?.action === 'save' && res.url) applyAnnotationSave(idx, res.url);
+      else if (res?.action === 'restore') applyAnnotationRestore(idx);
+      // cancel / fallbackCancel / null は何もしない
+      await removeTempData('annotate_src_' + token);
+      await removeTempData('annotate_res_' + token);
+    };
+    return () => ch.close();
+  }, [applyAnnotationSave, applyAnnotationRestore]);
+
+  // 「注釈」クリック時：別ウィンドウで開く。ブロックされたらインライン表示にフォールバック
+  const openAnnotation = useCallback(
+    async (idx: number) => {
+      if (!popupSupported) {
+        setAnnotatingIdx(idx);
+        return;
+      }
+      const imgs = imagesRef.current;
+      const s = stepRef.current;
+      const token =
+        typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : uuidv4();
+      try {
+        await setTempData(
+          'annotate_src_' + token,
+          JSON.stringify({
+            imageDataUrl: imgs[idx],
+            originalImageDataUrl: s.originalImageDataUrls?.[idx],
+          }),
+        );
+      } catch {
+        setAnnotatingIdx(idx);
+        return;
+      }
+      const url = `${getInstructionsBaseUrl('annotate')}?key=${token}`;
+      const win = window.open(url, 'mms-annotate-' + token, 'popup,width=1200,height=850');
+      if (!win) {
+        await removeTempData('annotate_src_' + token);
+        setAnnotatingIdx(idx);
+        return;
+      }
+      pendingPopups.current.set(token, idx);
+    },
+    [popupSupported],
+  );
 
   const addImage = useCallback(
     (dataUrl: string) => {
@@ -575,8 +690,9 @@ export default function StepEditor({
                         )}
                         <button
                           type="button"
-                          onClick={() => setAnnotatingIdx(imgIdx)}
+                          onClick={() => openAnnotation(imgIdx)}
                           className="font-medium text-violet-700 hover:text-violet-900"
+                          title={popupSupported ? '別ウィンドウで注釈を編集します' : undefined}
                         >
                           注釈
                         </button>
@@ -864,34 +980,11 @@ export default function StepEditor({
           imageDataUrl={images[annotatingIdx]}
           originalImageDataUrl={step.originalImageDataUrls?.[annotatingIdx]}
           onSave={(url) => {
-            const updated = [...images];
-            const originals = [...(step.originalImageDataUrls ?? [])];
-            while (originals.length <= annotatingIdx) originals.push('');
-            if (!originals[annotatingIdx]) originals[annotatingIdx] = images[annotatingIdx];
-            updated[annotatingIdx] = url;
-            onChange({
-              ...step,
-              imageDataUrl: undefined,
-              imageDataUrls: updated,
-              originalImageDataUrls: originals,
-            });
+            applyAnnotationSave(annotatingIdx, url);
             setAnnotatingIdx(null);
           }}
           onRestore={() => {
-            const originals = step.originalImageDataUrls ?? [];
-            if (!originals[annotatingIdx]) return;
-            const updated = [...images];
-            updated[annotatingIdx] = originals[annotatingIdx];
-            const newOriginals = [...originals];
-            newOriginals[annotatingIdx] = '';
-            onChange({
-              ...step,
-              imageDataUrl: undefined,
-              imageDataUrls: updated,
-              originalImageDataUrls: newOriginals.some((item) => item)
-                ? newOriginals
-                : undefined,
-            });
+            applyAnnotationRestore(annotatingIdx);
             setAnnotatingIdx(null);
           }}
           onClose={() => setAnnotatingIdx(null)}
