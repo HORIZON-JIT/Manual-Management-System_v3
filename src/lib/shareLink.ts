@@ -61,3 +61,15 @@ export function getViewPageBaseUrl(): string {
     : '';
   return `${origin}${basePath}/instructions/view`;
 }
+
+/**
+ * basePath（NEXT_PUBLIC_REPO_NAME ＋ NEXT_PUBLIC_BASE_SUBPATH。next.config.ts と同じ）を反映した
+ * /instructions/<subRoute> の絶対URLを返す。別ウィンドウを window.open する際などに使う（client専用）。
+ */
+export function getInstructionsBaseUrl(subRoute: string): string {
+  const origin = window.location.origin;
+  const repo = process.env.NEXT_PUBLIC_REPO_NAME ? `/${process.env.NEXT_PUBLIC_REPO_NAME}` : '';
+  const sub = process.env.NEXT_PUBLIC_BASE_SUBPATH ? `/${process.env.NEXT_PUBLIC_BASE_SUBPATH}` : '';
+  const basePath = repo ? `${repo}${sub}` : '';
+  return `${origin}${basePath}/instructions/${subRoute}`;
+}
