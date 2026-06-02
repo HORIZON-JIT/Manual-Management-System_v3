@@ -427,12 +427,20 @@ export default function ImageAnnotationEditor({ imageDataUrl, originalImageDataU
           )}
         </div>
         <span className="text-sm text-gray-400">画像注釈</span>
-        <button
-          onClick={handleSave}
-          className="px-4 py-1.5 text-sm font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition"
-        >
-          完了
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={onClose}
+            className="px-4 py-1.5 text-sm font-medium text-gray-200 border border-gray-600 rounded-lg transition hover:bg-gray-800 hover:text-white"
+          >
+            編集せず戻る
+          </button>
+          <button
+            onClick={handleSave}
+            className="px-4 py-1.5 text-sm font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition"
+          >
+            完了
+          </button>
+        </div>
       </div>
 
       {/* Canvas area */}
