@@ -389,7 +389,7 @@ export default function InstructionLibrary() {
                 <span>
                   ファイル内容も検索（手順の中身も対象）
                   <span className="mt-0.5 block text-xs text-neutral-400">
-                    OFFのときはファイル名のみを検索します（どちらもあいまい検索）。
+                    OFFのときはファイル名のみを検索します。
                   </span>
                 </span>
               </label>
