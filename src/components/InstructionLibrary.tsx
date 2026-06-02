@@ -121,7 +121,7 @@ export default function InstructionLibrary() {
   const [sortOrder, setSortOrder] = useState<SortOrder>('name-asc');
   const [category, setCategory] = useState<string>(ALL);
   const [department, setDepartment] = useState<string>(ALL);
-  const [contentSearch, setContentSearch] = useState(false);
+  const [contentSearch, setContentSearch] = useState(true);
   const [layout, setLayout] = useState<LibraryLayout>('grid');
   const [opening, setOpening] = useState<string | null>(null);
   // 起動時は必ず全スキャン（キャッシュを無視してカテゴリ/部署を読み直す）。以降はキャッシュ優先。
@@ -389,7 +389,7 @@ export default function InstructionLibrary() {
                 <span>
                   ファイル内容も検索（手順の中身も対象）
                   <span className="mt-0.5 block text-xs text-neutral-400">
-                    OFFのときはファイル名のみを検索します（どちらもあいまい検索）。
+                    OFFのときはファイル名のみを検索します。
                   </span>
                 </span>
               </label>
