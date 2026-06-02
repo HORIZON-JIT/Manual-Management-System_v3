@@ -24,6 +24,14 @@ export interface Condition {
   group?: string;
 }
 
+/** 画像注釈エディタの注釈オブジェクト（座標は 0–1 正規化）。再編集で移動・調整できるよう保持する。 */
+export type ImageAnnotation =
+  | { type: 'circle'; cx: number; cy: number; radiusX: number; radiusY: number; color: string }
+  | { type: 'rectangle'; x: number; y: number; width: number; height: number; color: string }
+  | { type: 'arrow'; x1: number; y1: number; x2: number; y2: number; scale: number; color: string }
+  | { type: 'number'; x: number; y: number; value: number; scale: number; color: string }
+  | { type: 'text'; x: number; y: number; value: string; scale: number; color: string };
+
 export interface Step {
   id: string;
   orderIndex: number;
@@ -33,6 +41,8 @@ export interface Step {
   imageDataUrl?: string;
   imageDataUrls?: string[];
   imageCaptions?: string[];
+  /** 画像ごとの注釈オブジェクト。index は imageDataUrls と対応。 */
+  imageAnnotations?: (ImageAnnotation[] | null)[];
   caution?: string;
   checkItems?: CheckItem[];
   conditionId?: string;

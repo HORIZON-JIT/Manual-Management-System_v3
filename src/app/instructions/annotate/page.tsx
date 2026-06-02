@@ -6,10 +6,11 @@ import ImageAnnotationEditor from '@/components/ImageAnnotationEditor';
 import EditorOnlyNotice from '@/components/EditorOnlyNotice';
 import { getTempData, setTempData } from '@/lib/tempStorage';
 import { VIEWER_ONLY } from '@/lib/appMode';
+import type { ImageAnnotation } from '@/types/instruction';
 
 const CHANNEL = 'mms-annotate';
 
-type Src = { imageDataUrl: string; originalImageDataUrl?: string };
+type Src = { imageDataUrl: string; originalImageDataUrl?: string; initialAnnotations?: ImageAnnotation[] };
 
 function AnnotatePageContent() {
   const params = useSearchParams();
@@ -56,7 +57,11 @@ function AnnotatePageContent() {
     return () => window.removeEventListener('beforeunload', onBeforeUnload);
   }, [token]);
 
-  const finishAnnotation = async (action: 'save' | 'restore' | 'cancel', url?: string) => {
+  const finishAnnotation = async (
+    action: 'save' | 'restore' | 'cancel',
+    url?: string,
+    annotations?: ImageAnnotation[],
+  ) => {
     if (!token) {
       window.close();
       return;
@@ -64,7 +69,7 @@ function AnnotatePageContent() {
     try {
       await setTempData(
         'annotate_res_' + token,
-        JSON.stringify(url ? { action, url } : { action }),
+        JSON.stringify(url ? { action, url, annotations } : { action }),
       );
       resultWritten.current = true;
     } catch {
@@ -103,7 +108,8 @@ function AnnotatePageContent() {
     <ImageAnnotationEditor
       imageDataUrl={src.imageDataUrl}
       originalImageDataUrl={src.originalImageDataUrl}
-      onSave={(url) => finishAnnotation('save', url)}
+      initialAnnotations={src.initialAnnotations}
+      onSave={(url, annotations) => finishAnnotation('save', url, annotations)}
       onRestore={() => finishAnnotation('restore')}
       onClose={() => finishAnnotation('cancel')}
     />
