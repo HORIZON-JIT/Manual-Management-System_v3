@@ -375,18 +375,23 @@ export default function InstructionLibrary() {
                   type="text"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder="手順書をさがす"
+                  placeholder="手順書をさがす（あいまい検索）"
                   className="h-12 w-full rounded-xl border border-neutral-200 bg-white pl-11 pr-3 text-base text-neutral-800 outline-none transition focus:border-[#c9b188]"
                 />
               </label>
-              <label className="mt-2 flex cursor-pointer items-center gap-2 text-sm text-neutral-600">
+              <label className="mt-2 flex cursor-pointer items-start gap-2 text-sm text-neutral-600">
                 <input
                   type="checkbox"
                   checked={contentSearch}
                   onChange={(e) => setContentSearch(e.target.checked)}
-                  className="h-4 w-4 rounded border-neutral-300 accent-[#a48149]"
+                  className="mt-0.5 h-4 w-4 rounded border-neutral-300 accent-[#a48149]"
                 />
-                ファイル内容も検索（手順の中身も対象）
+                <span>
+                  ファイル内容も検索（手順の中身も対象）
+                  <span className="mt-0.5 block text-xs text-neutral-400">
+                    OFFのときはファイル名のみを検索します（どちらもあいまい検索）。
+                  </span>
+                </span>
               </label>
             </div>
             <div className="flex items-center gap-2 sm:ml-auto">
