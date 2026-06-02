@@ -70,6 +70,32 @@ function buildSearchText(json: Record<string, unknown>): string {
   return parts.join('\n').slice(0, SEARCH_TEXT_LIMIT).toLowerCase();
 }
 
+/** 曖昧検索用の正規化：小文字化・全角半角統一(NFKC)・カタカナ→ひらがな・空白除去。 */
+function normalizeForSearch(value: string): string {
+  return value
+    .normalize('NFKC')
+    .toLowerCase()
+    .replace(/[ァ-ヶ]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0x60))
+    .replace(/\s+/g, '');
+}
+
+/**
+ * 曖昧検索の判定。
+ * 1) 部分一致（連続）にヒットすればOK。
+ * 2) なければサブシーケンス一致（query の文字が target に順番どおり現れる）でOK。
+ * いずれも normalizeForSearch 済みの文字列を渡す前提。
+ */
+function fuzzyMatch(query: string, target: string): boolean {
+  if (!query) return true;
+  if (!target) return false;
+  if (target.includes(query)) return true;
+  let qi = 0;
+  for (let ti = 0; ti < target.length && qi < query.length; ti += 1) {
+    if (target[ti] === query[qi]) qi += 1;
+  }
+  return qi === query.length;
+}
+
 function formatDate(value?: string): string | null {
   if (!value) return null;
   const date = new Date(value);
@@ -274,11 +300,15 @@ export default function InstructionLibrary() {
 
   const filteredFiles = [...files]
     .filter((f) => {
-      const q = query.trim().toLowerCase();
+      const q = normalizeForSearch(query.trim());
       if (!q) return true;
-      if (displayName(f).toLowerCase().includes(q) || f.name.toLowerCase().includes(q)) return true;
-      // 「ファイル内容も検索」がONなら本文(手順の中身)も対象にする
-      return contentSearch && (meta[f.id]?.searchText?.includes(q) ?? false);
+      // ファイル名（タイトル・実ファイル名）を曖昧検索
+      const nameHit =
+        fuzzyMatch(q, normalizeForSearch(displayName(f))) ||
+        fuzzyMatch(q, normalizeForSearch(f.name));
+      // チェックOFF時はファイル名のみ。ONなら本文(手順の中身)も曖昧検索の対象にする
+      if (!contentSearch) return nameHit;
+      return nameHit || fuzzyMatch(q, normalizeForSearch(meta[f.id]?.searchText ?? ''));
     })
     .filter((f) => (department === ALL ? true : meta[f.id]?.department === department))
     .filter((f) => (category === ALL ? true : meta[f.id]?.category === category))
