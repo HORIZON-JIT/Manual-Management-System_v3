@@ -8,6 +8,7 @@ import {
   StepLink,
   StepJump,
   Condition,
+  ImageAnnotation,
   getStepConditionIds,
   getStepImages,
 } from '@/types/instruction';
@@ -75,22 +76,37 @@ export default function StepEditor({
     imagesRef.current = images;
   }, [step, images]);
 
+  // 再編集できるよう、注釈の「下地（クリーン画像）」と保存済み注釈オブジェクトを取り出す
+  const getAnnotationSource = useCallback((idx: number) => {
+    const s = stepRef.current;
+    const imgs = imagesRef.current;
+    const original = s.originalImageDataUrls?.[idx];
+    return {
+      base: original && original !== '' ? original : imgs[idx],
+      initial: s.imageAnnotations?.[idx] ?? [],
+    };
+  }, []);
+
   // 注釈結果を step に反映する（インライン・別ウィンドウ両方で共用）
   const applyAnnotationSave = useCallback(
-    (idx: number, url: string) => {
+    (idx: number, url: string, annotations: ImageAnnotation[]) => {
       const s = stepRef.current;
       const imgs = imagesRef.current;
       if (idx < 0 || idx >= imgs.length) return;
       const updated = [...imgs];
       const originals = [...(s.originalImageDataUrls ?? [])];
       while (originals.length <= idx) originals.push('');
-      if (!originals[idx]) originals[idx] = imgs[idx];
+      if (!originals[idx]) originals[idx] = imgs[idx]; // 初回の素の画像を下地として保持
       updated[idx] = url;
+      const anns = [...(s.imageAnnotations ?? [])];
+      while (anns.length <= idx) anns.push(null);
+      anns[idx] = annotations.length > 0 ? annotations : null;
       onChange({
         ...s,
         imageDataUrl: undefined,
         imageDataUrls: updated,
         originalImageDataUrls: originals,
+        imageAnnotations: anns.some((a) => a && a.length) ? anns : undefined,
       });
     },
     [onChange],
@@ -107,11 +123,14 @@ export default function StepEditor({
       updated[idx] = originals[idx];
       const newOriginals = [...originals];
       newOriginals[idx] = '';
+      const anns = [...(s.imageAnnotations ?? [])];
+      if (anns.length > idx) anns[idx] = null;
       onChange({
         ...s,
         imageDataUrl: undefined,
         imageDataUrls: updated,
         originalImageDataUrls: newOriginals.some((item) => item) ? newOriginals : undefined,
+        imageAnnotations: anns.some((a) => a && a.length) ? anns : undefined,
       });
     },
     [onChange],
@@ -131,7 +150,7 @@ export default function StepEditor({
       if (!token || !pendingPopups.current.has(token)) return;
       const idx = pendingPopups.current.get(token)!;
       pendingPopups.current.delete(token);
-      let res: { action?: string; url?: string } | null = null;
+      let res: { action?: string; url?: string; annotations?: ImageAnnotation[] } | null = null;
       if (!event.data?.fallbackCancel) {
         const raw = await getTempData('annotate_res_' + token);
         if (raw) {
@@ -142,7 +161,7 @@ export default function StepEditor({
           }
         }
       }
-      if (res?.action === 'save' && res.url) applyAnnotationSave(idx, res.url);
+      if (res?.action === 'save' && res.url) applyAnnotationSave(idx, res.url, res.annotations ?? []);
       else if (res?.action === 'restore') applyAnnotationRestore(idx);
       // cancel / fallbackCancel / null は何もしない
       await removeTempData('annotate_src_' + token);
@@ -158,16 +177,16 @@ export default function StepEditor({
         setAnnotatingIdx(idx);
         return;
       }
-      const imgs = imagesRef.current;
-      const s = stepRef.current;
+      const { base, initial } = getAnnotationSource(idx);
       const token =
         typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : uuidv4();
       try {
         await setTempData(
           'annotate_src_' + token,
           JSON.stringify({
-            imageDataUrl: imgs[idx],
-            originalImageDataUrl: s.originalImageDataUrls?.[idx],
+            imageDataUrl: base,
+            originalImageDataUrl: base,
+            initialAnnotations: initial,
           }),
         );
       } catch {
@@ -183,7 +202,7 @@ export default function StepEditor({
       }
       pendingPopups.current.set(token, idx);
     },
-    [popupSupported],
+    [popupSupported, getAnnotationSource],
   );
 
   const addImage = useCallback(
@@ -977,10 +996,11 @@ export default function StepEditor({
 
       {annotatingIdx !== null && (
         <ImageAnnotationEditor
-          imageDataUrl={images[annotatingIdx]}
-          originalImageDataUrl={step.originalImageDataUrls?.[annotatingIdx]}
-          onSave={(url) => {
-            applyAnnotationSave(annotatingIdx, url);
+          imageDataUrl={getAnnotationSource(annotatingIdx).base}
+          originalImageDataUrl={getAnnotationSource(annotatingIdx).base}
+          initialAnnotations={getAnnotationSource(annotatingIdx).initial}
+          onSave={(url, annotations) => {
+            applyAnnotationSave(annotatingIdx, url, annotations);
             setAnnotatingIdx(null);
           }}
           onRestore={() => {

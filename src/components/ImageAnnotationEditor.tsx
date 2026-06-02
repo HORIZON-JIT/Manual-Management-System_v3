@@ -1,20 +1,17 @@
 'use client';
 
 import { useRef, useState, useEffect, useCallback } from 'react';
+import type { ImageAnnotation } from '@/types/instruction';
 
-type Annotation =
-  | { type: 'circle'; cx: number; cy: number; radiusX: number; radiusY: number; color: string }
-  | { type: 'rectangle'; x: number; y: number; width: number; height: number; color: string }
-  | { type: 'arrow'; x1: number; y1: number; x2: number; y2: number; scale: number; color: string }
-  | { type: 'number'; x: number; y: number; value: number; scale: number; color: string }
-  | { type: 'text'; x: number; y: number; value: string; scale: number; color: string };
+type Annotation = ImageAnnotation;
 
 type Tool = 'select' | 'arrow' | 'circle' | 'rectangle' | 'number' | 'text';
 
 interface ImageAnnotationEditorProps {
   imageDataUrl: string;
   originalImageDataUrl?: string;
-  onSave: (annotatedDataUrl: string) => void;
+  initialAnnotations?: Annotation[];
+  onSave: (annotatedDataUrl: string, annotations: Annotation[]) => void;
   onRestore: () => void;
   onClose: () => void;
 }
@@ -23,12 +20,17 @@ const DEFAULT_ANNOTATION_COLOR = '#EF4444';
 const OUTLINE_COLOR = '#FFFFFF';
 const ANNOTATION_COLORS = ['#EF4444', '#2563EB', '#16A34A', '#F59E0B', '#111827'];
 
-export default function ImageAnnotationEditor({ imageDataUrl, originalImageDataUrl, onSave, onRestore, onClose }: ImageAnnotationEditorProps) {
+export default function ImageAnnotationEditor({ imageDataUrl, originalImageDataUrl, initialAnnotations, onSave, onRestore, onClose }: ImageAnnotationEditorProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imgRef = useRef<HTMLImageElement | null>(null);
   const [tool, setTool] = useState<Tool>('circle');
-  const [annotations, setAnnotations] = useState<Annotation[]>([]);
-  const [nextNumber, setNextNumber] = useState(1);
+  const [annotations, setAnnotations] = useState<Annotation[]>(initialAnnotations ?? []);
+  const [nextNumber, setNextNumber] = useState(() => {
+    const maxNum = (initialAnnotations ?? [])
+      .filter((a): a is Extract<Annotation, { type: 'number' }> => a.type === 'number')
+      .reduce((m, a) => Math.max(m, a.value), 0);
+    return maxNum + 1;
+  });
   const [size, setSize] = useState(100);
   const [textValue, setTextValue] = useState('');
   const [color, setColor] = useState(DEFAULT_ANNOTATION_COLOR);
@@ -394,14 +396,17 @@ export default function ImageAnnotationEditor({ imageDataUrl, originalImageDataU
 
   const handleSave = () => {
     if (annotations.length === 0) {
-      onClose();
-      return;
+      // 元々注釈が無く、何も描いていなければ変更なしで閉じる
+      if (!initialAnnotations || initialAnnotations.length === 0) {
+        onClose();
+        return;
+      }
     }
     const canvas = canvasRef.current;
     if (!canvas) return;
     redraw(annotations, undefined, false);
     const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
-    onSave(dataUrl);
+    onSave(dataUrl, annotations);
   };
 
   return (
