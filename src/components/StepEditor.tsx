@@ -48,8 +48,10 @@ export default function StepEditor({
   onMoveDown,
 }: StepEditorProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const replaceInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [annotatingIdx, setAnnotatingIdx] = useState<number | null>(null);
+  const [replaceTargetIdx, setReplaceTargetIdx] = useState<number | null>(null);
   const [popupSupported, setPopupSupported] = useState(false);
   const pendingPopups = useRef<Map<string, number>>(new Map());
   const [showJumpForm, setShowJumpForm] = useState(false);
@@ -222,6 +224,7 @@ export default function StepEditor({
 
   const removeImage = useCallback(
     (imageIndex: number) => {
+      setReplaceTargetIdx(null);
       const currentStep = stepRef.current;
       const updatedImages = imagesRef.current.filter((_, i) => i !== imageIndex);
       const updatedCaptions = (currentStep.imageCaptions ?? []).filter(
@@ -239,6 +242,7 @@ export default function StepEditor({
 
   const moveImage = useCallback(
     (imageIndex: number, direction: 'up' | 'down') => {
+      setReplaceTargetIdx(null);
       const currentStep = stepRef.current;
       const updatedImages = [...imagesRef.current];
       const captions = [...(currentStep.imageCaptions ?? [])];
@@ -290,6 +294,43 @@ export default function StepEditor({
     [addImage],
   );
 
+  // 指定 index の画像だけを差し替える（コメントは維持・注釈と下地はクリア）
+  const replaceImage = useCallback(
+    (idx: number, dataUrl: string) => {
+      const s = stepRef.current;
+      const imgs = imagesRef.current;
+      if (idx < 0 || idx >= imgs.length) return;
+      const updated = [...imgs];
+      updated[idx] = dataUrl;
+      const originals = [...(s.originalImageDataUrls ?? [])];
+      if (originals.length > idx) originals[idx] = '';
+      const anns = [...(s.imageAnnotations ?? [])];
+      if (anns.length > idx) anns[idx] = null;
+      onChange({
+        ...s,
+        imageDataUrl: undefined,
+        imageDataUrls: updated,
+        originalImageDataUrls: originals.some((o) => o) ? originals : undefined,
+        imageAnnotations: anns.some((a) => a && a.length) ? anns : undefined,
+      });
+      setReplaceTargetIdx(null);
+    },
+    [onChange],
+  );
+
+  const processReplaceFile = useCallback(
+    (idx: number, file: File) => {
+      if (file.size > 20 * 1024 * 1024) {
+        alert('画像サイズは20MB以下にしてください。');
+        return;
+      }
+      compressImage(file)
+        .then((dataUrl) => replaceImage(idx, dataUrl))
+        .catch(() => alert('画像の処理に失敗しました。'));
+    },
+    [replaceImage],
+  );
+
   const handleScreenCapture = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
@@ -330,12 +371,15 @@ export default function StepEditor({
         if (item.type.startsWith('image/')) {
           e.preventDefault();
           const file = item.getAsFile();
-          if (file) processImageFile(file);
+          if (!file) return;
+          // 差し替えモード中はその画像を置換、そうでなければ末尾に追加
+          if (replaceTargetIdx !== null) processReplaceFile(replaceTargetIdx, file);
+          else processImageFile(file);
           return;
         }
       }
     },
-    [processImageFile],
+    [processImageFile, processReplaceFile, replaceTargetIdx],
   );
 
   useEffect(() => {
@@ -661,12 +705,26 @@ export default function StepEditor({
             className="hidden"
           />
 
+          <input
+            ref={replaceInputRef}
+            type="file"
+            accept="image/*"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file && replaceTargetIdx !== null) processReplaceFile(replaceTargetIdx, file);
+              e.target.value = '';
+            }}
+            className="hidden"
+          />
+
           {images.length > 0 ? (
             <div className="space-y-3">
               {images.map((imgUrl, imgIdx) => (
                 <div
                   key={imgIdx}
-                  className="overflow-hidden rounded-lg border border-slate-200 bg-white"
+                  className={`overflow-hidden rounded-lg border bg-white ${
+                    replaceTargetIdx === imgIdx ? 'border-blue-400 ring-2 ring-blue-400' : 'border-slate-200'
+                  }`}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
@@ -674,6 +732,26 @@ export default function StepEditor({
                     alt={`ステップ ${index + 1} の画像 ${imgIdx + 1}`}
                     className="mx-auto max-h-56 max-w-full object-contain"
                   />
+                  {replaceTargetIdx === imgIdx && (
+                    <div className="flex flex-wrap items-center gap-2 border-t border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-800">
+                      <span className="font-semibold">この画像を差し替え中：</span>
+                      <span>Ctrl+V で貼り付け、または</span>
+                      <button
+                        type="button"
+                        onClick={() => replaceInputRef.current?.click()}
+                        className="rounded border border-blue-300 bg-white px-2 py-1 font-medium text-blue-700 hover:bg-blue-100"
+                      >
+                        ファイルを選択
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setReplaceTargetIdx(null)}
+                        className="rounded px-2 py-1 font-medium text-slate-500 hover:text-slate-800"
+                      >
+                        キャンセル
+                      </button>
+                    </div>
+                  )}
                   <div className="space-y-2 border-t border-slate-200 bg-white p-3">
                     <input
                       type="text"
@@ -707,6 +785,20 @@ export default function StepEditor({
                             </button>
                           </>
                         )}
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setReplaceTargetIdx((cur) => (cur === imgIdx ? null : imgIdx))
+                          }
+                          className={`font-medium ${
+                            replaceTargetIdx === imgIdx
+                              ? 'text-blue-700'
+                              : 'text-slate-500 hover:text-blue-700'
+                          }`}
+                          title="この画像だけを差し替えます"
+                        >
+                          差し替え
+                        </button>
                         <button
                           type="button"
                           onClick={() => openAnnotation(imgIdx)}
