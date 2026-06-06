@@ -146,6 +146,7 @@ export default function InstructionForm({ initialData, approvalMode = false }: I
   const [viewUrlCopied, setViewUrlCopied] = useState(false);
   const [draftSaveMessage, setDraftSaveMessage] = useState<string | null>(null);
   const [auth, setAuth] = useState(getAuthState());
+  const [authorEdited, setAuthorEdited] = useState(false);
   const [approveOnSave, setApproveOnSave] = useState(false);
   const [approvalDate, setApprovalDate] = useState(initialData?.approval?.current?.approvedAt?.slice(0, 10) || todayInputValue());
   const [revokeOnSave, setRevokeOnSave] = useState(false);
@@ -171,6 +172,13 @@ export default function InstructionForm({ initialData, approvalMode = false }: I
     }
     return addAuthListener(setAuth);
   }, []);
+
+  useEffect(() => {
+    const googleName = auth.userName?.trim();
+    if (!googleName || authorEdited) return;
+    if (isEdit && initialData?.updatedBy) return;
+    setAuthorName(googleName);
+  }, [auth.userName, authorEdited, initialData?.updatedBy, isEdit]);
 
   useEffect(() => {
     if (!showDescriptionGuide && !showUpdateHistoryGuide) return;
@@ -348,6 +356,8 @@ export default function InstructionForm({ initialData, approvalMode = false }: I
       .map((keyword) => keyword.trim())
       .filter(Boolean);
     const now = new Date().toISOString();
+    const googleEmail = auth.userEmail || undefined;
+    const updatedByEmail = initialData ? googleEmail || initialData.updatedByEmail : undefined;
 
     return {
       id: initialData?.id || 'preview',
@@ -359,7 +369,9 @@ export default function InstructionForm({ initialData, approvalMode = false }: I
       createdAt: initialData?.createdAt || now,
       updatedAt: now,
       createdBy: initialData?.createdBy || authorName.trim() || undefined,
+      createdByEmail: initialData?.createdByEmail || (!isEdit ? googleEmail : undefined),
       updatedBy: isEdit && authorName.trim() ? authorName.trim() : initialData?.updatedBy,
+      updatedByEmail,
       keywords: parsedKeywords.length > 0 ? parsedKeywords : undefined,
       conditions: conditions.length > 0 ? conditions : undefined,
       conditionGroups: (() => {
@@ -400,6 +412,8 @@ export default function InstructionForm({ initialData, approvalMode = false }: I
     if (trimmedName) saveLastAuthorName(trimmedName);
 
     const now = new Date().toISOString();
+    const googleEmail = auth.userEmail || undefined;
+    const updatedByEmail = initialData ? googleEmail || initialData.updatedByEmail : undefined;
     let updateHistory: UpdateHistoryEntry[] = initialData?.updateHistory || [];
     if (isEdit && trimmedName && addHistory) {
       const snapshot: InstructionSnapshot = {
@@ -409,9 +423,11 @@ export default function InstructionForm({ initialData, approvalMode = false }: I
         steps: initialData!.steps,
         keywords: initialData!.keywords,
         createdBy: initialData!.createdBy,
+        createdByEmail: initialData!.createdByEmail,
       };
       const entry: UpdateHistoryEntry = {
         updatedBy: trimmedName,
+        updatedByEmail: googleEmail || initialData?.updatedByEmail,
         updatedAt: now,
         snapshot,
       };
@@ -491,7 +507,9 @@ export default function InstructionForm({ initialData, approvalMode = false }: I
       createdAt: initialData?.createdAt || now,
       updatedAt: now,
       createdBy: initialData?.createdBy || trimmedName || undefined,
+      createdByEmail: initialData?.createdByEmail || (!isEdit ? googleEmail : undefined),
       updatedBy: isEdit && trimmedName ? trimmedName : initialData?.updatedBy,
+      updatedByEmail,
       updateHistory: updateHistory.length > 0 ? updateHistory : undefined,
       approval,
       status,
@@ -1085,10 +1103,18 @@ export default function InstructionForm({ initialData, approvalMode = false }: I
                   <input
                     type="text"
                     value={authorName}
-                    onChange={(event) => setAuthorName(event.target.value)}
+                    onChange={(event) => {
+                      setAuthorEdited(true);
+                      setAuthorName(event.target.value);
+                    }}
                     className={`${fieldClass} h-12`}
                     placeholder={isEdit ? '更新者の名前を入力' : '作成者の名前を入力'}
                   />
+                  {auth.userEmail && (
+                    <p className="mt-1.5 text-xs text-slate-500">
+                      Googleアカウント: {auth.userName || 'Googleユーザー'} / {auth.userEmail}
+                    </p>
+                  )}
                 </div>
 
                 <div className="md:col-span-2">
