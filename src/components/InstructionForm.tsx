@@ -158,6 +158,7 @@ export default function InstructionForm({ initialData, approvalMode = false }: I
   useEffect(() => {
     if (!approvalMode) return;
     setShowSaveSettings(true);
+    setShowSidebarConditions(false);
     const timer = setTimeout(() => {
       approvalPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }, 250);
@@ -607,6 +608,13 @@ export default function InstructionForm({ initialData, approvalMode = false }: I
     }
 
     void saveToFolder(instruction);
+  };
+
+  const handleToggleSaveSettings = () => {
+    setShowSaveSettings((shown) => {
+      if (!shown) setShowSidebarConditions(false);
+      return !shown;
+    });
   };
 
   const groupedConditions = (() => {
@@ -1355,7 +1363,7 @@ export default function InstructionForm({ initialData, approvalMode = false }: I
             <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
               <button
                 type="button"
-                onClick={() => setShowSaveSettings((shown) => !shown)}
+                onClick={handleToggleSaveSettings}
                 aria-expanded={showSaveSettings}
                 className="flex w-full items-start justify-between gap-3 text-left"
               >
