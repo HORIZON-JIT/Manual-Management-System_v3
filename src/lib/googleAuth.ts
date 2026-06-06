@@ -1,5 +1,6 @@
 const CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '';
-const SCOPES = 'https://www.googleapis.com/auth/drive https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/script.projects';
+const SCOPES =
+  'openid email profile https://www.googleapis.com/auth/drive https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/script.projects';
 
 const STORAGE_TOKEN_KEY = 'google_auth_token';
 const STORAGE_EXPIRY_KEY = 'google_auth_expiry';
@@ -32,6 +33,7 @@ const authState: GoogleAuthState = {
 
 let tokenClient: google.accounts.oauth2.TokenClient | null = null;
 const listeners: Set<AuthListener> = new Set();
+const pendingAuthRequests: Set<(state: GoogleAuthState) => void> = new Set();
 
 // サイレント再ログイン用の内部状態
 let refreshTimer: ReturnType<typeof setTimeout> | null = null;
@@ -40,6 +42,12 @@ let silentMode = false; // 直近の requestAccessToken がUIなしの自動更�
 
 function notifyListeners() {
   listeners.forEach((fn) => fn({ ...authState }));
+}
+
+function resolvePendingAuthRequests() {
+  const state = { ...authState };
+  pendingAuthRequests.forEach((resolve) => resolve(state));
+  pendingAuthRequests.clear();
 }
 
 export function isGoogleConfigured(): boolean {
@@ -70,7 +78,16 @@ function loadScript(src: string): Promise<void> {
   });
 }
 
-async function fetchUserInfo(accessToken: string) {
+function saveCachedUserInfo() {
+  const user = {
+    name: authState.userName,
+    email: authState.userEmail,
+    photo: authState.userPhoto,
+  };
+  localStorage.setItem(STORAGE_USER_KEY, JSON.stringify(user));
+}
+
+async function fetchUserInfo(accessToken: string): Promise<boolean> {
   try {
     const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
       headers: { Authorization: `Bearer ${accessToken}` },
@@ -80,10 +97,13 @@ async function fetchUserInfo(accessToken: string) {
       authState.userName = data.name || null;
       authState.userEmail = data.email || null;
       authState.userPhoto = data.picture || null;
+      saveCachedUserInfo();
+      return !!authState.userEmail;
     }
   } catch {
     // Non-critical, ignore
   }
+  return false;
 }
 
 /** Save token + user info to localStorage for session persistence */
@@ -91,12 +111,7 @@ function saveSession(accessToken: string, expiresIn: number) {
   tokenExpiry = Date.now() + expiresIn * 1000;
   localStorage.setItem(STORAGE_TOKEN_KEY, accessToken);
   localStorage.setItem(STORAGE_EXPIRY_KEY, String(tokenExpiry));
-  const user = {
-    name: authState.userName,
-    email: authState.userEmail,
-    photo: authState.userPhoto,
-  };
-  localStorage.setItem(STORAGE_USER_KEY, JSON.stringify(user));
+  saveCachedUserInfo();
 }
 
 /** Clear saved session from localStorage */
@@ -208,6 +223,7 @@ export async function initGoogleAuth(): Promise<void> {
         clearRefreshTimer();
         clearSession();
         notifyListeners();
+        resolvePendingAuthRequests();
         return;
       }
 
@@ -222,10 +238,12 @@ export async function initGoogleAuth(): Promise<void> {
       saveSession(response.access_token, expiresIn);
       scheduleSilentRefresh();
       notifyListeners();
+      resolvePendingAuthRequests();
     },
     error_callback: () => {
       // ポップアップを閉じた／自動更新が拒否された等。状態は維持する
       silentMode = false;
+      resolvePendingAuthRequests();
     },
   });
 
@@ -261,6 +279,36 @@ export function signIn(): void {
   if (!tokenClient) return;
   silentMode = false;
   tokenClient.requestAccessToken({ prompt: 'select_account' });
+}
+
+export async function ensureGoogleUserInfo(): Promise<GoogleAuthState> {
+  if (!isGoogleConfigured()) return getAuthState();
+  if (!authState.isInitialized) {
+    await initGoogleAuth();
+  }
+
+  if (authState.accessToken && !authState.userEmail) {
+    await fetchUserInfo(authState.accessToken);
+    notifyListeners();
+  }
+
+  if (authState.isSignedIn && authState.userEmail) {
+    return getAuthState();
+  }
+
+  if (!tokenClient) return getAuthState();
+  const client = tokenClient;
+
+  return new Promise((resolve) => {
+    pendingAuthRequests.add(resolve);
+    silentMode = false;
+    try {
+      client.requestAccessToken({ prompt: authState.isSignedIn ? 'consent' : 'select_account' });
+    } catch {
+      pendingAuthRequests.delete(resolve);
+      resolve(getAuthState());
+    }
+  });
 }
 
 export function signOut(): void {
