@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { DriveFileInfo, downloadDriveFile, getTargetFolder, listJsonFilesInFolder } from '@/lib/googleDrive';
-import { getApprovalStatus, WorkInstruction } from '@/types/instruction';
+import { getApprovalStatus, getCategoryLabel, WorkInstruction } from '@/types/instruction';
 
 interface DriveJsonFilePickerProps {
   open: boolean;
@@ -15,6 +15,9 @@ type SortOrder = 'updated-desc' | 'updated-asc';
 interface FileListItem extends DriveFileInfo {
   createdBy?: string;
   updatedBy?: string;
+  category?: string;
+  department?: string;
+  searchableText?: string;
   approvalStatus?: 'approved' | 'needs_reapproval' | 'unapproved';
   approvalApprovedAt?: string;
 }
@@ -51,6 +54,34 @@ function approvalBadgeLabel(status?: string): string {
   return '未承認';
 }
 
+function buildSearchableText(instruction: WorkInstruction): string {
+  const parts: string[] = [
+    instruction.title,
+    instruction.description,
+    instruction.department,
+    instruction.category,
+    ...(instruction.keywords ?? []),
+  ].filter((value): value is string => !!value);
+
+  for (const step of instruction.steps ?? []) {
+    parts.push(...[
+      step.title,
+      step.description,
+      step.caution,
+      step.detailDescription,
+      ...(step.checkItems ?? []).map((check) => check.label),
+      ...(step.links ?? []).flatMap((link) => [link.label, link.url]),
+      ...(step.imageCaptions ?? []),
+    ].filter((value): value is string => !!value));
+  }
+
+  for (const condition of instruction.conditions ?? []) {
+    parts.push(condition.label);
+  }
+
+  return parts.filter(Boolean).join('\n').toLowerCase();
+}
+
 export default function DriveJsonFilePicker({ open, onClose, onFileLoaded }: DriveJsonFilePickerProps) {
   const [files, setFiles] = useState<FileListItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -61,6 +92,10 @@ export default function DriveJsonFilePicker({ open, onClose, onFileLoaded }: Dri
   const [sortOrder, setSortOrder] = useState<SortOrder>('updated-desc');
   const [createdByFilter, setCreatedByFilter] = useState('all');
   const [updatedByFilter, setUpdatedByFilter] = useState('all');
+  const [categoryFilter, setCategoryFilter] = useState('all');
+  const [departmentFilter, setDepartmentFilter] = useState('all');
+  const [approvalFilter, setApprovalFilter] = useState('all');
+  const [includeContentSearch, setIncludeContentSearch] = useState(false);
   const [metadataLoading, setMetadataLoading] = useState(false);
 
   useEffect(() => {
@@ -100,6 +135,9 @@ export default function DriveJsonFilePicker({ open, onClose, onFileLoaded }: Dri
       (file) =>
         file.createdBy === undefined &&
         file.updatedBy === undefined &&
+        file.category === undefined &&
+        file.department === undefined &&
+        file.searchableText === undefined &&
         file.approvalStatus === undefined,
     );
     if (pending.length === 0) return;
@@ -115,6 +153,9 @@ export default function DriveJsonFilePicker({ open, onClose, onFileLoaded }: Dri
             id: file.id,
             createdBy: json.createdBy?.trim() || file.ownerName || '',
             updatedBy: json.updatedBy?.trim() || file.lastModifyingUserName || '',
+            category: json.category || '',
+            department: json.department || '',
+            searchableText: buildSearchableText(json),
             approvalStatus: getApprovalStatus(json),
             approvalApprovedAt: json.approval?.current?.approvedAt,
           };
@@ -124,6 +165,9 @@ export default function DriveJsonFilePicker({ open, onClose, onFileLoaded }: Dri
             id: file.id,
             createdBy: file.ownerName || '',
             updatedBy: file.lastModifyingUserName || '',
+            category: '',
+            department: '',
+            searchableText: '',
             approvalStatus: 'unapproved' as const,
           };
         }
@@ -140,6 +184,9 @@ export default function DriveJsonFilePicker({ open, onClose, onFileLoaded }: Dri
                   ...file,
                   createdBy: meta.createdBy || undefined,
                   updatedBy: meta.updatedBy || undefined,
+                  category: meta.category || undefined,
+                  department: meta.department || undefined,
+                  searchableText: meta.searchableText || undefined,
                   approvalStatus: meta.approvalStatus,
                   approvalApprovedAt: meta.approvalApprovedAt,
                 }
@@ -180,6 +227,10 @@ export default function DriveJsonFilePicker({ open, onClose, onFileLoaded }: Dri
     setSortOrder('updated-desc');
     setCreatedByFilter('all');
     setUpdatedByFilter('all');
+    setCategoryFilter('all');
+    setDepartmentFilter('all');
+    setApprovalFilter('all');
+    setIncludeContentSearch(false);
     onClose();
   };
 
@@ -191,14 +242,27 @@ export default function DriveJsonFilePicker({ open, onClose, onFileLoaded }: Dri
     new Set(files.map((file) => file.updatedBy).filter((value): value is string => !!value)),
   ).sort((a, b) => a.localeCompare(b, 'ja'));
 
+  const categoryOptions = Array.from(
+    new Set(files.map((file) => file.category).filter((value): value is string => !!value)),
+  ).sort((a, b) => getCategoryLabel(a).localeCompare(getCategoryLabel(b), 'ja'));
+
+  const departmentOptions = Array.from(
+    new Set(files.map((file) => file.department).filter((value): value is string => !!value)),
+  ).sort((a, b) => a.localeCompare(b, 'ja'));
+
   const filteredFiles = [...files]
     .filter((file) => {
       const normalizedQuery = query.trim().toLowerCase();
       if (!normalizedQuery) return true;
-      return file.name.toLowerCase().includes(normalizedQuery);
+      if (file.name.toLowerCase().includes(normalizedQuery)) return true;
+      if (!includeContentSearch) return false;
+      return (file.searchableText ?? '').includes(normalizedQuery);
     })
     .filter((file) => (createdByFilter === 'all' ? true : file.createdBy === createdByFilter))
     .filter((file) => (updatedByFilter === 'all' ? true : file.updatedBy === updatedByFilter))
+    .filter((file) => (categoryFilter === 'all' ? true : file.category === categoryFilter))
+    .filter((file) => (departmentFilter === 'all' ? true : file.department === departmentFilter))
+    .filter((file) => (approvalFilter === 'all' ? true : file.approvalStatus === approvalFilter))
     .sort((a, b) => {
       const aTime = a.modifiedTime ? new Date(a.modifiedTime).getTime() : 0;
       const bTime = b.modifiedTime ? new Date(b.modifiedTime).getTime() : 0;
@@ -234,8 +298,8 @@ export default function DriveJsonFilePicker({ open, onClose, onFileLoaded }: Dri
 
         <div className="flex-1 overflow-y-auto px-4 py-3 sm:px-5">
           <div className="mb-3 rounded-2xl border border-neutral-200 bg-white px-4 py-3">
-            <div className="grid gap-3 lg:grid-cols-[minmax(0,1.4fr)_repeat(3,minmax(0,1fr))]">
-              <label className="block">
+            <div className="grid gap-3 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,0.8fr)_repeat(3,minmax(0,1fr))]">
+              <div className="block">
                 <span className="mb-1.5 block text-xs font-medium text-neutral-500">ファイル名で検索</span>
                 <input
                   type="text"
@@ -244,7 +308,16 @@ export default function DriveJsonFilePicker({ open, onClose, onFileLoaded }: Dri
                   placeholder="ファイル名を入力"
                   className="brand-panel w-full rounded-xl border border-neutral-200 px-3 py-2 text-sm text-neutral-800 outline-none transition focus:border-[#c9b188] focus:bg-white"
                 />
-              </label>
+                <label className="mt-2 flex cursor-pointer items-center gap-2 text-xs font-medium text-neutral-500">
+                  <input
+                    type="checkbox"
+                    checked={includeContentSearch}
+                    onChange={(e) => setIncludeContentSearch(e.target.checked)}
+                    className="h-3.5 w-3.5 rounded border-neutral-300 accent-blue-600"
+                  />
+                  手順書の中身も検索
+                </label>
+              </div>
 
               <label className="block">
                 <span className="mb-1.5 block text-xs font-medium text-neutral-500">更新日で並び替え</span>
@@ -257,6 +330,52 @@ export default function DriveJsonFilePicker({ open, onClose, onFileLoaded }: Dri
                   <option value="updated-asc">古い順</option>
                 </select>
               </label>
+
+              <div className="block">
+                <span className="mb-1.5 block text-xs font-medium text-neutral-500">カテゴリで絞り込み</span>
+                <select
+                  value={categoryFilter}
+                  onChange={(e) => setCategoryFilter(e.target.value)}
+                  className="brand-panel w-full rounded-xl border border-neutral-200 px-3 py-2 text-sm text-neutral-800 outline-none transition focus:border-[#c9b188] focus:bg-white"
+                >
+                  <option value="all">すべて</option>
+                  {categoryOptions.map((category) => (
+                    <option key={category} value={category}>
+                      {getCategoryLabel(category)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="block">
+                <span className="mb-1.5 block text-xs font-medium text-neutral-500">部署で絞り込み</span>
+                <select
+                  value={departmentFilter}
+                  onChange={(e) => setDepartmentFilter(e.target.value)}
+                  className="brand-panel w-full rounded-xl border border-neutral-200 px-3 py-2 text-sm text-neutral-800 outline-none transition focus:border-[#c9b188] focus:bg-white"
+                >
+                  <option value="all">すべて</option>
+                  {departmentOptions.map((department) => (
+                    <option key={department} value={department}>
+                      {department}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="block">
+                <span className="mb-1.5 block text-xs font-medium text-neutral-500">承認で絞り込み</span>
+                <select
+                  value={approvalFilter}
+                  onChange={(e) => setApprovalFilter(e.target.value)}
+                  className="brand-panel w-full rounded-xl border border-neutral-200 px-3 py-2 text-sm text-neutral-800 outline-none transition focus:border-[#c9b188] focus:bg-white"
+                >
+                  <option value="all">すべて</option>
+                  <option value="approved">承認済み</option>
+                  <option value="needs_reapproval">要再承認</option>
+                  <option value="unapproved">未承認</option>
+                </select>
+              </div>
 
               <label className="block">
                 <span className="mb-1.5 block text-xs font-medium text-neutral-500">作成者で絞り込み</span>
