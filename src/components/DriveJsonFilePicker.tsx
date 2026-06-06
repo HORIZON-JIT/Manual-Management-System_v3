@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { DriveFileInfo, downloadDriveFile, getTargetFolder, listJsonFilesInFolder } from '@/lib/googleDrive';
+import { getApprovalStatus, WorkInstruction } from '@/types/instruction';
 
 interface DriveJsonFilePickerProps {
   open: boolean;
@@ -14,6 +15,8 @@ type SortOrder = 'updated-desc' | 'updated-asc';
 interface FileListItem extends DriveFileInfo {
   createdBy?: string;
   updatedBy?: string;
+  approvalStatus?: 'approved' | 'needs_reapproval' | 'unapproved';
+  approvalApprovedAt?: string;
 }
 
 function formatDate(value?: string): string | null {
@@ -34,6 +37,18 @@ function formatSize(bytes?: number): string | null {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function approvalBadgeClass(status?: string): string {
+  if (status === 'approved') return 'border-emerald-200 bg-emerald-50 text-emerald-700';
+  if (status === 'needs_reapproval') return 'border-amber-200 bg-amber-50 text-amber-700';
+  return 'border-neutral-200 bg-neutral-50 text-neutral-500';
+}
+
+function approvalBadgeLabel(status?: string, approvedAt?: string): string {
+  if (status === 'approved') return `承認済み${approvedAt ? ` ${formatDate(approvedAt)}` : ''}`;
+  if (status === 'needs_reapproval') return '要再承認';
+  return '未承認';
 }
 
 export default function DriveJsonFilePicker({ open, onClose, onFileLoaded }: DriveJsonFilePickerProps) {
@@ -81,7 +96,12 @@ export default function DriveJsonFilePicker({ open, onClose, onFileLoaded }: Dri
     if (!open || files.length === 0) return;
 
     let cancelled = false;
-    const pending = files.filter((file) => file.createdBy === undefined && file.updatedBy === undefined);
+    const pending = files.filter(
+      (file) =>
+        file.createdBy === undefined &&
+        file.updatedBy === undefined &&
+        file.approvalStatus === undefined,
+    );
     if (pending.length === 0) return;
 
     setMetadataLoading(true);
@@ -90,11 +110,13 @@ export default function DriveJsonFilePicker({ open, onClose, onFileLoaded }: Dri
       pending.map(async (file) => {
         try {
           const content = await downloadDriveFile(file.id);
-          const json = JSON.parse(content) as { createdBy?: string; updatedBy?: string };
+          const json = JSON.parse(content) as WorkInstruction;
           return {
             id: file.id,
             createdBy: json.createdBy?.trim() || file.ownerName || '',
             updatedBy: json.updatedBy?.trim() || file.lastModifyingUserName || '',
+            approvalStatus: getApprovalStatus(json),
+            approvalApprovedAt: json.approval?.current?.approvedAt,
           };
         } catch (err) {
           console.error('Failed to load file metadata:', err);
@@ -102,6 +124,7 @@ export default function DriveJsonFilePicker({ open, onClose, onFileLoaded }: Dri
             id: file.id,
             createdBy: file.ownerName || '',
             updatedBy: file.lastModifyingUserName || '',
+            approvalStatus: 'unapproved' as const,
           };
         }
       }),
@@ -117,6 +140,8 @@ export default function DriveJsonFilePicker({ open, onClose, onFileLoaded }: Dri
                   ...file,
                   createdBy: meta.createdBy || undefined,
                   updatedBy: meta.updatedBy || undefined,
+                  approvalStatus: meta.approvalStatus,
+                  approvalApprovedAt: meta.approvalApprovedAt,
                 }
               : file;
           }),
@@ -305,7 +330,19 @@ export default function DriveJsonFilePicker({ open, onClose, onFileLoaded }: Dri
                       </div>
 
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-lg font-medium text-neutral-900">{file.name}</p>
+                        <div className="flex min-w-0 flex-wrap items-center gap-2">
+                          <p className="min-w-0 flex-1 truncate text-lg font-medium text-neutral-900">{file.name}</p>
+                          {file.approvalStatus && (
+                            <span className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold ${approvalBadgeClass(file.approvalStatus)}`}>
+                              {file.approvalStatus === 'approved' && (
+                                <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.3} d="M5 13l4 4L19 7" />
+                                </svg>
+                              )}
+                              {approvalBadgeLabel(file.approvalStatus, file.approvalApprovedAt)}
+                            </span>
+                          )}
+                        </div>
                         <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-neutral-400">
                           {updatedAt && <span>更新: {updatedAt}</span>}
                           {size && <span>サイズ: {size}</span>}
