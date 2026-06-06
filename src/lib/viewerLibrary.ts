@@ -15,6 +15,7 @@ const DEPT_FILTER_KEY = 'mms-viewer-dept';
 const LAYOUT_KEY = 'mms-viewer-layout';
 
 export type LibraryLayout = 'grid' | 'list';
+export type CachedApprovalStatus = 'approved' | 'needs_reapproval' | 'unapproved';
 
 export interface ViewStat {
   /** 開いた回数 */
@@ -30,6 +31,13 @@ export interface CachedMeta {
   department: string;
   /** 本文検索用に抽出・小文字化したテキスト（画像データは含めない） */
   searchText: string;
+  /** 上長承認の現在状態 */
+  approvalStatus?: CachedApprovalStatus;
+  approvalApprovedAt?: string;
+  approvalUserName?: string;
+  approvalUserEmail?: string;
+  approvalRevokedAt?: string;
+  approvalRevokeReason?: string;
   /** Drive上の更新日時。これが変わったらキャッシュを無効化する */
   modifiedTime?: string;
 }

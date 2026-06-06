@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useEffect, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { v4 as uuidv4 } from 'uuid';
 import {
@@ -12,6 +12,9 @@ import {
   UpdateHistoryEntry,
   InstructionSnapshot,
   InstructionStatus,
+  ApprovalState,
+  getApprovalStatus,
+  getInstructionRevision,
   getStepConditionIds,
 } from '@/types/instruction';
 import { saveInstruction } from '@/lib/storage';
@@ -19,7 +22,7 @@ import { buildExcelBuffer, ExcelNavMode } from '@/lib/exportSpreadsheet';
 import { uploadAsGoogleSheet, saveFileToDrive, getTargetFolder } from '@/lib/googleDrive';
 import { addStepNavLinks, addSheetCheckboxes, addResetScript } from '@/lib/sheetsNavLinks';
 import { getViewPageBaseUrl } from '@/lib/shareLink';
-import { isGoogleConfigured, getAuthState } from '@/lib/googleAuth';
+import { isGoogleConfigured, getAuthState, addAuthListener, initGoogleAuth } from '@/lib/googleAuth';
 import { getCustomDepartments, addCustomDepartment } from '@/lib/customDepartments';
 import StepEditor from './StepEditor';
 import VersionHistoryModal from './VersionHistoryModal';
@@ -32,6 +35,7 @@ const labelClass = 'mb-1.5 block text-sm font-semibold text-slate-700';
 
 interface InstructionFormProps {
   initialData?: WorkInstruction;
+  approvalMode?: boolean;
 }
 
 function createEmptyStep(orderIndex: number): Step {
@@ -49,9 +53,29 @@ function saveLastAuthorName(name: string) {
   }
 }
 
-export default function InstructionForm({ initialData }: InstructionFormProps) {
+function todayInputValue(): string {
+  const date = new Date();
+  const offsetDate = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+  return offsetDate.toISOString().slice(0, 10);
+}
+
+function formatDate(value?: string): string {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat('ja-JP', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(date);
+}
+
+export default function InstructionForm({ initialData, approvalMode = false }: InstructionFormProps) {
   const router = useRouter();
   const isEdit = !!initialData;
+  const descriptionGuideRef = useRef<HTMLDivElement>(null);
+  const updateHistoryGuideRef = useRef<HTMLDivElement>(null);
+  const approvalPanelRef = useRef<HTMLDivElement>(null);
 
   const [title, setTitle] = useState(initialData?.title || '');
   const [category, setCategory] = useState(initialData?.category || DEFAULT_CATEGORIES[0]);
@@ -86,8 +110,9 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
   const [showFlowchart, setShowFlowchart] = useState(false);
   const [showStepIndex, setShowStepIndex] = useState(false);
   const [showDescriptionGuide, setShowDescriptionGuide] = useState(false);
+  const [showUpdateHistoryGuide, setShowUpdateHistoryGuide] = useState(false);
   const [showSidebarConditions, setShowSidebarConditions] = useState(false);
-  const [showSaveSettings, setShowSaveSettings] = useState(false);
+  const [showSaveSettings, setShowSaveSettings] = useState(approvalMode);
   const [conditions, setConditions] = useState<Condition[]>(() => {
     const raw = initialData?.conditions ?? [];
     if (raw.length === 0) return [];
@@ -113,10 +138,51 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
   } | null>(null);
   const [viewUrlCopied, setViewUrlCopied] = useState(false);
   const [draftSaveMessage, setDraftSaveMessage] = useState<string | null>(null);
+  const [auth, setAuth] = useState(getAuthState());
+  const [approveOnSave, setApproveOnSave] = useState(false);
+  const [approvalDate, setApprovalDate] = useState(initialData?.approval?.current?.approvedAt?.slice(0, 10) || todayInputValue());
+  const [revokeOnSave, setRevokeOnSave] = useState(false);
+  const [revokeReason, setRevokeReason] = useState('');
 
   useEffect(() => {
     setCustomDepartments(getCustomDepartments());
   }, []);
+
+  useEffect(() => {
+    if (!approvalMode) return;
+    setShowSaveSettings(true);
+    const timer = setTimeout(() => {
+      approvalPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [approvalMode]);
+
+  useEffect(() => {
+    if (isGoogleConfigured()) {
+      initGoogleAuth().catch(() => {});
+    }
+    return addAuthListener(setAuth);
+  }, []);
+
+  useEffect(() => {
+    if (!showDescriptionGuide && !showUpdateHistoryGuide) return;
+
+    const closeGuidesOnOutsideClick = (event: MouseEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+
+      if (showDescriptionGuide && !descriptionGuideRef.current?.contains(target)) {
+        setShowDescriptionGuide(false);
+      }
+
+      if (showUpdateHistoryGuide && !updateHistoryGuideRef.current?.contains(target)) {
+        setShowUpdateHistoryGuide(false);
+      }
+    };
+
+    document.addEventListener('mousedown', closeGuidesOnOutsideClick);
+    return () => document.removeEventListener('mousedown', closeGuidesOnOutsideClick);
+  }, [showDescriptionGuide, showUpdateHistoryGuide]);
 
   // 既定の部署＋追加された部署＋編集中データの部署を重複なくまとめる
   const departmentOptions = Array.from(
@@ -138,6 +204,10 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
 
   const hasRestorableVersions =
     isEdit && initialData?.updateHistory?.some((entry) => !!entry.snapshot);
+  const currentApproval = initialData?.approval?.current;
+  const approvalStatus = initialData ? getApprovalStatus(initialData) : 'unapproved';
+  const currentRevision = getInstructionRevision(initialData ?? { updateHistory: undefined });
+  const approvalHistory = initialData?.approval?.history ?? [];
 
   const handleRestoreVersion = (snapshot: InstructionSnapshot) => {
     setTitle(snapshot.title);
@@ -338,6 +408,63 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
       updateHistory = [...updateHistory, entry];
     }
 
+    let approval: ApprovalState | undefined = initialData?.approval
+      ? {
+          current: initialData.approval.current,
+          history: initialData.approval.history ? [...initialData.approval.history] : undefined,
+        }
+      : undefined;
+
+    if (status === 'completed' && (approveOnSave || revokeOnSave)) {
+      const authState = getAuthState();
+      if (!isGoogleConfigured() || !authState.isSignedIn || !authState.userEmail) {
+        alert('上長承認を記録するには Google にサインインしてください。');
+        return null;
+      }
+      if (approveOnSave && !approvalDate) {
+        alert('承認日を入力してください。');
+        return null;
+      }
+      if (revokeOnSave && !revokeReason.trim()) {
+        alert('承認取消理由を入力してください。');
+        return null;
+      }
+
+      const history = approval?.history ? [...approval.history] : [];
+      const revision = updateHistory.length;
+      if (approveOnSave) {
+        const record = {
+          approvedAt: approvalDate,
+          revision,
+          userName: authState.userName || undefined,
+          userEmail: authState.userEmail,
+        };
+        history.push({
+          action: 'approved',
+          actedAt: now,
+          revision,
+          userName: record.userName,
+          userEmail: record.userEmail,
+        });
+        approval = { current: record, history };
+      }
+      if (revokeOnSave) {
+        history.push({
+          action: 'revoked',
+          actedAt: now,
+          revision,
+          userName: authState.userName || undefined,
+          userEmail: authState.userEmail,
+          reason: revokeReason.trim(),
+        });
+        approval = { history };
+      }
+    }
+
+    if (approval && !approval.current && (!approval.history || approval.history.length === 0)) {
+      approval = undefined;
+    }
+
     const parsedKeywords = keywordsText
       .split(/[,\s]+/)
       .map((keyword) => keyword.trim())
@@ -355,6 +482,7 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
       createdBy: initialData?.createdBy || trimmedName || undefined,
       updatedBy: isEdit && trimmedName ? trimmedName : initialData?.updatedBy,
       updateHistory: updateHistory.length > 0 ? updateHistory : undefined,
+      approval,
       status,
       keywords: parsedKeywords.length > 0 ? parsedKeywords : undefined,
       conditions: conditions.length > 0 ? conditions : undefined,
@@ -637,25 +765,154 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
     </section>
   );
 
+  const renderApprovalPanel = () => {
+    const approver = auth.userEmail
+      ? `${auth.userName || 'Googleユーザー'} / ${auth.userEmail}`
+      : 'Googleにサインインすると承認者を自動記録します';
+    const statusLabel =
+      approvalStatus === 'approved'
+        ? '承認済み'
+        : approvalStatus === 'needs_reapproval'
+          ? '要再承認'
+          : '未承認';
+    const statusClass =
+      approvalStatus === 'approved'
+        ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+        : approvalStatus === 'needs_reapproval'
+          ? 'border-amber-200 bg-amber-50 text-amber-700'
+          : 'border-slate-200 bg-slate-50 text-slate-500';
+
+    return (
+      <div id="approval-section" ref={approvalPanelRef} className="mt-5 border-t border-slate-200 pt-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-sm font-semibold text-slate-700">上長承認</p>
+          <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${statusClass}`}>
+            {statusLabel}
+            {approvalStatus === 'approved' && currentApproval?.approvedAt ? ` ${formatDate(currentApproval.approvedAt)}` : ''}
+          </span>
+        </div>
+
+        {currentApproval && (
+          <div className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-500">
+            <p>前回承認日: {formatDate(currentApproval.approvedAt)}</p>
+            <p>承認者: {currentApproval.userName || 'Googleユーザー'}</p>
+            {currentApproval.userEmail && <p className="break-all">メール: {currentApproval.userEmail}</p>}
+            {approvalStatus === 'needs_reapproval' && (
+              <p className="mt-1 font-semibold text-amber-700">
+                現在の改版 v{currentRevision + 1} では再承認が必要です。
+              </p>
+            )}
+          </div>
+        )}
+
+        <div className="mt-3 space-y-3">
+          <label className="flex cursor-pointer items-start gap-3">
+            <input
+              type="checkbox"
+              checked={approveOnSave}
+              onChange={(event) => {
+                setApproveOnSave(event.target.checked);
+                if (event.target.checked) setRevokeOnSave(false);
+              }}
+              className="mt-1 h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+            />
+            <span>
+              <span className="block text-sm font-semibold text-slate-700">
+                この版を承認済みにする
+              </span>
+              <span className="mt-1 block text-xs leading-5 text-slate-500">
+                完成保存時に、ログイン中のGoogleアカウントを承認者として記録します。
+              </span>
+            </span>
+          </label>
+
+          {approveOnSave && (
+            <div className="rounded-lg border border-emerald-100 bg-emerald-50/60 p-3">
+              <label className="block text-xs font-semibold text-slate-600">
+                承認日
+                <input
+                  type="date"
+                  value={approvalDate}
+                  onChange={(event) => setApprovalDate(event.target.value)}
+                  className={`${fieldClass} mt-1 bg-white`}
+                />
+              </label>
+              <p className="mt-2 text-xs leading-5 text-slate-600">
+                承認者: {approver}
+              </p>
+            </div>
+          )}
+
+          {currentApproval && (
+            <label className="flex cursor-pointer items-start gap-3">
+              <input
+                type="checkbox"
+                checked={revokeOnSave}
+                onChange={(event) => {
+                  setRevokeOnSave(event.target.checked);
+                  if (event.target.checked) setApproveOnSave(false);
+                }}
+                className="mt-1 h-4 w-4 rounded border-slate-300 text-red-600 focus:ring-red-500"
+              />
+              <span>
+                <span className="block text-sm font-semibold text-slate-700">
+                  承認を取り消す
+                </span>
+                <span className="mt-1 block text-xs leading-5 text-slate-500">
+                  取消理由とGoogleアカウントを履歴に残します。
+                </span>
+              </span>
+            </label>
+          )}
+
+          {revokeOnSave && (
+            <div className="rounded-lg border border-red-100 bg-red-50/60 p-3">
+              <label className="block text-xs font-semibold text-slate-600">
+                取消理由 <span className="text-red-500">必須</span>
+                <textarea
+                  value={revokeReason}
+                  onChange={(event) => setRevokeReason(event.target.value)}
+                  rows={3}
+                  className={`${fieldClass} mt-1 resize-y bg-white`}
+                  placeholder="例: 誤って承認したため"
+                />
+              </label>
+              <p className="mt-2 text-xs leading-5 text-slate-600">
+                取消者: {approver}
+              </p>
+            </div>
+          )}
+
+          {approvalHistory.length > 0 && (
+            <p className="text-xs text-slate-400">
+              承認履歴 {approvalHistory.length} 件を保存済み
+            </p>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <>
       <form
-        className="mx-auto max-w-6xl px-4 py-8"
+        className="mx-auto max-w-[88rem] px-6 py-7"
         onSubmit={(event) => event.preventDefault()}
       >
-        <div className="mb-8 flex flex-col gap-4 border-b border-slate-200 pb-6 md:flex-row md:items-end md:justify-between">
-          <div>
-            <p className="text-sm font-semibold tracking-[0.16em] text-blue-700">
+        <div className="mb-7 border-b border-slate-200 pb-5">
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold tracking-[0.24em] text-slate-400">
               {isEdit ? 'EDIT MANUAL' : 'NEW MANUAL'}
             </p>
-            <h1 className="mt-2 text-3xl font-bold tracking-tight text-slate-950">
-              {isEdit ? '手順書の編集' : '新規手順書の作成'}
-            </h1>
-            <p className="mt-2 text-sm text-slate-500">
-              基本情報、条件分岐、各ステップを入力してDriveへ保存します。
-            </p>
+            <div className="mt-2 flex flex-wrap items-baseline gap-x-4 gap-y-1">
+              <h1 className="text-2xl font-semibold tracking-tight text-slate-950">
+                {isEdit ? '手順書の編集' : '新規手順書の作成'}
+              </h1>
+              <p className="text-sm leading-6 text-slate-500">
+                基本情報、条件分岐、各ステップを入力してDriveへ保存します。
+              </p>
+            </div>
           </div>
-          <LinkButton href="/" label="ホームへ戻る" />
         </div>
 
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_21rem]">
@@ -669,7 +926,7 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
               </div>
 
               <div className="grid gap-5 md:grid-cols-2">
-                <div className="md:col-span-2">
+                <div ref={descriptionGuideRef} className="md:col-span-2">
                   <label className={labelClass}>
                     タイトル <span className="text-red-500">*</span>
                   </label>
@@ -865,21 +1122,49 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
               </div>
 
               {isEdit && (
-                <div className="mt-5 rounded-lg border border-slate-200 bg-slate-50 p-4">
-                  <label className="flex cursor-pointer items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={addHistory}
-                      onChange={(event) => setAddHistory(event.target.checked)}
-                      className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                    />
-                    <span className="text-sm font-semibold text-slate-700">
-                      更新履歴に追記する
-                    </span>
+                <div
+                  ref={updateHistoryGuideRef}
+                  className="mt-5 rounded-lg border border-slate-200 bg-slate-50 p-4"
+                >
+                  <div className="flex flex-wrap items-center gap-2">
+                    <label className="flex cursor-pointer items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={addHistory}
+                        onChange={(event) => setAddHistory(event.target.checked)}
+                        className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      <span className="text-sm font-semibold text-slate-700">
+                        更新履歴に追記する
+                      </span>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setShowUpdateHistoryGuide((current) => !current)}
+                      className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-slate-300 bg-white text-[11px] font-bold text-slate-500 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700"
+                      aria-expanded={showUpdateHistoryGuide}
+                      aria-label="更新履歴の説明を表示"
+                      title="更新履歴の説明"
+                    >
+                      ?
+                    </button>
                     <span className="text-xs text-slate-500">
                       大きな変更があった場合にチェックしてください
                     </span>
-                  </label>
+                  </div>
+
+                  {showUpdateHistoryGuide && (
+                    <div className="mt-3 rounded-lg border border-blue-100 bg-blue-50/70 px-4 py-3 text-sm leading-6 text-slate-700">
+                      <p className="font-semibold text-slate-900">
+                        更新ルール
+                      </p>
+                      <ul className="mt-2 list-disc space-y-1 pl-5 text-slate-600">
+                        <li>大きく内容が変わったとき（ツールが変わる・ステップが増減する等）に改訂する</li>
+                        <li>一言二言の軽微な修正では改訂不要</li>
+                        <li>更新履歴を残し、旧バージョンへの復元を可能にする</li>
+                      </ul>
+                    </div>
+                  )}
 
                   {addHistory && (
                     <input
@@ -993,10 +1278,11 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
                       onChange={() => setExcelNavMode(option.value as ExcelNavMode)}
                       className="accent-blue-600"
                     />
-                    {option.label}
-                  </label>
-                ))}
+                  {option.label}
+                </label>
+              ))}
               </div>
+              {renderApprovalPanel()}
             </section>
             <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
               <div className="space-y-3">
@@ -1131,6 +1417,7 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
                       スクロール（従来通り）
                     </label>
                   </div>
+                  {renderApprovalPanel()}
                 </>
               )}
             </section>
@@ -1138,7 +1425,7 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
         </div>
       </form>
 
-      <div className="fixed left-6 top-24 z-30 hidden xl:block">
+      <div className="hidden">
         {showStepIndex ? (
           <nav className="w-60 rounded-lg border border-slate-200 bg-white p-4 shadow-[0_18px_44px_rgba(15,23,42,0.10)]">
             <div className="mb-4 flex items-start justify-between gap-3">
@@ -1190,7 +1477,7 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
       <button
         type="button"
         onClick={() => setShowStepIndex(true)}
-        className="fixed bottom-6 left-6 z-30 flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-lg xl:hidden"
+        className="fixed bottom-6 left-6 z-30 flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-lg"
       >
         <svg className="h-4 w-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
@@ -1199,8 +1486,8 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
       </button>
 
       {showStepIndex && (
-        <div className="fixed inset-0 z-40 flex items-end bg-slate-950/25 p-4 xl:hidden">
-          <nav className="w-full rounded-lg bg-white p-4 shadow-xl">
+        <div className="fixed inset-0 z-40 flex items-end bg-slate-950/25 p-4">
+          <nav className="w-full rounded-lg bg-white p-4 shadow-xl sm:max-w-md">
             <div className="mb-3 flex items-center justify-between">
               <h2 className="text-base font-semibold text-slate-900">ステップ一覧</h2>
               <button type="button" onClick={() => setShowStepIndex(false)} className="px-2 py-1 text-slate-500">
@@ -1323,19 +1610,5 @@ export default function InstructionForm({ initialData }: InstructionFormProps) {
         />
       )}
     </>
-  );
-}
-
-function LinkButton({ href, label }: { href: string; label: string }) {
-  return (
-    <button
-      type="button"
-      onClick={() => {
-        window.location.href = href;
-      }}
-      className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
-    >
-      {label}
-    </button>
   );
 }

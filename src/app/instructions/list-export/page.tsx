@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { WorkInstruction, getCategoryLabel } from '@/types/instruction';
+import { WorkInstruction, getApprovalStatus, getCategoryLabel } from '@/types/instruction';
 import { downloadDriveFile, getTargetFolder, listJsonFilesInFolder, saveFileToDrive } from '@/lib/googleDrive';
 import { addAuthListener, getAuthState, GoogleAuthState, initGoogleAuth, isGoogleConfigured, signIn } from '@/lib/googleAuth';
 import { buildInstructionListExcel, exportInstructionList } from '@/lib/exportSpreadsheet';
@@ -181,6 +181,8 @@ function ListExportTool() {
               <tr>
                 <th className="px-3 py-2 font-medium">タイトル</th>
                 <th className="px-3 py-2 font-medium">カテゴリ</th>
+                <th className="px-3 py-2 font-medium">承認</th>
+                <th className="px-3 py-2 font-medium">承認日</th>
                 <th className="px-3 py-2 font-medium">作成者</th>
                 <th className="px-3 py-2 font-medium">更新者</th>
                 <th className="px-3 py-2 font-medium">作成日</th>
@@ -191,10 +193,14 @@ function ListExportTool() {
             <tbody className="divide-y divide-slate-100">
               {instructions.map((inst) => {
                 const updater = inst.updatedBy || inst.updateHistory?.[inst.updateHistory.length - 1]?.updatedBy || '';
+                const approvalStatus = getApprovalStatus(inst);
+                const approvalLabel = approvalStatus === 'approved' ? '承認済み' : approvalStatus === 'needs_reapproval' ? '要再承認' : '未承認';
                 return (
                   <tr key={inst.id} className="hover:bg-slate-50">
                     <td className="max-w-xs truncate px-3 py-2.5 text-slate-900">{inst.title}</td>
                     <td className="px-3 py-2.5 text-slate-600">{getCategoryLabel(inst.category)}</td>
+                    <td className="px-3 py-2.5 text-slate-600">{approvalLabel}</td>
+                    <td className="px-3 py-2.5 text-slate-600">{fmtDate(inst.approval?.current?.approvedAt) || '—'}</td>
                     <td className="px-3 py-2.5 text-slate-600">{inst.createdBy || '—'}</td>
                     <td className="px-3 py-2.5 text-slate-600">{updater || '—'}</td>
                     <td className="px-3 py-2.5 text-slate-600">{fmtDate(inst.createdAt) || '—'}</td>

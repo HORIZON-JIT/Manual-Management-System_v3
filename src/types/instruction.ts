@@ -29,7 +29,7 @@ export type ImageAnnotation =
   | { type: 'circle'; cx: number; cy: number; radiusX: number; radiusY: number; color: string }
   | { type: 'rectangle'; x: number; y: number; width: number; height: number; color: string }
   | { type: 'arrow'; x1: number; y1: number; x2: number; y2: number; scale: number; color: string }
-  | { type: 'number'; x: number; y: number; value: number; scale: number; color: string }
+  | { type: 'number'; x: number; y: number; value: number; scale: number; color: string; mode?: 'auto' | 'manual' }
   | { type: 'text'; x: number; y: number; value: string; scale: number; color: string };
 
 export interface Step {
@@ -37,6 +37,7 @@ export interface Step {
   orderIndex: number;
   title: string;
   description: string;
+  detailDescription?: string;
   /** @deprecated Use imageDataUrls instead */
   imageDataUrl?: string;
   imageDataUrls?: string[];
@@ -101,6 +102,41 @@ export interface UpdateHistoryEntry {
   snapshot?: InstructionSnapshot;
 }
 
+export type ApprovalAction = 'approved' | 'revoked';
+
+export interface ApprovalRecord {
+  approvedAt: string;
+  revision: number;
+  userName?: string;
+  userEmail?: string;
+}
+
+export interface ApprovalHistoryEntry {
+  action: ApprovalAction;
+  actedAt: string;
+  revision: number;
+  userName?: string;
+  userEmail?: string;
+  reason?: string;
+}
+
+export interface ApprovalState {
+  current?: ApprovalRecord;
+  history?: ApprovalHistoryEntry[];
+}
+
+export type ApprovalStatus = 'approved' | 'needs_reapproval' | 'unapproved';
+
+export function getInstructionRevision(instruction: Pick<WorkInstruction, 'updateHistory'>): number {
+  return instruction.updateHistory?.length ?? 0;
+}
+
+export function getApprovalStatus(instruction: Pick<WorkInstruction, 'approval' | 'updateHistory'>): ApprovalStatus {
+  const current = instruction.approval?.current;
+  if (!current) return 'unapproved';
+  return current.revision === getInstructionRevision(instruction) ? 'approved' : 'needs_reapproval';
+}
+
 export type InstructionStatus = 'draft' | 'completed';
 
 export interface ConditionGroup {
@@ -121,6 +157,7 @@ export interface WorkInstruction {
   createdBy?: string;
   updatedBy?: string;
   updateHistory?: UpdateHistoryEntry[];
+  approval?: ApprovalState;
   status?: InstructionStatus;
   keywords?: string[];
   driveFileId?: string;

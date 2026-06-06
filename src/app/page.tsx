@@ -2,13 +2,14 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { WorkInstruction } from '@/types/instruction';
+import { WorkInstruction, getCategoryLabel } from '@/types/instruction';
 import { isGoogleConfigured, getAuthState, signIn } from '@/lib/googleAuth';
 import { DriveFileInfo } from '@/lib/googleDrive';
 import DriveJsonFilePicker from '@/components/DriveJsonFilePicker';
 import InstructionLibrary from '@/components/InstructionLibrary';
 import XmbMenu, { XmbCategory } from '@/components/XmbMenu';
 import { exportToExcel } from '@/lib/exportSpreadsheet';
+import { getViewPageBaseUrl } from '@/lib/shareLink';
 import { setTempData } from '@/lib/tempStorage';
 import { VIEWER_ONLY } from '@/lib/appMode';
 
@@ -94,6 +95,8 @@ function EditorHomePage() {
   const [showJsonPicker, setShowJsonPicker] = useState(false);
   const [showPreviewPicker, setShowPreviewPicker] = useState(false);
   const [showExcelPicker, setShowExcelPicker] = useState(false);
+  const [showApprovalRequestPicker, setShowApprovalRequestPicker] = useState(false);
+  const [showNotifyPicker, setShowNotifyPicker] = useState(false);
 
   useEffect(() => {
     if (!importError) return;
@@ -126,6 +129,66 @@ function EditorHomePage() {
     if (ensureDriveReady()) setShowExcelPicker(true);
   };
 
+  const handleApprovalRequestClick = () => {
+    if (ensureDriveReady()) setShowApprovalRequestPicker(true);
+  };
+
+  const handleNotifyClick = () => {
+    if (ensureDriveReady()) setShowNotifyPicker(true);
+  };
+
+  const buildApprovalRequestMailUrl = (instruction: WorkInstruction, fileId: string) => {
+    const viewBaseUrl = getViewPageBaseUrl();
+    const viewUrl = `${viewBaseUrl}?driveFileId=${encodeURIComponent(fileId)}`;
+    const approvalUrl = `${viewBaseUrl.replace('/instructions/view', '/instructions/edit')}?source=drive&driveFileId=${encodeURIComponent(fileId)}&mode=approval`;
+    const requestedAt = new Date().toLocaleDateString('ja-JP');
+    const subject = `【承認依頼】${instruction.title}`;
+    const body = [
+      '手順書が完成しましたので、内容の確認及び承認をお願いします。',
+      '',
+      `手順書名: ${instruction.title}`,
+      `部署: ${instruction.department || '未設定'}`,
+      `カテゴリ: ${getCategoryLabel(instruction.category)}`,
+      `依頼日: ${requestedAt}`,
+      '',
+      `確認用URL: ${viewUrl}`,
+      `承認用URL: ${approvalUrl}`,
+      '',
+      '承認用URLを開き、保存設定内の「上長承認」から承認操作をお願いします。',
+    ].join('\n');
+    const params = new URLSearchParams({
+      view: 'cm',
+      fs: '1',
+      su: subject,
+      body,
+    });
+    return `https://mail.google.com/mail/?${params.toString()}`;
+  };
+
+  const buildInstructionNotifyMailUrl = (instruction: WorkInstruction, fileId: string) => {
+    const viewUrl = `${getViewPageBaseUrl()}?driveFileId=${encodeURIComponent(fileId)}`;
+    const notifiedAt = new Date().toLocaleDateString('ja-JP');
+    const subject = `【手順書通知】${instruction.title}`;
+    const body = [
+      '手順書を作成/改版しました。内容を確認してください。',
+      '',
+      `手順書名: ${instruction.title}`,
+      `部署: ${instruction.department || '未設定'}`,
+      `カテゴリ: ${getCategoryLabel(instruction.category)}`,
+      `概要: ${instruction.description || '未記入'}`,
+      `通知日: ${notifiedAt}`,
+      '',
+      `閲覧URL: ${viewUrl}`,
+    ].join('\n');
+    const params = new URLSearchParams({
+      view: 'cm',
+      fs: '1',
+      su: subject,
+      body,
+    });
+    return `https://mail.google.com/mail/?${params.toString()}`;
+  };
+
   const handleExcelFileLoaded = async (content: string, file: DriveFileInfo) => {
     try {
       const json = JSON.parse(content);
@@ -137,6 +200,50 @@ function EditorHomePage() {
     } catch (err) {
       setImportError(
         err instanceof Error ? err.message : `${file.name} の読み込みに失敗しました。`,
+      );
+    }
+  };
+
+  const handleApprovalRequestFileLoaded = async (content: string, file: DriveFileInfo) => {
+    try {
+      const json = JSON.parse(content);
+      if (!json.id || !json.title || !json.steps || !Array.isArray(json.steps)) {
+        throw new Error('有効な手順書データではありません。');
+      }
+      const instruction = json as WorkInstruction;
+      if (instruction.status !== 'completed') {
+        throw new Error('承認依頼は完成済みの手順書のみ対象です。');
+      }
+      setShowApprovalRequestPicker(false);
+      const opened = window.open(buildApprovalRequestMailUrl(instruction, file.id), '_blank', 'noopener,noreferrer');
+      if (!opened) {
+        throw new Error('Gmailを開けませんでした。ポップアップブロックを解除してください。');
+      }
+    } catch (err) {
+      setImportError(
+        err instanceof Error ? err.message : `${file.name} の承認依頼メール作成に失敗しました。`,
+      );
+    }
+  };
+
+  const handleNotifyFileLoaded = async (content: string, file: DriveFileInfo) => {
+    try {
+      const json = JSON.parse(content);
+      if (!json.id || !json.title || !json.steps || !Array.isArray(json.steps)) {
+        throw new Error('有効な手順書データではありません。');
+      }
+      const instruction = json as WorkInstruction;
+      if (instruction.status !== 'completed') {
+        throw new Error('通知メールは完成済みの手順書のみ対象です。');
+      }
+      setShowNotifyPicker(false);
+      const opened = window.open(buildInstructionNotifyMailUrl(instruction, file.id), '_blank', 'noopener,noreferrer');
+      if (!opened) {
+        throw new Error('Gmailを開けませんでした。ポップアップブロックを解除してください。');
+      }
+    } catch (err) {
+      setImportError(
+        err instanceof Error ? err.message : `${file.name} の通知メール作成に失敗しました。`,
       );
     }
   };
@@ -212,6 +319,29 @@ function EditorHomePage() {
             </>
           ),
           onClick: handlePreviewClick,
+        },
+        {
+          title: '承認を依頼',
+          description: '完成済み手順書を選び、Gmailで承認依頼メールを作成します。',
+          icon: (
+            <>
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12.75 11.25 15 15 9.75" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 8.25v8.25A2.25 2.25 0 0118.75 18.75H5.25A2.25 2.25 0 013 16.5V8.25m18 0A2.25 2.25 0 0018.75 6H5.25A2.25 2.25 0 003 8.25m18 0-9 5.25-9-5.25" />
+            </>
+          ),
+          onClick: handleApprovalRequestClick,
+        },
+        {
+          title: '手順書作成/改版を通知',
+          description: '完成済み手順書を選び、Gmailで対象者向けの閲覧案内を作成します。',
+          icon: (
+            <>
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21.75 6.75v10.5A2.25 2.25 0 0119.5 19.5h-15A2.25 2.25 0 012.25 17.25V6.75" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="m2.25 6.75 8.954 5.37a2.25 2.25 0 002.292 0l8.954-5.37" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15.75h.008v.008H12z" />
+            </>
+          ),
+          onClick: handleNotifyClick,
         },
       ],
     },
@@ -333,6 +463,16 @@ function EditorHomePage() {
         open={showExcelPicker}
         onClose={() => setShowExcelPicker(false)}
         onFileLoaded={handleExcelFileLoaded}
+      />
+      <DriveJsonFilePicker
+        open={showApprovalRequestPicker}
+        onClose={() => setShowApprovalRequestPicker(false)}
+        onFileLoaded={handleApprovalRequestFileLoaded}
+      />
+      <DriveJsonFilePicker
+        open={showNotifyPicker}
+        onClose={() => setShowNotifyPicker(false)}
+        onFileLoaded={handleNotifyFileLoaded}
       />
     </div>
   );

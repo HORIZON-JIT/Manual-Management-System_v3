@@ -21,7 +21,7 @@ function AnnotatePageContent() {
 
   useEffect(() => {
     if (!token) {
-      setStatus('missing');
+      queueMicrotask(() => setStatus('missing'));
       return;
     }
     getTempData('annotate_src_' + token)
