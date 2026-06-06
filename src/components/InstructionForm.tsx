@@ -1526,35 +1526,37 @@ export default function InstructionForm({ initialData, approvalMode = false }: I
         )}
       </div>
 
+      {!showStepIndex && (
       <button
         type="button"
         onClick={() => setShowStepIndex(true)}
-        className="fixed bottom-6 left-6 z-30 flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-lg"
+        className="fixed left-4 top-24 z-30 flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-lg transition hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800 sm:left-6"
       >
-        <svg className="h-4 w-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className="h-4 w-4 text-slate-500 dark:text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
         </svg>
         目次
       </button>
+      )}
 
       {showStepIndex && (
-        <div className="fixed inset-0 z-40 flex items-end bg-slate-950/25 p-4">
-          <nav className="w-full rounded-lg bg-white p-4 shadow-xl sm:max-w-md">
+        <div className="fixed inset-0 z-40 bg-slate-950/20 p-4 pt-24 backdrop-blur-[1px] sm:pl-6">
+          <nav className="max-h-[calc(100vh-7rem)] w-full overflow-hidden rounded-lg border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-700 dark:bg-slate-900 sm:max-w-md">
             <div className="mb-3 flex items-center justify-between">
               <h2 className="text-base font-semibold text-slate-900">ステップ一覧</h2>
-              <button type="button" onClick={() => setShowStepIndex(false)} className="px-2 py-1 text-slate-500">
+              <button type="button" onClick={() => setShowStepIndex(false)} className="rounded-md px-2 py-1 text-slate-500 transition hover:bg-slate-100 hover:text-slate-800 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white">
                 閉じる
               </button>
             </div>
-            <div className="max-h-[55vh] space-y-1 overflow-y-auto">
+            <div className="max-h-[calc(100vh-12rem)] space-y-1 overflow-y-auto pr-1">
               {steps.map((step, index) => (
                 <button
                   type="button"
                   key={step.id}
                   onClick={() => scrollToEditStep(step.id)}
-                  className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+                  className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"
                 >
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-slate-100 text-xs font-semibold">{index + 1}</span>
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-slate-100 text-xs font-semibold dark:bg-slate-800">{index + 1}</span>
                   {step.title.trim() || '(タイトル未入力)'}
                 </button>
               ))}
