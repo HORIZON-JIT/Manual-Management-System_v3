@@ -1257,7 +1257,7 @@ export default function InstructionForm({ initialData, approvalMode = false }: I
             </section>
           </div>
 
-          <aside className="h-fit space-y-4 lg:sticky lg:top-24">
+          <aside className="h-fit space-y-4 lg:sticky lg:top-24 lg:flex lg:max-h-[calc(100vh-7rem)] lg:flex-col lg:gap-3 lg:space-y-0">
             <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm lg:hidden">
               <h2 className="text-base font-semibold text-slate-950">保存設定</h2>
 
@@ -1300,7 +1300,7 @@ export default function InstructionForm({ initialData, approvalMode = false }: I
               </div>
               {renderApprovalPanel()}
             </section>
-            <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+            <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm lg:shrink-0">
               <div className="space-y-3">
                 {draftSaveMessage && (
                   <p className="rounded-lg bg-emerald-50 px-3 py-2 text-center text-sm font-medium text-emerald-700">
@@ -1311,7 +1311,7 @@ export default function InstructionForm({ initialData, approvalMode = false }: I
                 <button
                   type="button"
                   onClick={() => setShowFlowchart(true)}
-                  className="w-full rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-700 transition hover:bg-blue-100"
+                  className="w-full rounded-lg border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-semibold text-blue-700 transition hover:bg-blue-100"
                 >
                   作成中のフローチャートを表示
                 </button>
@@ -1319,7 +1319,7 @@ export default function InstructionForm({ initialData, approvalMode = false }: I
                   type="button"
                   onClick={() => handleDraftSave(true)}
                   disabled={saving}
-                  className="w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+                  className="w-full rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
                 >
                   下書き保存して継続
                 </button>
@@ -1327,7 +1327,7 @@ export default function InstructionForm({ initialData, approvalMode = false }: I
                   type="button"
                   onClick={() => handleDraftSave(false)}
                   disabled={saving}
-                  className="w-full rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800 transition hover:bg-amber-100 disabled:opacity-50"
+                  className="w-full rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm font-semibold text-amber-800 transition hover:bg-amber-100 disabled:opacity-50"
                 >
                   下書き保存して終了
                 </button>
@@ -1335,7 +1335,7 @@ export default function InstructionForm({ initialData, approvalMode = false }: I
                   type="button"
                   onClick={handleCompleteClick}
                   disabled={saving}
-                  className="w-full rounded-lg bg-slate-950 px-4 py-3 text-base font-bold text-white shadow-sm transition hover:bg-slate-800 disabled:opacity-50"
+                  className="w-full rounded-lg bg-slate-950 px-4 py-2.5 text-base font-bold text-white shadow-sm transition hover:bg-slate-800 disabled:opacity-50"
                 >
                   {saving ? '保存中...' : '完成してDriveへ保存'}
                 </button>
@@ -1345,13 +1345,14 @@ export default function InstructionForm({ initialData, approvalMode = false }: I
                   </p>
                 )}
               </div>
-              <p className="mt-4 text-xs leading-5 text-slate-500">
+              <p className="mt-3 text-[11px] leading-5 text-slate-500">
                 完成時は、指定した Google Drive フォルダに JSON を保存します。Excel出力を選んだ場合のみ、
                 スプレッドシートも保存します。
               </p>
             </section>
-            {renderConditionPanel(true, 'hidden lg:block')}
-            <section className="hidden rounded-lg border border-slate-200 bg-white p-5 shadow-sm lg:block">
+            <div className="hidden min-h-0 flex-1 flex-col gap-3 overflow-y-auto pr-1 lg:flex">
+            {renderConditionPanel(true, '')}
+            <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
               <button
                 type="button"
                 onClick={() => setShowSaveSettings((shown) => !shown)}
@@ -1437,6 +1438,7 @@ export default function InstructionForm({ initialData, approvalMode = false }: I
                 </>
               )}
             </section>
+            </div>
           </aside>
         </div>
       </form>
