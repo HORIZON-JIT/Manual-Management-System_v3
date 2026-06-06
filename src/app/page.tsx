@@ -7,7 +7,7 @@ import { isGoogleConfigured, getAuthState, signIn } from '@/lib/googleAuth';
 import { DriveFileInfo } from '@/lib/googleDrive';
 import DriveJsonFilePicker from '@/components/DriveJsonFilePicker';
 import InstructionLibrary from '@/components/InstructionLibrary';
-import XmbMenu, { XmbCategory } from '@/components/XmbMenu';
+import XmbMenu, { XmbCategory, XmbItem } from '@/components/XmbMenu';
 import { exportToExcel } from '@/lib/exportSpreadsheet';
 import { getViewPageBaseUrl } from '@/lib/shareLink';
 import { setTempData } from '@/lib/tempStorage';
@@ -387,6 +387,34 @@ function EditorHomePage() {
       ],
     },
   ];
+  const shareItems: XmbItem[] =
+    categories
+      .find((category) => category.key === 'drive')
+      ?.items.filter(
+        (item) =>
+          item.onClick === handleApprovalRequestClick ||
+          item.onClick === handleNotifyClick,
+      ) ?? [];
+  const displayCategories: XmbCategory[] = categories.map((category) => {
+    if (category.key === 'drive') {
+      return {
+        ...category,
+        items: category.items.filter(
+          (item) =>
+            item.onClick !== handleApprovalRequestClick &&
+            item.onClick !== handleNotifyClick,
+        ),
+      };
+    }
+    if (category.key === 'output') {
+      return {
+        ...category,
+        label: '出力・共有',
+        items: [...category.items, ...shareItems],
+      };
+    }
+    return category;
+  });
 
   return (
     <div className="mx-auto flex min-h-[calc(100vh-76px)] max-w-7xl flex-col px-6 py-8 lg:py-10">
@@ -395,7 +423,7 @@ function EditorHomePage() {
         <p className="text-sm font-semibold text-neutral-500">Manual Management</p>
       </div>
 
-      <XmbMenu categories={categories} className="flex-none" />
+      <XmbMenu categories={displayCategories} className="flex-none" />
 
       {showAuthPrompt && (
         <section className="mt-6 rounded-lg border border-neutral-200 bg-white px-5 py-5 shadow-[0_18px_44px_rgba(0,0,0,0.06)]">
