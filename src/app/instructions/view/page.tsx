@@ -486,7 +486,7 @@ function InstructionViewContent() {
   };
 
   return (
-    <div className="mx-auto grid max-w-[104rem] gap-8 px-4 py-6 lg:grid-cols-[15rem_minmax(0,1fr)] xl:grid-cols-[16rem_minmax(0,1fr)]">
+    <div className="mx-auto max-w-[88rem] px-4 py-6">
       <main className="min-w-0 w-full">
       <div className="flex flex-wrap items-center gap-2 mb-6 no-print">
         <div className="flex-1" />
@@ -999,7 +999,56 @@ function InstructionViewContent() {
       )}
       </main>
 
-      <aside className="order-first no-print hidden min-w-0 lg:block">
+      <div className="no-print">
+        {!showChapters && (
+          <button
+            type="button"
+            onClick={() => setShowChapters(true)}
+            className="fixed left-4 top-24 z-30 flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-lg transition hover:border-slate-300 hover:bg-slate-50 sm:left-6"
+          >
+            <svg className="h-4 w-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+            目次
+          </button>
+        )}
+
+        {showChapters && (
+          <div className="fixed inset-0 z-40 bg-slate-950/20 p-4 pt-24 backdrop-blur-[1px] sm:pl-6">
+            <nav className="max-h-[calc(100vh-7rem)] w-full overflow-hidden rounded-lg border border-slate-200 bg-white p-4 shadow-xl sm:max-w-md">
+              <div className="mb-3 flex items-center justify-between">
+                <h2 className="text-base font-semibold text-slate-900">ステップ一覧</h2>
+                <button
+                  type="button"
+                  onClick={() => setShowChapters(false)}
+                  className="rounded-md px-2 py-1 text-slate-500 transition hover:bg-slate-100 hover:text-slate-800"
+                >
+                  閉じる
+                </button>
+              </div>
+              <div className="max-h-[calc(100vh-12rem)] space-y-1 overflow-y-auto pr-1">
+                {sortedSteps.map((step) => (
+                  <button
+                    key={step.id}
+                    type="button"
+                    onClick={() => scrollToStep(step)}
+                    className="group flex w-full items-start gap-3 rounded-lg px-2 py-2.5 text-left transition hover:bg-slate-50"
+                  >
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-slate-100 text-xs font-bold text-slate-600 transition group-hover:bg-slate-950 group-hover:text-white">
+                      {chapterStepNumbers.get(step.id)}
+                    </span>
+                    <span className="pt-0.5 text-sm font-medium leading-5 text-slate-700 group-hover:text-slate-950">
+                      {step.title || '未入力のステップ'}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </nav>
+          </div>
+        )}
+      </div>
+
+      <aside className="hidden">
         {showChapters ? (
         <nav className="sticky top-24 w-full rounded-lg border border-slate-200 bg-white p-4 shadow-[0_18px_44px_rgba(15,23,42,0.10)]">
           <div className="flex items-start justify-between gap-3">
