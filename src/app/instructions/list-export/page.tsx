@@ -195,11 +195,26 @@ function ListExportTool() {
                 const updater = inst.updatedBy || inst.updateHistory?.[inst.updateHistory.length - 1]?.updatedBy || '';
                 const approvalStatus = getApprovalStatus(inst);
                 const approvalLabel = approvalStatus === 'approved' ? '承認済み' : approvalStatus === 'needs_reapproval' ? '要再承認' : '未承認';
+                const approvalClass =
+                  approvalStatus === 'approved'
+                    ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                    : approvalStatus === 'needs_reapproval'
+                      ? 'border-amber-200 bg-amber-50 text-amber-700'
+                      : 'border-slate-200 bg-slate-50 text-slate-500';
                 return (
                   <tr key={inst.id} className="hover:bg-slate-50">
                     <td className="max-w-xs truncate px-3 py-2.5 text-slate-900">{inst.title}</td>
                     <td className="px-3 py-2.5 text-slate-600">{getCategoryLabel(inst.category)}</td>
-                    <td className="px-3 py-2.5 text-slate-600">{approvalLabel}</td>
+                    <td className="px-3 py-2.5">
+                      <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold ${approvalClass}`}>
+                        {approvalStatus === 'approved' && (
+                          <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.3} d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                        {approvalLabel}
+                      </span>
+                    </td>
                     <td className="px-3 py-2.5 text-slate-600">{fmtDate(inst.approval?.current?.approvedAt) || '—'}</td>
                     <td className="px-3 py-2.5 text-slate-600">{inst.createdBy || '—'}</td>
                     <td className="px-3 py-2.5 text-slate-600">{updater || '—'}</td>
