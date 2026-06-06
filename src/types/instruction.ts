@@ -93,10 +93,12 @@ export interface InstructionSnapshot {
   steps: Step[];
   keywords?: string[];
   createdBy?: string;
+  createdByEmail?: string;
 }
 
 export interface UpdateHistoryEntry {
   updatedBy: string;
+  updatedByEmail?: string;
   updatedAt: string;
   note?: string;
   snapshot?: InstructionSnapshot;
@@ -155,7 +157,9 @@ export interface WorkInstruction {
   createdAt: string;
   updatedAt: string;
   createdBy?: string;
+  createdByEmail?: string;
   updatedBy?: string;
+  updatedByEmail?: string;
   updateHistory?: UpdateHistoryEntry[];
   approval?: ApprovalState;
   status?: InstructionStatus;
