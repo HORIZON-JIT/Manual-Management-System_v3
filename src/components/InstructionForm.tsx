@@ -22,7 +22,14 @@ import { buildExcelBuffer, ExcelNavMode } from '@/lib/exportSpreadsheet';
 import { uploadAsGoogleSheet, saveFileToDrive, getTargetFolder } from '@/lib/googleDrive';
 import { addStepNavLinks, addSheetCheckboxes, addResetScript } from '@/lib/sheetsNavLinks';
 import { getViewPageBaseUrl } from '@/lib/shareLink';
-import { isGoogleConfigured, getAuthState, addAuthListener, initGoogleAuth } from '@/lib/googleAuth';
+import {
+  isGoogleConfigured,
+  getAuthState,
+  addAuthListener,
+  initGoogleAuth,
+  ensureGoogleUserInfo,
+  GoogleAuthState,
+} from '@/lib/googleAuth';
 import { getCustomDepartments, addCustomDepartment } from '@/lib/customDepartments';
 import StepEditor from './StepEditor';
 import VersionHistoryModal from './VersionHistoryModal';
@@ -364,7 +371,10 @@ export default function InstructionForm({ initialData, approvalMode = false }: I
     };
   };
 
-  const buildInstruction = (status: InstructionStatus): WorkInstruction | null => {
+  const buildInstruction = (
+    status: InstructionStatus,
+    approvalAuthState?: GoogleAuthState,
+  ): WorkInstruction | null => {
     if (!title.trim()) {
       alert('タイトルを入力してください。');
       return null;
@@ -416,7 +426,7 @@ export default function InstructionForm({ initialData, approvalMode = false }: I
       : undefined;
 
     if (status === 'completed' && (approveOnSave || revokeOnSave)) {
-      const authState = getAuthState();
+      const authState = approvalAuthState || getAuthState();
       if (!isGoogleConfigured() || !authState.isSignedIn || !authState.userEmail) {
         alert('上長承認を記録するには Google にサインインしてください。');
         return null;
@@ -576,8 +586,14 @@ export default function InstructionForm({ initialData, approvalMode = false }: I
     }
   };
 
-  const handleCompleteClick = () => {
-    const instruction = buildInstruction('completed');
+  const handleCompleteClick = async () => {
+    let approvalAuthState: GoogleAuthState | undefined;
+    if (approveOnSave || revokeOnSave) {
+      approvalAuthState = await ensureGoogleUserInfo();
+      setAuth(approvalAuthState);
+    }
+
+    const instruction = buildInstruction('completed', approvalAuthState);
     if (!instruction) return;
 
     if (!isGoogleConfigured() || !getAuthState().isSignedIn) {
