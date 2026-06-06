@@ -1,5 +1,5 @@
 ﻿import ExcelJS from 'exceljs';
-import { WorkInstruction, Condition, getCategoryLabel, getStepImages, getImageCaption } from '@/types/instruction';
+import { WorkInstruction, Condition, getApprovalStatus, getCategoryLabel, getStepImages, getImageCaption } from '@/types/instruction';
 
 /** Estimate row height for text in merged content columns */
 function calcRowHeight(text: string, charsPerLine: number, lineHeight: number, minHeight: number): number {
@@ -852,13 +852,19 @@ export async function buildInstructionListExcel(instructions: WorkInstruction[])
     { width: 14 },  // カテゴリ
     { width: 14 },  // 部署
     { width: 9 },   // 状態
+    { width: 12 },  // 承認状態
+    { width: 13 },  // 承認日
+    { width: 16 },  // 承認者
+    { width: 26 },  // 承認者メール
+    { width: 13 },  // 最終取消日
+    { width: 24 },  // 最終取消理由
     { width: 16 },  // 作成者
     { width: 16 },  // 更新者
     { width: 13 },  // 作成日
     { width: 13 },  // 更新日
     { width: 7 },   // 改版
   ];
-  const COLS = 10;
+  const COLS = 16;
   let row = 1;
 
   ws.getRow(row).height = 40;
@@ -870,7 +876,7 @@ export async function buildInstructionListExcel(instructions: WorkInstruction[])
   });
   row++;
 
-  const headers = ['No.', 'タイトル', 'カテゴリ', '部署', '状態', '作成者', '更新者', '作成日', '更新日', '改版'];
+  const headers = ['No.', 'タイトル', 'カテゴリ', '部署', '状態', '承認状態', '承認日', '承認者', '承認者メール', '最終取消日', '最終取消理由', '作成者', '更新者', '作成日', '更新日', '改版'];
   ws.getRow(row).height = 26;
   headers.forEach((h, i) => {
     const cell = ws.getCell(row, i + 1);
@@ -893,12 +899,21 @@ export async function buildInstructionListExcel(instructions: WorkInstruction[])
     const updater = inst.updatedBy || lastHist?.updatedBy || '';
     const revision = inst.updateHistory?.length ?? 0;
     const statusLabel = inst.status === 'draft' ? '下書き' : inst.status === 'completed' ? '完成' : '';
+    const approvalStatus = getApprovalStatus(inst);
+    const approvalLabel = approvalStatus === 'approved' ? '承認済み' : approvalStatus === 'needs_reapproval' ? '要再承認' : '未承認';
+    const lastRevoked = [...(inst.approval?.history ?? [])].reverse().find((entry) => entry.action === 'revoked');
     const values: (string | number)[] = [
       i + 1,
       inst.title || '',
       getCategoryLabel(inst.category),
       inst.department || '',
       statusLabel,
+      approvalLabel,
+      fmtDate(inst.approval?.current?.approvedAt),
+      inst.approval?.current?.userName || '',
+      inst.approval?.current?.userEmail || '',
+      fmtDate(lastRevoked?.actedAt),
+      lastRevoked?.reason || '',
       inst.createdBy || '',
       updater,
       fmtDate(inst.createdAt),

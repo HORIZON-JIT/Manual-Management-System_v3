@@ -7,6 +7,7 @@ import {
   WorkInstruction,
   InstructionSnapshot,
   Step,
+  getApprovalStatus,
   getCategoryLabel,
   getImageCaption,
   getStepConditionIds,
@@ -44,12 +45,14 @@ function InstructionViewContent() {
   const [chapterTargetStepId, setChapterTargetStepId] = useState<string | null>(null);
   const [revealedCount, setRevealedCount] = useState(1);
   const [showHistory, setShowHistory] = useState(false);
+  const [showApprovalHistory, setShowApprovalHistory] = useState(false);
   const [showFlowchart, setShowFlowchart] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showChapters, setShowChapters] = useState(false);
   const [viewingSnapshot, setViewingSnapshot] = useState<InstructionSnapshot | null>(null);
   const [viewUrlCopied, setViewUrlCopied] = useState(false);
+  const [expandedStepDetails, setExpandedStepDetails] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (!isGoogleConfigured()) return;
@@ -69,6 +72,7 @@ function InstructionViewContent() {
     setCheckStates({});
     setSelectedConditions({});
     setSelectedJumpTargets({});
+    setExpandedStepDetails({});
     setScrollTargetStepId(null);
     setChapterTargetStepId(null);
     setRevealedCount(1);
@@ -143,6 +147,13 @@ function InstructionViewContent() {
   const appViewUrl = (() => {
     const driveFileId = searchParams.get('driveFileId') || instruction?.driveFileId;
     return driveFileId ? `${getViewPageBaseUrl()}?driveFileId=${driveFileId}` : null;
+  })();
+  const editUrl = (() => {
+    const driveFileId = searchParams.get('driveFileId') || instruction?.driveFileId;
+    if (driveFileId) {
+      return `/instructions/edit?source=drive&driveFileId=${encodeURIComponent(driveFileId)}`;
+    }
+    return `/instructions/edit?id=${instruction?.id}`;
   })();
 
   const handleCopyViewUrl = async () => {
@@ -442,6 +453,7 @@ function InstructionViewContent() {
         const searchText = [
           step.title,
           step.description,
+          step.detailDescription,
           step.caution,
           ...(step.checkItems ?? []).map((item) => item.label),
           ...(step.imageCaptions ?? []),
@@ -474,8 +486,8 @@ function InstructionViewContent() {
   };
 
   return (
-    <div className="mx-auto grid max-w-7xl gap-8 px-4 py-6 lg:grid-cols-[16rem_minmax(0,56rem)]">
-      <main className="min-w-0 w-full max-w-4xl">
+    <div className="mx-auto grid max-w-[104rem] gap-8 px-4 py-6 lg:grid-cols-[15rem_minmax(0,1fr)] xl:grid-cols-[16rem_minmax(0,1fr)]">
+      <main className="min-w-0 w-full">
       <div className="flex flex-wrap items-center gap-2 mb-6 no-print">
         <div className="flex-1" />
         {appViewUrl && !VIEWER_ONLY && (
@@ -494,6 +506,14 @@ function InstructionViewContent() {
             更新履歴
           </button>
         )}
+        {instruction.approval?.history && instruction.approval.history.length > 0 && (
+          <button
+            onClick={() => setShowApprovalHistory(true)}
+            className="px-3 py-1.5 bg-slate-50 border border-slate-200 text-slate-600 rounded-lg text-sm hover:bg-slate-100 transition"
+          >
+            承認履歴
+          </button>
+        )}
         <button
           onClick={() => setShowFlowchart(true)}
           className="px-3 py-1.5 bg-slate-50 border border-slate-200 text-slate-600 rounded-lg text-sm hover:bg-slate-100 transition"
@@ -510,7 +530,7 @@ function InstructionViewContent() {
         )}
         {!isSharedView && !isPreviewView && !VIEWER_ONLY && (
           <Link
-            href={`/instructions/edit?id=${instruction.id}`}
+            href={editUrl}
             className="px-3 py-1.5 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-lg text-sm hover:from-blue-600 hover:to-indigo-600 transition shadow-sm"
           >
             編集
@@ -623,6 +643,43 @@ function InstructionViewContent() {
                 <div className="p-5 space-y-4">
                   {step.description && (
                     <p className="text-slate-700 whitespace-pre-wrap leading-relaxed">{step.description}</p>
+                  )}
+
+                  {step.detailDescription && (
+                    <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setExpandedStepDetails((current) => ({
+                            ...current,
+                            [step.id]: !current[step.id],
+                          }))
+                        }
+                        className="flex w-full items-center justify-between gap-3 text-left text-sm font-semibold text-slate-800 transition hover:text-blue-700"
+                        aria-expanded={!!expandedStepDetails[step.id]}
+                        aria-controls={`step-detail-${step.id}`}
+                      >
+                        <span>詳細説明</span>
+                        <svg
+                          className={`h-4 w-4 shrink-0 transition ${
+                            expandedStepDetails[step.id] ? 'rotate-180' : ''
+                          }`}
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </button>
+                      {expandedStepDetails[step.id] && (
+                        <div
+                          id={`step-detail-${step.id}`}
+                          className="mt-3 rounded-md border border-slate-200 bg-white px-3 py-3 text-sm leading-6 text-slate-700"
+                        >
+                          <p className="whitespace-pre-wrap">{step.detailDescription}</p>
+                        </div>
+                      )}
+                    </div>
                   )}
 
                   {getStepImages(step).map((imgUrl, imgIdx) => (
@@ -826,6 +883,64 @@ function InstructionViewContent() {
         />
       )}
 
+      {showApprovalHistory && instruction.approval?.history && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 no-print" onClick={() => setShowApprovalHistory(false)}>
+          <section
+            className="flex max-h-[80vh] w-full max-w-lg flex-col rounded-xl bg-white shadow-xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+              <div>
+                <h2 className="text-lg font-bold text-gray-800">承認履歴</h2>
+                <p className="mt-1 text-xs text-gray-500">
+                  現在状態: {getApprovalStatus(instruction) === 'approved' ? '承認済み' : getApprovalStatus(instruction) === 'needs_reapproval' ? '要再承認' : '未承認'}
+                </p>
+              </div>
+              <button
+                onClick={() => setShowApprovalHistory(false)}
+                className="text-2xl leading-none text-gray-400 hover:text-gray-600"
+              >
+                &times;
+              </button>
+            </div>
+            <div className="space-y-3 overflow-y-auto px-6 py-4">
+              {[...instruction.approval.history].reverse().map((entry, index) => (
+                <div key={`${entry.actedAt}-${index}`} className="rounded-lg border border-gray-200 p-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${
+                      entry.action === 'approved' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
+                    }`}>
+                      {entry.action === 'approved' ? '承認' : '承認取消'}
+                    </span>
+                    <span className="text-xs text-gray-400">
+                      {new Date(entry.actedAt).toLocaleString('ja-JP')}
+                    </span>
+                    <span className="text-xs text-gray-500">v{entry.revision + 1}</span>
+                  </div>
+                  <p className="mt-2 text-sm font-medium text-gray-700">
+                    {entry.userName || 'Googleユーザー'}
+                  </p>
+                  {entry.userEmail && <p className="break-all text-xs text-gray-500">{entry.userEmail}</p>}
+                  {entry.reason && (
+                    <p className="mt-2 rounded-md bg-gray-50 px-3 py-2 text-xs leading-5 text-gray-600">
+                      理由: {entry.reason}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+            <div className="border-t border-gray-200 px-6 py-3">
+              <button
+                onClick={() => setShowApprovalHistory(false)}
+                className="w-full py-2 text-sm text-gray-500 transition hover:text-gray-700"
+              >
+                閉じる
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+
       {showFlowchart && (
         <FlowchartModal instruction={instruction} onClose={() => setShowFlowchart(false)} />
       )}
@@ -884,9 +999,9 @@ function InstructionViewContent() {
       )}
       </main>
 
-      <aside className="order-first no-print hidden lg:block">
+      <aside className="order-first no-print hidden min-w-0 lg:block">
         {showChapters ? (
-        <nav className="sticky top-24 w-64 rounded-lg border border-slate-200 bg-white p-4 shadow-[0_18px_44px_rgba(15,23,42,0.10)]">
+        <nav className="sticky top-24 w-full rounded-lg border border-slate-200 bg-white p-4 shadow-[0_18px_44px_rgba(15,23,42,0.10)]">
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">Chapter</p>

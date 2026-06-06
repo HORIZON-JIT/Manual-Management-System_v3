@@ -50,6 +50,10 @@ export default function StepEditor({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const replaceInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const stepDescriptionGuideRef = useRef<HTMLDivElement>(null);
+  const stepCautionGuideRef = useRef<HTMLDivElement>(null);
+  const stepDetailGuideRef = useRef<HTMLDivElement>(null);
+  const checkItemsGuideRef = useRef<HTMLDivElement>(null);
   const [annotatingIdx, setAnnotatingIdx] = useState<number | null>(null);
   const [replaceTargetIdx, setReplaceTargetIdx] = useState<number | null>(null);
   const [popupSupported, setPopupSupported] = useState(false);
@@ -58,6 +62,13 @@ export default function StepEditor({
   const [jumpLabel, setJumpLabel] = useState('');
   const [jumpTargetId, setJumpTargetId] = useState('');
   const [showConditions, setShowConditions] = useState(false);
+  const [showStepDescriptionGuide, setShowStepDescriptionGuide] = useState(false);
+  const [showStepCautionGuide, setShowStepCautionGuide] = useState(false);
+  const [showStepDetailGuide, setShowStepDetailGuide] = useState(false);
+  const [showCheckItemsGuide, setShowCheckItemsGuide] = useState(false);
+  const [showStepDetailEditor, setShowStepDetailEditor] = useState(
+    () => !!step.detailDescription,
+  );
 
   const images = getStepImages(step);
   const stepRef = useRef(step);
@@ -140,7 +151,9 @@ export default function StepEditor({
 
   // 別ウィンドウ（ポップアップ）対応可否
   useEffect(() => {
-    setPopupSupported(typeof window !== 'undefined' && typeof BroadcastChannel !== 'undefined');
+    queueMicrotask(() =>
+      setPopupSupported(typeof window !== 'undefined' && typeof BroadcastChannel !== 'undefined'),
+    );
   }, []);
 
   // 別ウィンドウからの完了通知を受け取り、step に反映する
@@ -206,6 +219,56 @@ export default function StepEditor({
     },
     [popupSupported, getAnnotationSource],
   );
+
+  useEffect(() => {
+    const hasOpenGuide =
+      showStepDescriptionGuide ||
+      showStepCautionGuide ||
+      showStepDetailGuide ||
+      showCheckItemsGuide;
+    if (!hasOpenGuide) return;
+
+    const closeGuidesOnOutsideClick = (event: MouseEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+
+      if (
+        showStepDescriptionGuide &&
+        !stepDescriptionGuideRef.current?.contains(target)
+      ) {
+        setShowStepDescriptionGuide(false);
+      }
+
+      if (
+        showStepCautionGuide &&
+        !stepCautionGuideRef.current?.contains(target)
+      ) {
+        setShowStepCautionGuide(false);
+      }
+
+      if (
+        showStepDetailGuide &&
+        !stepDetailGuideRef.current?.contains(target)
+      ) {
+        setShowStepDetailGuide(false);
+      }
+
+      if (
+        showCheckItemsGuide &&
+        !checkItemsGuideRef.current?.contains(target)
+      ) {
+        setShowCheckItemsGuide(false);
+      }
+    };
+
+    document.addEventListener('mousedown', closeGuidesOnOutsideClick);
+    return () => document.removeEventListener('mousedown', closeGuidesOnOutsideClick);
+  }, [
+    showStepDescriptionGuide,
+    showStepCautionGuide,
+    showStepDetailGuide,
+    showCheckItemsGuide,
+  ]);
 
   const addImage = useCallback(
     (dataUrl: string) => {
@@ -445,6 +508,18 @@ export default function StepEditor({
     });
   };
 
+  const inlineAnnotationSource =
+    annotatingIdx !== null
+      ? {
+          base:
+            step.originalImageDataUrls?.[annotatingIdx] &&
+            step.originalImageDataUrls[annotatingIdx] !== ''
+              ? step.originalImageDataUrls[annotatingIdx]
+              : images[annotatingIdx],
+          initial: step.imageAnnotations?.[annotatingIdx] ?? [],
+        }
+      : null;
+
   return (
     <section
       ref={containerRef}
@@ -611,8 +686,47 @@ export default function StepEditor({
           />
         </div>
 
-        <div>
-          <label className={labelClass}>説明</label>
+        <div ref={stepDescriptionGuideRef}>
+          <div className="mb-1.5 flex items-center gap-2">
+            <label className="block text-sm font-semibold text-slate-700">説明</label>
+            <button
+              type="button"
+              onClick={() => setShowStepDescriptionGuide((current) => !current)}
+              className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-slate-300 bg-white text-[11px] font-bold text-slate-500 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700"
+              aria-expanded={showStepDescriptionGuide}
+              aria-label="説明欄の説明を表示"
+              title="説明欄の説明"
+            >
+              ?
+            </button>
+          </div>
+          {showStepDescriptionGuide && (
+            <div className="mb-3 rounded-lg border border-blue-100 bg-blue-50/70 px-4 py-3 text-sm leading-6 text-slate-700">
+              <p className="font-semibold text-slate-900">
+                説明の記述ルール
+              </p>
+              <ul className="mt-2 list-disc space-y-1 pl-5 text-slate-600">
+                <li>作業手順 / 行動を作業順に記述する</li>
+                <li>ツールや画面が変わったら区切る</li>
+                <li>「〜をする」「〜を行う」「〜を確認する」のように、言い切り記述とする</li>
+              </ul>
+              <div className="mt-3 text-slate-600">
+                <p className="font-semibold text-slate-800">例</p>
+                <p className="mt-1 whitespace-pre-line">
+                  ① XXXXXをする{'\n'}
+                  ・{'\n'}
+                  ・{'\n'}
+                  ② YYYYYをする{'\n'}
+                  ・{'\n'}
+                  ・
+                </p>
+              </div>
+              <ul className="mt-3 list-disc space-y-1 pl-5 text-slate-600">
+                <li>「ボタンをクリックし、それをメールする」のように、ふたつの作業を 1 文にしない</li>
+                <li>「〜でOK」「〜だとわかりやすい」「〜無き事」「〜すること」のような記述は行わない</li>
+              </ul>
+            </div>
+          )}
           <textarea
             value={step.description}
             onChange={(e) => onChange({ ...step, description: e.target.value })}
@@ -622,8 +736,40 @@ export default function StepEditor({
           />
         </div>
 
-        <div>
-          <label className={labelClass}>注意事項（任意）</label>
+        <div ref={stepCautionGuideRef}>
+          <div className="mb-1.5 flex items-center gap-2">
+            <label className="block text-sm font-semibold text-slate-700">注意事項（任意）</label>
+            <button
+              type="button"
+              onClick={() => setShowStepCautionGuide((current) => !current)}
+              className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-slate-300 bg-white text-[11px] font-bold text-slate-500 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700"
+              aria-expanded={showStepCautionGuide}
+              aria-label="注意事項欄の説明を表示"
+              title="注意事項欄の説明"
+            >
+              ?
+            </button>
+          </div>
+          {showStepCautionGuide && (
+            <div className="mb-3 rounded-lg border border-blue-100 bg-blue-50/70 px-4 py-3 text-sm leading-6 text-slate-700">
+              <p className="font-semibold text-slate-900">
+                注意事項の記述ルール
+              </p>
+              <ul className="mt-2 list-disc space-y-1 pl-5 text-slate-600">
+                <li>よくあるミスなど、作業の急所を記述する</li>
+                <li>トラブルやイレギュラー発生時の対策方法を記述する</li>
+              </ul>
+              <div className="mt-3 text-slate-600">
+                <p className="font-semibold text-slate-800">記述しない内容</p>
+                <ul className="mt-1 list-disc space-y-1 pl-5">
+                  <li>手順やチェック、あいまいな記述は行わない</li>
+                  <li>「〜前に実行しておく」のような手順を書かない</li>
+                  <li>「添付漏れがないように」のようなチェックを書かない</li>
+                  <li>「可能な限り」のようなあいまいな表現を書かない</li>
+                </ul>
+              </div>
+            </div>
+          )}
           <textarea
             value={step.caution || ''}
             onChange={(e) => onChange({ ...step, caution: e.target.value })}
@@ -682,15 +828,22 @@ export default function StepEditor({
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm font-medium text-blue-700 shadow-sm transition hover:bg-blue-50"
+                className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3.5 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-blue-200 hover:bg-slate-50 hover:text-blue-700 active:scale-[0.99]"
               >
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.6-4.6a2 2 0 012.8 0L16 16m-2-2l1.6-1.6a2 2 0 012.8 0L20 14m-4-8h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
                 画像を追加
               </button>
               <button
                 type="button"
                 onClick={handleScreenCapture}
-                className="rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm font-medium text-emerald-700 shadow-sm transition hover:bg-emerald-50"
+                className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3.5 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-emerald-200 hover:bg-slate-50 hover:text-emerald-700 active:scale-[0.99]"
               >
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8h4l2-3h6l2 3h4v11H3V8z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 17a3 3 0 100-6 3 3 0 000 6z" />
+                </svg>
                 スクショ撮影
               </button>
             </div>
@@ -760,18 +913,18 @@ export default function StepEditor({
                       className={`${inputClass} py-1.5 text-xs`}
                       placeholder="画像のコメントを入力"
                     />
-                    <div className="flex items-center justify-between gap-2 text-xs">
+                    <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
                       <span className="text-slate-500">
                         画像 {imgIdx + 1} / {images.length}
                       </span>
-                      <div className="flex items-center gap-3">
+                      <div className="flex flex-wrap items-center gap-2">
                         {images.length > 1 && (
                           <>
                             <button
                               type="button"
                               onClick={() => moveImage(imgIdx, 'up')}
                               disabled={imgIdx === 0}
-                              className="text-slate-500 hover:text-blue-700 disabled:opacity-30"
+                              className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 font-medium text-slate-500 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700 disabled:opacity-30"
                             >
                               前へ
                             </button>
@@ -779,7 +932,7 @@ export default function StepEditor({
                               type="button"
                               onClick={() => moveImage(imgIdx, 'down')}
                               disabled={imgIdx === images.length - 1}
-                              className="text-slate-500 hover:text-blue-700 disabled:opacity-30"
+                              className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 font-medium text-slate-500 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700 disabled:opacity-30"
                             >
                               次へ
                             </button>
@@ -790,28 +943,37 @@ export default function StepEditor({
                           onClick={() =>
                             setReplaceTargetIdx((cur) => (cur === imgIdx ? null : imgIdx))
                           }
-                          className={`font-medium ${
+                          className={`inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3.5 py-2 text-xs font-semibold shadow-sm transition active:scale-[0.98] ${
                             replaceTargetIdx === imgIdx
-                              ? 'text-blue-700'
-                              : 'text-slate-500 hover:text-blue-700'
+                              ? 'border-blue-300 bg-blue-600 text-white shadow-blue-100'
+                              : 'border-blue-100 bg-blue-50 text-blue-700 hover:border-blue-200 hover:bg-blue-100'
                           }`}
                           title="この画像だけを差し替えます"
                         >
+                          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v6h6M20 20v-6h-6M5 19a8 8 0 0013-3M19 5a8 8 0 00-13 3" />
+                          </svg>
                           差し替え
                         </button>
                         <button
                           type="button"
                           onClick={() => openAnnotation(imgIdx)}
-                          className="font-medium text-violet-700 hover:text-violet-900"
+                          className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-violet-100 bg-violet-50 px-3.5 py-2 text-xs font-semibold text-violet-700 shadow-sm transition hover:border-violet-200 hover:bg-violet-100 active:scale-[0.98]"
                           title={popupSupported ? '別ウィンドウで注釈を編集します' : undefined}
                         >
+                          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536M4 20h4.5L19 9.5 14.5 5 4 15.5V20z" />
+                          </svg>
                           注釈
                         </button>
                         <button
                           type="button"
                           onClick={() => removeImage(imgIdx)}
-                          className="font-medium text-red-600 hover:text-red-800"
+                          className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-red-100 bg-red-50 px-3.5 py-2 text-xs font-semibold text-red-600 shadow-sm transition hover:border-red-200 hover:bg-red-100 active:scale-[0.98]"
                         >
+                          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 7h12M9 7V5h6v2m-7 3l.6 9h6.8l.6-9" />
+                          </svg>
                           削除
                         </button>
                       </div>
@@ -1032,8 +1194,34 @@ export default function StepEditor({
             )}
           </div>}
 
-          <div className="rounded-lg border border-slate-200 p-4">
-            <p className="mb-3 text-sm font-semibold text-slate-800">チェック項目</p>
+          <div ref={checkItemsGuideRef} className="rounded-lg border border-slate-200 p-4">
+            <div className="mb-3 flex items-center gap-2">
+              <p className="text-sm font-semibold text-slate-800">チェック項目</p>
+              <button
+                type="button"
+                onClick={() => setShowCheckItemsGuide((current) => !current)}
+                className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-slate-300 bg-white text-[11px] font-bold text-slate-500 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700"
+                aria-expanded={showCheckItemsGuide}
+                aria-label="チェック項目の説明を表示"
+                title="チェック項目の説明"
+              >
+                ?
+              </button>
+            </div>
+            {showCheckItemsGuide && (
+              <div className="mb-3 rounded-lg border border-blue-100 bg-blue-50/70 px-4 py-3 text-sm leading-6 text-slate-700">
+                <p className="font-semibold text-slate-900">
+                  チェック項目の記述ルール
+                </p>
+                <ul className="mt-2 list-disc space-y-1 pl-5 text-slate-600">
+                  <li>YES、NO で答えられる記述にする</li>
+                  <li>一項目につき、ひとつのチェックにする</li>
+                </ul>
+                <p className="mt-3 text-slate-600">
+                  複数のチェックやあいまいな記述は行わない
+                </p>
+              </div>
+            )}
             <div className="space-y-2">
               {(step.checkItems ?? []).map((item, itemIndex) => (
                 <div
@@ -1083,14 +1271,66 @@ export default function StepEditor({
               </button>
             </div>
           </div>
+
+          <div ref={stepDetailGuideRef} className="rounded-lg border border-slate-200 p-4">
+            <button
+              type="button"
+              onClick={() => setShowStepDetailEditor((current) => !current)}
+              className="flex w-full items-center justify-between gap-3 text-left text-sm font-semibold text-slate-800 transition hover:text-blue-700"
+              aria-expanded={showStepDetailEditor}
+            >
+              <span>詳細説明（任意）</span>
+              <svg
+                className={`h-4 w-4 shrink-0 transition ${showStepDetailEditor ? 'rotate-180' : ''}`}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+
+            {showStepDetailEditor && (
+              <div className="mt-3">
+                <div className="mb-1.5 flex items-center gap-2">
+                  <label className="block text-sm font-semibold text-slate-700">詳細説明</label>
+                  <button
+                    type="button"
+                    onClick={() => setShowStepDetailGuide((current) => !current)}
+                    className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-slate-300 bg-white text-[11px] font-bold text-slate-500 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700"
+                    aria-expanded={showStepDetailGuide}
+                    aria-label="詳細説明欄の説明を表示"
+                    title="詳細説明欄の説明"
+                  >
+                    ?
+                  </button>
+                </div>
+                {showStepDetailGuide && (
+                  <div className="mb-3 rounded-lg border border-blue-100 bg-blue-50/70 px-4 py-3 text-sm leading-6 text-slate-700">
+                    <p className="text-slate-600">
+                      マクロの中身・作成経緯など、通常手順では不要だが知っておくべき内容を入力します。
+                    </p>
+                  </div>
+                )}
+                <textarea
+                  value={step.detailDescription || ''}
+                  onChange={(e) =>
+                    onChange({ ...step, detailDescription: e.target.value || undefined })
+                  }
+                  rows={4}
+                  className={`${inputClass} resize-y`}
+                />
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
-      {annotatingIdx !== null && (
+      {annotatingIdx !== null && inlineAnnotationSource && (
         <ImageAnnotationEditor
-          imageDataUrl={getAnnotationSource(annotatingIdx).base}
-          originalImageDataUrl={getAnnotationSource(annotatingIdx).base}
-          initialAnnotations={getAnnotationSource(annotatingIdx).initial}
+          imageDataUrl={inlineAnnotationSource.base}
+          originalImageDataUrl={inlineAnnotationSource.base}
+          initialAnnotations={inlineAnnotationSource.initial}
           onSave={(url, annotations) => {
             applyAnnotationSave(annotatingIdx, url, annotations);
             setAnnotatingIdx(null);

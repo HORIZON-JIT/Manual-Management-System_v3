@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { getCategoryLabel } from '@/types/instruction';
+import { WorkInstruction, getApprovalStatus, getCategoryLabel } from '@/types/instruction';
 import {
   DriveFileInfo,
   getTargetFolder,
@@ -54,6 +54,7 @@ function buildSearchText(json: Record<string, unknown>): string {
       const step = s as Record<string, unknown>;
       push(step.title);
       push(step.description);
+      push(step.detailDescription);
       push(step.caution);
       if (Array.isArray(step.imageCaptions)) step.imageCaptions.forEach(push);
       if (Array.isArray(step.checkItems)) {
@@ -105,6 +106,18 @@ function formatDate(value?: string): string | null {
     month: '2-digit',
     day: '2-digit',
   }).format(date);
+}
+
+function approvalBadgeClass(status?: string): string {
+  if (status === 'approved') return 'border-emerald-200 bg-emerald-50 text-emerald-700';
+  if (status === 'needs_reapproval') return 'border-amber-200 bg-amber-50 text-amber-700';
+  return 'border-neutral-200 bg-neutral-50 text-neutral-500';
+}
+
+function approvalBadgeLabel(status?: string, approvedAt?: string): string {
+  if (status === 'approved') return `承認済み${approvedAt ? ` ${formatDate(approvedAt)}` : ''}`;
+  if (status === 'needs_reapproval') return '要再承認';
+  return '未承認';
 }
 
 export default function InstructionLibrary() {
@@ -207,7 +220,8 @@ export default function InstructionLibrary() {
             !cache[f.id] ||
             cache[f.id].modifiedTime !== f.modifiedTime ||
             cache[f.id].department === undefined ||
-            cache[f.id].searchText === undefined,
+            cache[f.id].searchText === undefined ||
+            cache[f.id].approvalStatus === undefined,
         );
     if (stale.length === 0) {
       queueMicrotask(() => setMeta(cache));
@@ -222,14 +236,21 @@ export default function InstructionLibrary() {
       stale.map(async (f) => {
         try {
           const content = await downloadDriveFile(f.id);
-          const json = JSON.parse(content) as Record<string, unknown>;
+          const json = JSON.parse(content) as WorkInstruction;
+          const lastRevoked = [...(json.approval?.history ?? [])].reverse().find((entry) => entry.action === 'revoked');
           return {
             id: f.id,
             meta: {
-              title: (json.title as string)?.trim() || f.name.replace(/\.json$/i, ''),
-              category: (json.category as string)?.trim() || '',
-              department: (json.department as string)?.trim() || '',
-              searchText: buildSearchText(json),
+              title: json.title?.trim() || f.name.replace(/\.json$/i, ''),
+              category: json.category?.trim() || '',
+              department: json.department?.trim() || '',
+              searchText: buildSearchText(json as unknown as Record<string, unknown>),
+              approvalStatus: getApprovalStatus(json),
+              approvalApprovedAt: json.approval?.current?.approvedAt,
+              approvalUserName: json.approval?.current?.userName,
+              approvalUserEmail: json.approval?.current?.userEmail,
+              approvalRevokedAt: lastRevoked?.actedAt,
+              approvalRevokeReason: lastRevoked?.reason,
               modifiedTime: f.modifiedTime,
             } as CachedMeta,
           };
@@ -241,6 +262,7 @@ export default function InstructionLibrary() {
               category: '',
               department: '',
               searchText: f.name.toLowerCase(),
+              approvalStatus: 'unapproved',
               modifiedTime: f.modifiedTime,
             } as CachedMeta,
           };
@@ -534,6 +556,8 @@ export default function InstructionLibrary() {
                   const isOpening = opening === file.id;
                   const cat = meta[file.id]?.category;
                   const dept = meta[file.id]?.department;
+                  const approvalStatus = meta[file.id]?.approvalStatus;
+                  const approvalApprovedAt = meta[file.id]?.approvalApprovedAt;
                   const count = stats[file.id]?.count ?? 0;
                   return (
                     <li key={file.id}>
@@ -566,6 +590,9 @@ export default function InstructionLibrary() {
                                 {getCategoryLabel(cat)}
                               </span>
                             )}
+                            <span className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold ${approvalBadgeClass(approvalStatus)}`}>
+                              {approvalBadgeLabel(approvalStatus, approvalApprovedAt)}
+                            </span>
                             {count >= FREQUENT_THRESHOLD && (
                               <span className="brand-surface brand-text inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium">
                                 <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 24 24"><path d="m12 17.27 6.18 3.73-1.64-7.03L22 9.24l-7.19-.62L12 2 9.19 8.62 2 9.24l5.46 4.73L5.82 21z" /></svg>

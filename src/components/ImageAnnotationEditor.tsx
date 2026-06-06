@@ -31,6 +31,8 @@ export default function ImageAnnotationEditor({ imageDataUrl, originalImageDataU
       .reduce((m, a) => Math.max(m, a.value), 0);
     return maxNum + 1;
   });
+  const [numberMode, setNumberMode] = useState<'auto' | 'manual'>('auto');
+  const [manualNumber, setManualNumber] = useState(1);
   const [size, setSize] = useState(100);
   const [textValue, setTextValue] = useState('');
   const [color, setColor] = useState(DEFAULT_ANNOTATION_COLOR);
@@ -362,8 +364,16 @@ export default function ImageAnnotationEditor({ imageDataUrl, originalImageDataU
       setDragStart(null);
     } else if (tool === 'number') {
       setSelectedIndex(null);
-      setAnnotations(prev => [...prev, { type: 'number', x: pt.x, y: pt.y, value: nextNumber, scale: size / 100, color }]);
-      setNextNumber(n => n + 1);
+      const value = numberMode === 'auto' ? nextNumber : manualNumber;
+      setAnnotations(prev => [
+        ...prev,
+        { type: 'number', x: pt.x, y: pt.y, value, scale: size / 100, color, mode: numberMode },
+      ]);
+      if (numberMode === 'auto') {
+        setNextNumber(n => n + 1);
+      } else {
+        setManualNumber(value + 1);
+      }
     } else if (tool === 'text' && textValue.trim()) {
       setSelectedIndex(null);
       setAnnotations(prev => [...prev, { type: 'text', x: pt.x, y: pt.y, value: textValue.trim(), scale: size / 100, color }]);
@@ -375,7 +385,7 @@ export default function ImageAnnotationEditor({ imageDataUrl, originalImageDataU
     const removed = annotations[annotations.length - 1];
     setAnnotations(prev => prev.slice(0, -1));
     setSelectedIndex(null);
-    if (removed.type === 'number') {
+    if (removed.type === 'number' && removed.mode !== 'manual') {
       setNextNumber(removed.value);
     }
   };
@@ -390,7 +400,7 @@ export default function ImageAnnotationEditor({ imageDataUrl, originalImageDataU
     if (selectedIndex === null) return;
     const removed = annotations[selectedIndex];
     setAnnotations((previous) => previous.filter((_, index) => index !== selectedIndex));
-    if (removed?.type === 'number') setNextNumber(removed.value);
+    if (removed?.type === 'number' && removed.mode !== 'manual') setNextNumber(removed.value);
     setSelectedIndex(null);
   };
 
@@ -517,6 +527,49 @@ export default function ImageAnnotationEditor({ imageDataUrl, originalImageDataU
             placeholder="配置する文字を入力"
             className="h-10 w-56 rounded-lg border border-gray-700 bg-gray-800 px-3 text-sm text-white outline-none placeholder:text-gray-500 focus:border-blue-500"
           />
+        )}
+        {tool === 'number' && (
+          <div className="flex flex-wrap items-center gap-2 rounded-lg border border-gray-700 bg-gray-800 px-2 py-1.5">
+            <div className="flex overflow-hidden rounded-md border border-gray-700">
+              {([
+                ['auto', '連番'],
+                ['manual', '番号指定'],
+              ] as const).map(([mode, label]) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => setNumberMode(mode)}
+                  className={`px-3 py-1.5 text-xs font-semibold transition ${
+                    numberMode === mode
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-900 text-gray-300 hover:bg-gray-700'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            {numberMode === 'auto' ? (
+              <span className="px-2 text-xs text-gray-300">
+                次: {nextNumber}
+              </span>
+            ) : (
+              <label className="flex items-center gap-1.5 text-xs text-gray-300">
+                <span>番号</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={999}
+                  value={manualNumber}
+                  onChange={(event) => {
+                    const value = Number(event.target.value);
+                    setManualNumber(Number.isFinite(value) && value > 0 ? value : 1);
+                  }}
+                  className="h-8 w-20 rounded-md border border-gray-700 bg-gray-900 px-2 text-sm text-white outline-none focus:border-blue-500"
+                />
+              </label>
+            )}
+          </div>
         )}
         <div className="mx-2 h-6 w-px bg-gray-700" />
         <div className="flex items-center gap-2" aria-label="注釈の色">

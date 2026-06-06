@@ -33,11 +33,12 @@ export default function Header() {
     setCurrentFolder(folder ?? getTargetFolder());
   };
   const isInstructionView = pathname.includes('/instructions/view');
+  const showHomeLink = pathname !== '/';
 
   return (
     <>
       <header className="sticky top-0 z-40 border-b border-neutral-200/80 bg-white/90 text-neutral-950 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-6 py-3">
+        <div className="mx-auto flex max-w-[92rem] items-center justify-between gap-4 px-6 py-3">
           <Link href="/" className="flex min-w-0 items-center gap-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
             <span className="app-logo flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-sm font-semibold tracking-wide shadow-[0_10px_24px_rgba(0,0,0,0.16)]">
               H
@@ -93,6 +94,14 @@ export default function Header() {
               </svg>
               <span className="truncate">{currentFolder ? currentFolder.name : '保存先未設定'}</span>
             </button>
+            {showHomeLink && (
+              <Link
+                href="/"
+                className="ml-2 inline-flex h-9 items-center justify-center rounded-md border border-neutral-200 bg-white px-3 text-sm font-semibold text-neutral-600 shadow-[0_6px_16px_rgba(0,0,0,0.04)] transition hover:border-neutral-300 hover:bg-neutral-50 hover:text-neutral-950"
+              >
+                ホームへ戻る
+              </Link>
+            )}
           </nav>
 
           <button
@@ -144,6 +153,15 @@ export default function Header() {
               </svg>
               <span className="truncate">{currentFolder ? `保存先: ${currentFolder.name}` : 'Driveフォルダを指定'}</span>
             </button>
+            {showHomeLink && (
+              <Link
+                href="/"
+                onClick={() => setMenuOpen(false)}
+                className="flex w-full items-center gap-2 rounded-md px-3 py-2.5 text-sm font-medium text-neutral-600 transition hover:bg-neutral-100 hover:text-neutral-950"
+              >
+                ホームへ戻る
+              </Link>
+            )}
           </nav>
         )}
       </header>
