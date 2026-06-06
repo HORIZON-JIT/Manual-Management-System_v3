@@ -578,7 +578,17 @@ export default function InstructionLibrary() {
                           )}
                         </div>
                         <div className="min-w-0 flex-1">
-                          <p className={`text-base font-semibold leading-6 text-neutral-900 ${layout === 'grid' ? 'line-clamp-2' : 'line-clamp-1'}`}>{displayName(file)}</p>
+                          <div className="flex min-w-0 flex-wrap items-center gap-2">
+                            <p className={`min-w-0 flex-1 text-base font-semibold leading-6 text-neutral-900 ${layout === 'grid' ? 'line-clamp-2' : 'line-clamp-1'}`}>{displayName(file)}</p>
+                            <span className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold ${approvalBadgeClass(approvalStatus)}`}>
+                              {approvalStatus === 'approved' && (
+                                <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.3} d="M5 13l4 4L19 7" />
+                                </svg>
+                              )}
+                              {approvalBadgeLabel(approvalStatus, approvalApprovedAt)}
+                            </span>
+                          </div>
                           <div className="mt-2 flex flex-wrap items-center gap-2">
                             {dept && (
                               <span className="brand-border-soft brand-surface brand-text rounded-full border px-2.5 py-0.5 text-xs font-medium">
@@ -590,9 +600,6 @@ export default function InstructionLibrary() {
                                 {getCategoryLabel(cat)}
                               </span>
                             )}
-                            <span className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold ${approvalBadgeClass(approvalStatus)}`}>
-                              {approvalBadgeLabel(approvalStatus, approvalApprovedAt)}
-                            </span>
                             {count >= FREQUENT_THRESHOLD && (
                               <span className="brand-surface brand-text inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium">
                                 <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 24 24"><path d="m12 17.27 6.18 3.73-1.64-7.03L22 9.24l-7.19-.62L12 2 9.19 8.62 2 9.24l5.46 4.73L5.82 21z" /></svg>
