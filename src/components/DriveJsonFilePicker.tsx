@@ -45,8 +45,8 @@ function approvalBadgeClass(status?: string): string {
   return 'border-neutral-200 bg-neutral-50 text-neutral-500';
 }
 
-function approvalBadgeLabel(status?: string, approvedAt?: string): string {
-  if (status === 'approved') return `承認済み${approvedAt ? ` ${formatDate(approvedAt)}` : ''}`;
+function approvalBadgeLabel(status?: string): string {
+  if (status === 'approved') return '承認済み';
   if (status === 'needs_reapproval') return '要再承認';
   return '未承認';
 }
@@ -339,7 +339,7 @@ export default function DriveJsonFilePicker({ open, onClose, onFileLoaded }: Dri
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.3} d="M5 13l4 4L19 7" />
                                 </svg>
                               )}
-                              {approvalBadgeLabel(file.approvalStatus, file.approvalApprovedAt)}
+                              {approvalBadgeLabel(file.approvalStatus)}
                             </span>
                           )}
                         </div>
