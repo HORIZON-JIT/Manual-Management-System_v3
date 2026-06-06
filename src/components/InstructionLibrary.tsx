@@ -114,8 +114,8 @@ function approvalBadgeClass(status?: string): string {
   return 'border-neutral-200 bg-neutral-50 text-neutral-500';
 }
 
-function approvalBadgeLabel(status?: string, approvedAt?: string): string {
-  if (status === 'approved') return `承認済み${approvedAt ? ` ${formatDate(approvedAt)}` : ''}`;
+function approvalBadgeLabel(status?: string): string {
+  if (status === 'approved') return '承認済み';
   if (status === 'needs_reapproval') return '要再承認';
   return '未承認';
 }
@@ -557,7 +557,6 @@ export default function InstructionLibrary() {
                   const cat = meta[file.id]?.category;
                   const dept = meta[file.id]?.department;
                   const approvalStatus = meta[file.id]?.approvalStatus;
-                  const approvalApprovedAt = meta[file.id]?.approvalApprovedAt;
                   const count = stats[file.id]?.count ?? 0;
                   return (
                     <li key={file.id}>
@@ -586,7 +585,7 @@ export default function InstructionLibrary() {
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.3} d="M5 13l4 4L19 7" />
                                 </svg>
                               )}
-                              {approvalBadgeLabel(approvalStatus, approvalApprovedAt)}
+                              {approvalBadgeLabel(approvalStatus)}
                             </span>
                           </div>
                           <div className="mt-2 flex flex-wrap items-center gap-2">
