@@ -122,7 +122,7 @@ function ListExportTool() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-8">
+    <div className="mx-auto max-w-7xl px-4 py-8">
       <BackLink />
       <h1 className="text-3xl font-bold tracking-tight text-slate-950">手順書一覧出力</h1>
       <p className="mt-2 text-sm text-slate-500">
@@ -176,8 +176,20 @@ function ListExportTool() {
           </button>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-slate-50 text-xs text-slate-500">
+          <table className="min-w-[1180px] w-full table-fixed text-left text-sm">
+            <colgroup>
+              <col className="w-[320px]" />
+              <col className="w-[110px]" />
+              <col className="w-[110px]" />
+              <col className="w-[105px]" />
+              <col className="w-[110px]" />
+              <col className="w-[100px]" />
+              <col className="w-[110px]" />
+              <col className="w-[105px]" />
+              <col className="w-[105px]" />
+              <col className="w-[60px]" />
+            </colgroup>
+            <thead className="whitespace-nowrap bg-slate-50 text-xs text-slate-500">
               <tr>
                 <th className="px-3 py-2 font-medium">タイトル</th>
                 <th className="px-3 py-2 font-medium">カテゴリ</th>
@@ -204,9 +216,9 @@ function ListExportTool() {
                       : 'border-slate-200 bg-slate-50 text-slate-500';
                 return (
                   <tr key={inst.id} className="hover:bg-slate-50">
-                    <td className="max-w-xs truncate px-3 py-2.5 text-slate-900">{inst.title}</td>
-                    <td className="px-3 py-2.5 text-slate-600">{getCategoryLabel(inst.category)}</td>
-                    <td className="px-3 py-2.5">
+                    <td className="truncate px-3 py-2.5 text-slate-900" title={inst.title}>{inst.title}</td>
+                    <td className="whitespace-nowrap px-3 py-2.5 text-slate-600">{getCategoryLabel(inst.category)}</td>
+                    <td className="whitespace-nowrap px-3 py-2.5">
                       <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold ${approvalClass}`}>
                         {approvalStatus === 'approved' && (
                           <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -216,13 +228,13 @@ function ListExportTool() {
                         {approvalLabel}
                       </span>
                     </td>
-                    <td className="px-3 py-2.5 text-slate-600">{fmtDate(inst.approval?.current?.approvedAt) || '—'}</td>
-                    <td className="px-3 py-2.5 text-slate-600">{inst.approval?.current?.userName || inst.approval?.current?.userEmail || '—'}</td>
-                    <td className="px-3 py-2.5 text-slate-600">{inst.createdBy || '—'}</td>
-                    <td className="px-3 py-2.5 text-slate-600">{updater || '—'}</td>
-                    <td className="px-3 py-2.5 text-slate-600">{fmtDate(inst.createdAt) || '—'}</td>
-                    <td className="px-3 py-2.5 text-slate-600">{fmtDate(inst.updatedAt) || '—'}</td>
-                    <td className="px-3 py-2.5 text-center text-slate-600">{inst.updateHistory?.length ?? 0}</td>
+                    <td className="whitespace-nowrap px-3 py-2.5 text-slate-600">{fmtDate(inst.approval?.current?.approvedAt) || '—'}</td>
+                    <td className="truncate px-3 py-2.5 text-slate-600" title={inst.approval?.current?.userName || inst.approval?.current?.userEmail || ''}>{inst.approval?.current?.userName || inst.approval?.current?.userEmail || '—'}</td>
+                    <td className="truncate px-3 py-2.5 text-slate-600" title={inst.createdBy || ''}>{inst.createdBy || '—'}</td>
+                    <td className="truncate px-3 py-2.5 text-slate-600" title={updater}>{updater || '—'}</td>
+                    <td className="whitespace-nowrap px-3 py-2.5 text-slate-600">{fmtDate(inst.createdAt) || '—'}</td>
+                    <td className="whitespace-nowrap px-3 py-2.5 text-slate-600">{fmtDate(inst.updatedAt) || '—'}</td>
+                    <td className="whitespace-nowrap px-3 py-2.5 text-center text-slate-600">{inst.updateHistory?.length ?? 0}</td>
                   </tr>
                 );
               })}
