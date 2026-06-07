@@ -43,6 +43,7 @@ function InstructionViewContent() {
   const [selectedJumpTargets, setSelectedJumpTargets] = useState<Record<string, string>>({});
   const [scrollTargetStepId, setScrollTargetStepId] = useState<string | null>(null);
   const [chapterTargetStepId, setChapterTargetStepId] = useState<string | null>(null);
+  const [copiedPathId, setCopiedPathId] = useState<string | null>(null);
   const [revealedCount, setRevealedCount] = useState(1);
   const [showHistory, setShowHistory] = useState(false);
   const [showApprovalHistory, setShowApprovalHistory] = useState(false);
@@ -53,6 +54,27 @@ function InstructionViewContent() {
   const [viewingSnapshot, setViewingSnapshot] = useState<InstructionSnapshot | null>(null);
   const [viewUrlCopied, setViewUrlCopied] = useState(false);
   const [expandedStepDetails, setExpandedStepDetails] = useState<Record<string, boolean>>({});
+
+  const copyPathToClipboard = async (path: string, linkId: string) => {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(path);
+      } else {
+        const textarea = document.createElement('textarea');
+        textarea.value = path;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+      }
+      setCopiedPathId(linkId);
+      window.setTimeout(() => setCopiedPathId((current) => (current === linkId ? null : current)), 1800);
+    } catch {
+      alert('パスをコピーできませんでした。表示されているパスを選択してコピーしてください。');
+    }
+  };
 
   useEffect(() => {
     if (!isGoogleConfigured()) return;
@@ -457,7 +479,7 @@ function InstructionViewContent() {
           step.caution,
           ...(step.checkItems ?? []).map((item) => item.label),
           ...(step.imageCaptions ?? []),
-          ...(step.links ?? []).map((link) => link.label),
+          ...(step.links ?? []).flatMap((link) => [link.label, link.url, link.path]),
         ]
           .filter(Boolean)
           .join('\n')
@@ -702,6 +724,32 @@ function InstructionViewContent() {
                     <div className="bg-indigo-50 border border-indigo-200 rounded-lg px-4 py-3 space-y-1.5">
                       <p className="text-xs font-medium text-indigo-700 mb-1">関連リンク</p>
                       {step.links.map((link) => {
+                        if (link.type === 'path') {
+                          const path = link.path || '';
+                          return (
+                            <div
+                              key={link.id}
+                              className="rounded-lg border border-emerald-200 bg-white px-3 py-2"
+                            >
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <div className="min-w-0">
+                                  <p className="text-sm font-semibold text-emerald-800">{link.label}</p>
+                                  <p className="mt-1 select-all break-all font-mono text-xs text-slate-600">
+                                    {path || 'パス未設定'}
+                                  </p>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => path && copyPathToClipboard(path, link.id)}
+                                  disabled={!path}
+                                  className="shrink-0 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                  {copiedPathId === link.id ? 'コピー済み' : 'コピー'}
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        }
                         const href =
                           link.type === 'instruction'
                             ? link.driveFileId

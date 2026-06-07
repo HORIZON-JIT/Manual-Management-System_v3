@@ -61,7 +61,12 @@ function buildSearchText(json: Record<string, unknown>): string {
         step.checkItems.forEach((ci) => push((ci as { label?: unknown })?.label));
       }
       if (Array.isArray(step.links)) {
-        step.links.forEach((l) => push((l as { label?: unknown })?.label));
+        step.links.forEach((l) => {
+          const link = l as { label?: unknown; url?: unknown; path?: unknown };
+          push(link.label);
+          push(link.url);
+          push(link.path);
+        });
       }
       if (Array.isArray(step.jumps)) {
         step.jumps.forEach((j) => push((j as { label?: unknown })?.label));
