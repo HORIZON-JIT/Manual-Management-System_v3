@@ -183,6 +183,7 @@ function ListExportTool() {
                 <th className="px-3 py-2 font-medium">カテゴリ</th>
                 <th className="px-3 py-2 font-medium">承認</th>
                 <th className="px-3 py-2 font-medium">承認日</th>
+                <th className="px-3 py-2 font-medium">承認者</th>
                 <th className="px-3 py-2 font-medium">作成者</th>
                 <th className="px-3 py-2 font-medium">更新者</th>
                 <th className="px-3 py-2 font-medium">作成日</th>
@@ -216,6 +217,7 @@ function ListExportTool() {
                       </span>
                     </td>
                     <td className="px-3 py-2.5 text-slate-600">{fmtDate(inst.approval?.current?.approvedAt) || '—'}</td>
+                    <td className="px-3 py-2.5 text-slate-600">{inst.approval?.current?.userName || inst.approval?.current?.userEmail || '—'}</td>
                     <td className="px-3 py-2.5 text-slate-600">{inst.createdBy || '—'}</td>
                     <td className="px-3 py-2.5 text-slate-600">{updater || '—'}</td>
                     <td className="px-3 py-2.5 text-slate-600">{fmtDate(inst.createdAt) || '—'}</td>
