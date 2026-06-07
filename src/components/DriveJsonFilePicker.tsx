@@ -70,7 +70,7 @@ function buildSearchableText(instruction: WorkInstruction): string {
       step.caution,
       step.detailDescription,
       ...(step.checkItems ?? []).map((check) => check.label),
-      ...(step.links ?? []).flatMap((link) => [link.label, link.url]),
+      ...(step.links ?? []).flatMap((link) => [link.label, link.url, link.path]),
       ...(step.imageCaptions ?? []),
     ].filter((value): value is string => !!value));
   }

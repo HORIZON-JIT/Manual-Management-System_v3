@@ -5,10 +5,11 @@ export interface CheckItem {
 
 export interface StepLink {
   id: string;
-  type: 'instruction' | 'url';
+  type: 'instruction' | 'url' | 'path';
   instructionId?: string;
   driveFileId?: string;
   url?: string;
+  path?: string;
   label: string;
 }
 

@@ -1012,7 +1012,19 @@ export default function StepEditor({
                   key={link.id}
                   className="flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2"
                 >
-                  <span className="flex-1 truncate text-sm text-slate-700">{link.label}</span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="truncate text-sm text-slate-700">{link.label}</span>
+                      {link.type === 'path' && (
+                        <span className="shrink-0 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
+                          パス
+                        </span>
+                      )}
+                    </div>
+                    {link.type === 'path' && link.path && (
+                      <p className="mt-1 truncate font-mono text-xs text-slate-500">{link.path}</p>
+                    )}
+                  </div>
                   <button
                     type="button"
                     onClick={() =>
@@ -1073,6 +1085,25 @@ export default function StepEditor({
                 className="text-sm font-medium text-blue-700 hover:text-blue-900"
               >
                 + URLを追加
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const path = prompt('Explorerで開くパスを入力してください');
+                  if (!path) return;
+                  const label = prompt('パスの表示名を入力してください', path) || path;
+                  const newLink: StepLink = {
+                    id: uuidv4(),
+                    type: 'path',
+                    path,
+                    label,
+                  };
+                  onChange({ ...step, links: [...(step.links ?? []), newLink] });
+                }}
+                className="ml-4 text-sm font-medium text-emerald-700 hover:text-emerald-900"
+              >
+                + パスを追加
               </button>
             </div>
           </div>
