@@ -9,8 +9,10 @@ import {
   StepJump,
   Condition,
   ImageAnnotation,
+  ImageDisplaySize,
   getStepConditionIds,
   getStepImages,
+  getImageDisplaySize,
 } from '@/types/instruction';
 import { getAllInstructions } from '@/lib/storage';
 import { compressImage } from '@/lib/compressImage';
@@ -275,11 +277,13 @@ export default function StepEditor({
       const currentStep = stepRef.current;
       const currentImages = imagesRef.current;
       const captions = currentStep.imageCaptions ?? [];
+      const sizes = currentStep.imageDisplaySizes;
       onChange({
         ...currentStep,
         imageDataUrl: undefined,
         imageDataUrls: [...currentImages, dataUrl],
         imageCaptions: [...captions, ''],
+        imageDisplaySizes: sizes ? [...sizes, null] : undefined,
       });
     },
     [onChange],
@@ -293,11 +297,13 @@ export default function StepEditor({
       const updatedCaptions = (currentStep.imageCaptions ?? []).filter(
         (_, i) => i !== imageIndex,
       );
+      const updatedSizes = (currentStep.imageDisplaySizes ?? []).filter((_, i) => i !== imageIndex);
       onChange({
         ...currentStep,
         imageDataUrl: undefined,
         imageDataUrls: updatedImages.length > 0 ? updatedImages : undefined,
         imageCaptions: updatedCaptions.length > 0 ? updatedCaptions : undefined,
+        imageDisplaySizes: updatedSizes.some((s) => s) ? updatedSizes : undefined,
       });
     },
     [onChange],
@@ -310,6 +316,8 @@ export default function StepEditor({
       const updatedImages = [...imagesRef.current];
       const captions = [...(currentStep.imageCaptions ?? [])];
       while (captions.length < updatedImages.length) captions.push('');
+      const sizes: (ImageDisplaySize | null)[] = [...(currentStep.imageDisplaySizes ?? [])];
+      while (sizes.length < updatedImages.length) sizes.push(null);
 
       const targetIndex = direction === 'up' ? imageIndex - 1 : imageIndex + 1;
       if (targetIndex < 0 || targetIndex >= updatedImages.length) return;
@@ -322,12 +330,14 @@ export default function StepEditor({
         captions[targetIndex],
         captions[imageIndex],
       ];
+      [sizes[imageIndex], sizes[targetIndex]] = [sizes[targetIndex], sizes[imageIndex]];
 
       onChange({
         ...currentStep,
         imageDataUrl: undefined,
         imageDataUrls: updatedImages,
         imageCaptions: captions.some((caption) => caption) ? captions : undefined,
+        imageDisplaySizes: sizes.some((s) => s) ? sizes : undefined,
       });
     },
     [onChange],
@@ -339,6 +349,16 @@ export default function StepEditor({
       while (captions.length <= imageIndex) captions.push('');
       captions[imageIndex] = caption;
       onChange({ ...step, imageCaptions: captions });
+    },
+    [onChange, step],
+  );
+
+  const setImageDisplaySize = useCallback(
+    (imageIndex: number, size: ImageDisplaySize) => {
+      const sizes: (ImageDisplaySize | null)[] = [...(step.imageDisplaySizes ?? [])];
+      while (sizes.length <= imageIndex) sizes.push(null);
+      sizes[imageIndex] = size === 'natural' ? null : size;
+      onChange({ ...step, imageDisplaySizes: sizes.some((s) => s) ? sizes : undefined });
     },
     [onChange, step],
   );
@@ -913,6 +933,32 @@ export default function StepEditor({
                       className={`${inputClass} py-1.5 text-xs`}
                       placeholder="画像のコメントを入力"
                     />
+                    <div className="flex flex-wrap items-center gap-2 text-xs">
+                      <span className="text-slate-500">表示サイズ</span>
+                      <div className="inline-flex overflow-hidden rounded-full border border-slate-200">
+                        {([
+                          ['natural', '等倍'],
+                          ['large', '大きく'],
+                          ['small', '小さく'],
+                        ] as const).map(([val, label]) => {
+                          const active = getImageDisplaySize(step, imgIdx) === val;
+                          return (
+                            <button
+                              key={val}
+                              type="button"
+                              onClick={() => setImageDisplaySize(imgIdx, val)}
+                              className={`px-3 py-1 font-medium transition ${
+                                active
+                                  ? 'bg-blue-600 text-white'
+                                  : 'bg-white text-slate-600 hover:bg-slate-100'
+                              }`}
+                            >
+                              {label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
                     <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
                       <span className="text-slate-500">
                         画像 {imgIdx + 1} / {images.length}
