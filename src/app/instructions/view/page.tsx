@@ -10,6 +10,7 @@ import {
   getApprovalStatus,
   getCategoryLabel,
   getImageCaption,
+  getImageDisplaySize,
   getStepConditionIds,
   getStepImages,
 } from '@/types/instruction';
@@ -704,13 +705,21 @@ function InstructionViewContent() {
                     </div>
                   )}
 
-                  {getStepImages(step).map((imgUrl, imgIdx) => (
+                  {getStepImages(step).map((imgUrl, imgIdx) => {
+                    const displaySize = getImageDisplaySize(step, imgIdx);
+                    const imgSizeClass =
+                      displaySize === 'large'
+                        ? 'w-full h-auto'
+                        : displaySize === 'small'
+                          ? 'mx-auto h-auto max-w-[220px] sm:max-w-[320px]'
+                          : 'max-w-full h-auto mx-auto';
+                    return (
                     <div key={imgIdx} className="rounded-lg border border-slate-200 overflow-hidden">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={imgUrl}
                         alt={`ステップ${stepNumbers[index]} の画像 ${imgIdx + 1}`}
-                        className="max-w-full h-auto mx-auto"
+                        className={imgSizeClass}
                       />
                       {getImageCaption(step, imgIdx) && (
                         <p className="px-3 py-2 text-sm text-slate-600 bg-slate-50 border-t border-slate-200">
@@ -718,7 +727,8 @@ function InstructionViewContent() {
                         </p>
                       )}
                     </div>
-                  ))}
+                    );
+                  })}
 
                   {step.links && step.links.length > 0 && (
                     <div className="bg-indigo-50 border border-indigo-200 rounded-lg px-4 py-3 space-y-1.5">

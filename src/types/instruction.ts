@@ -33,6 +33,9 @@ export type ImageAnnotation =
   | { type: 'number'; x: number; y: number; value: number; scale: number; color: string; mode?: 'auto' | 'manual' }
   | { type: 'text'; x: number; y: number; value: string; scale: number; color: string };
 
+/** 画像の表示サイズ（ビューア）。等倍 / 大きく（列幅いっぱい） / 小さく（中央に小さめ）。 */
+export type ImageDisplaySize = 'natural' | 'large' | 'small';
+
 export interface Step {
   id: string;
   orderIndex: number;
@@ -45,6 +48,8 @@ export interface Step {
   imageCaptions?: string[];
   /** 画像ごとの注釈オブジェクト。index は imageDataUrls と対応。 */
   imageAnnotations?: (ImageAnnotation[] | null)[];
+  /** 画像ごとの表示サイズ。index は imageDataUrls と対応。未指定は 'natural'。 */
+  imageDisplaySizes?: (ImageDisplaySize | null)[];
   caution?: string;
   checkItems?: CheckItem[];
   conditionId?: string;
@@ -73,6 +78,11 @@ export function getStepImages(step: Step): string[] {
 /** Get caption for image at index */
 export function getImageCaption(step: Step, index: number): string {
   return step.imageCaptions?.[index] ?? '';
+}
+
+/** Get display size for image at index（未指定は等倍） */
+export function getImageDisplaySize(step: Step, index: number): ImageDisplaySize {
+  return step.imageDisplaySizes?.[index] ?? 'natural';
 }
 
 export type Category = string;
