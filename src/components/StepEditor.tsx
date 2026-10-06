@@ -18,7 +18,16 @@ import { getAllInstructions } from '@/lib/storage';
 import { compressImage } from '@/lib/compressImage';
 import { setTempData, getTempData, removeTempData } from '@/lib/tempStorage';
 import { getInstructionsBaseUrl } from '@/lib/shareLink';
+import { downloadDriveFile, DriveFileInfo } from '@/lib/googleDrive';
+import { isGoogleConfigured, getAuthState } from '@/lib/googleAuth';
 import ImageAnnotationEditor from './ImageAnnotationEditor';
+import DriveJsonFilePicker from './DriveJsonFilePicker';
+
+/** URL から driveFileId を取り出す（無ければ null） */
+function extractDriveFileId(url: string): string | null {
+  const match = url.match(/[?&]driveFileId=([^&#]+)/);
+  return match ? decodeURIComponent(match[1]) : null;
+}
 
 interface StepEditorProps {
   step: Step;
@@ -60,6 +69,14 @@ export default function StepEditor({
   const [replaceTargetIdx, setReplaceTargetIdx] = useState<number | null>(null);
   const [popupSupported, setPopupSupported] = useState(false);
   const pendingPopups = useRef<Map<string, number>>(new Map());
+  const [showUrlForm, setShowUrlForm] = useState(false);
+  const [urlInput, setUrlInput] = useState('');
+  const [urlLabelInput, setUrlLabelInput] = useState('');
+  const [addingUrl, setAddingUrl] = useState(false);
+  const [editingLinkId, setEditingLinkId] = useState<string | null>(null);
+  const [editingLabel, setEditingLabel] = useState('');
+  const [showDriveLinkPicker, setShowDriveLinkPicker] = useState(false);
+  const [linkMessage, setLinkMessage] = useState<string | null>(null);
   const [showJumpForm, setShowJumpForm] = useState(false);
   const [jumpLabel, setJumpLabel] = useState('');
   const [jumpTargetId, setJumpTargetId] = useState('');
@@ -539,6 +556,78 @@ export default function StepEditor({
           initial: step.imageAnnotations?.[annotatingIdx] ?? [],
         }
       : null;
+
+  // --- 関連リンク ---
+  const appendLink = (link: StepLink) => {
+    const current = stepRef.current;
+    onChange({ ...current, links: [...(current.links ?? []), link] });
+  };
+
+  const resetUrlForm = () => {
+    setShowUrlForm(false);
+    setUrlInput('');
+    setUrlLabelInput('');
+  };
+
+  const handleAddUrlLink = async () => {
+    const url = urlInput.trim();
+    if (!url) return;
+    let label = urlLabelInput.trim();
+    const driveFileId = extractDriveFileId(url);
+    setAddingUrl(true);
+    try {
+      if (driveFileId) {
+        // 手順書の閲覧URL → アプリ内の手順書リンクとして保存。表示名が空なら Drive からタイトルを取得
+        if (!label && isGoogleConfigured() && getAuthState().isSignedIn) {
+          try {
+            const json = JSON.parse(await downloadDriveFile(driveFileId)) as { title?: string };
+            label = json.title?.trim() || '';
+          } catch {
+            // 取得できなければ URL を表示名にする
+          }
+        }
+        appendLink({ id: uuidv4(), type: 'instruction', driveFileId, label: label || url });
+      } else {
+        appendLink({ id: uuidv4(), type: 'url', url, label: label || url });
+      }
+      resetUrlForm();
+    } finally {
+      setAddingUrl(false);
+    }
+  };
+
+  const handleOpenDriveLinkPicker = () => {
+    if (!isGoogleConfigured() || !getAuthState().isSignedIn) {
+      setLinkMessage('Driveの手順書を選ぶには、右上からGoogleにログインしてください。');
+      return;
+    }
+    setLinkMessage(null);
+    setShowDriveLinkPicker(true);
+  };
+
+  const handleDriveLinkLoaded = (content: string, file: DriveFileInfo) => {
+    let title = file.name.replace(/\.json$/i, '');
+    try {
+      const json = JSON.parse(content) as { title?: string };
+      if (json.title?.trim()) title = json.title.trim();
+    } catch {
+      // ファイル名を表示名にする
+    }
+    appendLink({ id: uuidv4(), type: 'instruction', driveFileId: file.id, label: title });
+    setShowDriveLinkPicker(false);
+  };
+
+  const saveLinkLabel = (linkId: string) => {
+    const label = editingLabel.trim();
+    if (label) {
+      onChange({
+        ...step,
+        links: (step.links ?? []).map((item) => (item.id === linkId ? { ...item, label } : item)),
+      });
+    }
+    setEditingLinkId(null);
+    setEditingLabel('');
+  };
 
   return (
     <section
@@ -1059,18 +1148,69 @@ export default function StepEditor({
                   className="flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2"
                 >
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="truncate text-sm text-slate-700">{link.label}</span>
-                      {link.type === 'path' && (
-                        <span className="shrink-0 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
-                          パス
-                        </span>
-                      )}
-                    </div>
+                    {editingLinkId === link.id ? (
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={editingLabel}
+                          onChange={(e) => setEditingLabel(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              saveLinkLabel(link.id);
+                            }
+                            if (e.key === 'Escape') setEditingLinkId(null);
+                          }}
+                          autoFocus
+                          className={`${inputClass} py-1 text-sm`}
+                          placeholder="表示名（例: 図面廃止）"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => saveLinkLabel(link.id)}
+                          className="shrink-0 text-sm font-medium text-blue-700 hover:text-blue-900"
+                        >
+                          保存
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditingLinkId(null)}
+                          className="shrink-0 text-sm text-slate-500 hover:text-slate-800"
+                        >
+                          取消
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <span className="truncate text-sm text-slate-700">{link.label}</span>
+                        {link.type === 'instruction' && (
+                          <span className="shrink-0 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[11px] font-semibold text-blue-700">
+                            手順書
+                          </span>
+                        )}
+                        {link.type === 'path' && (
+                          <span className="shrink-0 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
+                            パス
+                          </span>
+                        )}
+                      </div>
+                    )}
                     {link.type === 'path' && link.path && (
                       <p className="mt-1 truncate font-mono text-xs text-slate-500">{link.path}</p>
                     )}
                   </div>
+                  {editingLinkId !== link.id && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingLinkId(link.id);
+                        setEditingLabel(link.label);
+                      }}
+                      className="shrink-0 text-sm text-slate-500 hover:text-blue-700"
+                    >
+                      名前変更
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() =>
@@ -1079,7 +1219,7 @@ export default function StepEditor({
                         links: (step.links ?? []).filter((item) => item.id !== link.id),
                       })
                     }
-                    className="text-sm text-red-500 hover:text-red-700"
+                    className="shrink-0 text-sm text-red-500 hover:text-red-700"
                   >
                     削除
                   </button>
@@ -1105,7 +1245,7 @@ export default function StepEditor({
                 }}
                 className={`${inputClass} text-xs`}
               >
-                <option value="">+ 手順書を追加...</option>
+                <option value="">+ この端末の手順書を追加...</option>
                 {getAllInstructions().map((instruction) => (
                   <option key={instruction.id} value={instruction.id}>
                     {instruction.title}
@@ -1113,25 +1253,68 @@ export default function StepEditor({
                 ))}
               </select>
 
-              <button
-                type="button"
-                onClick={() => {
-                  const url = prompt('URLを入力してください');
-                  if (!url) return;
-                  const label =
-                    prompt('リンクの表示名を入力してください', url) || url;
-                  const newLink: StepLink = {
-                    id: uuidv4(),
-                    type: 'url',
-                    url,
-                    label,
-                  };
-                  onChange({ ...step, links: [...(step.links ?? []), newLink] });
-                }}
-                className="text-sm font-medium text-blue-700 hover:text-blue-900"
-              >
-                + URLを追加
-              </button>
+              {showUrlForm && (
+                <div className="space-y-2 rounded-lg border border-blue-100 bg-blue-50/60 p-3">
+                  <input
+                    type="text"
+                    value={urlInput}
+                    onChange={(e) => setUrlInput(e.target.value)}
+                    className={`${inputClass} text-sm`}
+                    placeholder="URL（手順書の閲覧URLなら表示名を自動取得します）"
+                    autoFocus
+                  />
+                  <input
+                    type="text"
+                    value={urlLabelInput}
+                    onChange={(e) => setUrlLabelInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        void handleAddUrlLink();
+                      }
+                    }}
+                    className={`${inputClass} text-sm`}
+                    placeholder="表示名（例: 図面廃止）※空欄なら自動"
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => void handleAddUrlLink()}
+                      disabled={!urlInput.trim() || addingUrl}
+                      className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50"
+                    >
+                      {addingUrl ? '追加中...' : '追加'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={resetUrlForm}
+                      className="rounded-lg px-3 py-1.5 text-xs text-slate-600 hover:bg-white"
+                    >
+                      キャンセル
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {linkMessage && <p className="text-xs text-amber-700">{linkMessage}</p>}
+
+              <div className="flex flex-wrap gap-x-4 gap-y-2">
+                <button
+                  type="button"
+                  onClick={handleOpenDriveLinkPicker}
+                  className="text-sm font-medium text-blue-700 hover:text-blue-900"
+                >
+                  + Driveの手順書から追加
+                </button>
+                {!showUrlForm && (
+                  <button
+                    type="button"
+                    onClick={() => setShowUrlForm(true)}
+                    className="text-sm font-medium text-blue-700 hover:text-blue-900"
+                  >
+                    + URLを追加
+                  </button>
+                )}
 
               <button
                 type="button"
@@ -1147,11 +1330,17 @@ export default function StepEditor({
                   };
                   onChange({ ...step, links: [...(step.links ?? []), newLink] });
                 }}
-                className="ml-4 text-sm font-medium text-emerald-700 hover:text-emerald-900"
+                className="text-sm font-medium text-emerald-700 hover:text-emerald-900"
               >
                 + パスを追加
               </button>
+              </div>
             </div>
+            <DriveJsonFilePicker
+              open={showDriveLinkPicker}
+              onClose={() => setShowDriveLinkPicker(false)}
+              onFileLoaded={handleDriveLinkLoaded}
+            />
           </div>
 
           {hasConditionGroups && <div id={`jump-settings-${step.id}`} className="rounded-lg border border-slate-200 p-4">
