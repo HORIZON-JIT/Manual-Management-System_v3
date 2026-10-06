@@ -44,6 +44,9 @@ export default function Header() {
               H
             </span>
             <span className="truncate text-[15px] font-semibold tracking-[0.08em]">{DEPARTMENT.brandLabel}</span>
+            <span className="shrink-0 rounded-md border border-neutral-300 px-1.5 py-0.5 text-[11px] font-semibold leading-none tracking-wide text-neutral-500">
+              v3
+            </span>
           </Link>
 
           <nav className="hidden items-center gap-1.5 md:flex">
