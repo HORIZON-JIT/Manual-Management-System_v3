@@ -14,7 +14,6 @@ import {
   getStepImages,
   getImageDisplaySize,
 } from '@/types/instruction';
-import { getAllInstructions } from '@/lib/storage';
 import { compressImage } from '@/lib/compressImage';
 import { setTempData, getTempData, removeTempData } from '@/lib/tempStorage';
 import { getInstructionsBaseUrl } from '@/lib/shareLink';
@@ -1225,33 +1224,6 @@ export default function StepEditor({
                   </button>
                 </div>
               ))}
-
-              <select
-                value=""
-                onChange={(e) => {
-                  if (!e.target.value) return;
-                  const all = getAllInstructions();
-                  const instruction = all.find((item) => item.id === e.target.value);
-                  if (!instruction) return;
-                  const newLink: StepLink = {
-                    id: uuidv4(),
-                    type: 'instruction',
-                    instructionId: instruction.id,
-                    driveFileId: instruction.driveFileId,
-                    label: instruction.title,
-                  };
-                  onChange({ ...step, links: [...(step.links ?? []), newLink] });
-                  e.target.value = '';
-                }}
-                className={`${inputClass} text-xs`}
-              >
-                <option value="">+ この端末の手順書を追加...</option>
-                {getAllInstructions().map((instruction) => (
-                  <option key={instruction.id} value={instruction.id}>
-                    {instruction.title}
-                  </option>
-                ))}
-              </select>
 
               {showUrlForm && (
                 <div className="space-y-2 rounded-lg border border-blue-100 bg-blue-50/60 p-3">
