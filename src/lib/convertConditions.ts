@@ -1,7 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import { Step, StepJump, Condition, ConditionGroup, JUMP_END_TARGET } from '../types/instruction';
 import { computeRoute, groupConditionsOf, selectableGroupIds, DEFAULT_JUMP_VALUE, ConditionSelection, JumpSelection } from './routeEngine';
-import { implicitNextId, sortSteps, buildFlowGraph } from './flowModel';
+import { implicitNextId, sortSteps, buildFlowGraph, successorOf } from './flowModel';
 
 /**
  * 条件グループ（conditions / conditionGroups / 各ステップの表示条件）で表した分岐を、
@@ -164,9 +164,23 @@ export function convertConditionsToFlow(source: ConvertSource): ConvertResult {
   const unreachable = buildFlowGraph(finalSteps).nodes.filter((n) => !!n.stepId && (n.kind === 'step' || n.kind === 'question') && n.unreachable);
   if (unreachable.length > 0) {
     const names = unreachable.map((n) => n.label).join('、');
-    const hint = fixedGroups.length > 0
-      ? `閲覧画面で選べない条件（${fixedGroups.map((g) => g.conditions.join('／')).join('、')}）だけが付いたステップが原因の可能性があります。該当ステップの表示条件を見直してから、もう一度お試しください。`
-      : '該当ステップの表示条件を見直してから、もう一度お試しください。';
+    // 原因A: 選択肢はあるが「通常ルートの選択肢名」が無いステップの通常ルートの先にある
+    //        （閲覧画面は選択肢名が無いと通常ルートのボタンを出さないので、その先は今も表示されない）
+    const unreachableIds = new Set(unreachable.map((n) => n.stepId));
+    const missingDefault = steps.find((orig) => {
+      if ((orig.jumps?.length ?? 0) === 0 || orig.jumpDefaultLabel) return false;
+      const succ = successorOf(steps, orig);
+      return succ.kind === 'step' && unreachableIds.has(succ.id);
+    });
+    let hint: string;
+    if (missingDefault) {
+      const no = stepName(missingDefault, steps);
+      hint = `「${no}」に選択肢はありますが「通常ルートの選択肢名」（例: OK）が入っていないため、閲覧画面でもその先は表示されていません。「${no}」の通常ルートの選択肢名を入れてから、もう一度お試しください。`;
+    } else if (fixedGroups.length > 0) {
+      hint = `閲覧画面で選べない条件（${fixedGroups.map((g) => g.conditions.join('／')).join('、')}）だけが付いたステップが原因の可能性があります。該当ステップの表示条件を見直してから、もう一度お試しください。`;
+    } else {
+      hint = '該当ステップの進み先や表示条件を見直してから、もう一度お試しください。';
+    }
     return { ok: false, reason: `変換すると次のステップがどこからもつながらなくなるため変換しません: ${names}。${hint}` };
   }
   return { ok: true, steps: finalSteps, combinations: combos.length, questions, fixedGroups, reachable: finalSteps.length };
