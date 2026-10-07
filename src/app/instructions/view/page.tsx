@@ -810,7 +810,7 @@ function InstructionViewContent() {
                       <p className="text-sm font-semibold text-slate-800">{step.branchQuestion || '次の進行を選択'}</p>
                       <p className="mt-1 text-xs text-slate-500">該当する内容を選ぶと、その先の手順を表示します。</p>
                       <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                      {step.jumps.map((jump) => {
+                      {step.jumps.map((jump, jumpIndex) => {
                         const targetStep = sortedSteps.find((candidate) => candidate.id === jump.targetStepId);
                         const isSelected = selectedJumpTargets[step.id] === jump.targetStepId;
                         return (
@@ -824,7 +824,7 @@ function InstructionViewContent() {
                                 : 'border-slate-200 bg-white text-slate-800 hover:border-slate-400'
                             }`}
                           >
-                            <span className="block text-sm font-semibold">{jump.label}</span>
+                            <span className="block text-sm font-semibold">{jump.label.trim() || `（答え${jumpIndex + 1}）`}</span>
                             {targetStep && (
                               <span className={`mt-1 block text-xs ${isSelected ? 'text-slate-300' : 'text-slate-500'}`}>
                                 {targetStep.title}
