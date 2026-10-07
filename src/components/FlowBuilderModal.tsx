@@ -251,6 +251,7 @@ export default function FlowBuilderModal({ steps, onChange, onClose, onEditStep,
                   <p className="text-sm font-semibold text-slate-900">図で組み立てる方式に変換できます</p>
                   <ul className="mt-2 list-disc space-y-1 pl-5 text-xs leading-5 text-slate-600">
                     <li>条件の選び方 {conversion.combinations} 通りすべてで、変換前後の手順の流れが一致することを確認済みです。</li>
+                    <li>全 {conversion.reachable} ステップが変換後も図につながっています（つながらなくなるステップがある場合は変換できません）。</li>
                     <li>条件グループは質問（{conversion.questions} 件）に置き換わり、閲覧時は「条件を選択」のタブではなく、質問の答えを押して進む形になります。</li>
                     <li>変換はこの編集画面の中だけで行われます。保存するまで手順書は変わりません。</li>
                   </ul>

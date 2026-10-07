@@ -1,7 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import { Step, StepJump, Condition, ConditionGroup, JUMP_END_TARGET } from '../types/instruction';
 import { computeRoute, groupConditionsOf, selectableGroupIds, DEFAULT_JUMP_VALUE, ConditionSelection, JumpSelection } from './routeEngine';
-import { implicitNextId, sortSteps } from './flowModel';
+import { implicitNextId, sortSteps, buildFlowGraph } from './flowModel';
 
 /**
  * 条件グループ（conditions / conditionGroups / 各ステップの表示条件）で表した分岐を、
@@ -28,7 +28,7 @@ export interface FixedGroup {
 }
 
 export type ConvertResult =
-  | { ok: true; steps: Step[]; combinations: number; questions: number; fixedGroups: FixedGroup[] }
+  | { ok: true; steps: Step[]; combinations: number; questions: number; fixedGroups: FixedGroup[]; reachable: number }
   | { ok: false; reason: string };
 
 const MAX_COMBINATIONS = 512;
@@ -43,7 +43,7 @@ export function convertConditionsToFlow(source: ConvertSource): ConvertResult {
   const steps = sortSteps(source.steps);
   const conditions = source.conditions ?? [];
   const allGroups = groupConditionsOf(conditions);
-  if (allGroups.length === 0) return { ok: true, steps, combinations: 1, questions: 0, fixedGroups: [] };
+  if (allGroups.length === 0) return { ok: true, steps, combinations: 1, questions: 0, fixedGroups: [], reachable: steps.length };
   // 閲覧画面で実際に選べるグループだけを列挙し、選べないグループは閲覧画面と同じく先頭の条件に固定する
   const selectable = selectableGroupIds(source);
   const groups = allGroups.filter((g) => selectable.has(g.groupId));
@@ -159,7 +159,17 @@ export function convertConditionsToFlow(source: ConvertSource): ConvertResult {
       return { ok: false, reason: `変換前後で手順の流れが一致しないため自動変換できません（「${stepName(convertedById.get(firstDiff?.id ?? '') ?? firstDiff, steps)}」付近）。` };
     }
   }
-  return { ok: true, steps: converted.map((s, i) => ({ ...s, orderIndex: i })), combinations: combos.length, questions, fixedGroups };
+  // --- 検証: 変換後にどこからもつながらないステップ（内容が実質的に失われる）があれば変換しない ---
+  const finalSteps = converted.map((s, i) => ({ ...s, orderIndex: i }));
+  const unreachable = buildFlowGraph(finalSteps).nodes.filter((n) => n.kind === 'step' && n.unreachable);
+  if (unreachable.length > 0) {
+    const names = unreachable.map((n) => n.label).join('、');
+    const hint = fixedGroups.length > 0
+      ? `閲覧画面で選べない条件（${fixedGroups.map((g) => g.conditions.join('／')).join('、')}）だけが付いたステップが原因の可能性があります。該当ステップの表示条件を見直してから、もう一度お試しください。`
+      : '該当ステップの表示条件を見直してから、もう一度お試しください。';
+    return { ok: false, reason: `変換すると次のステップがどこからもつながらなくなるため変換しません: ${names}。${hint}` };
+  }
+  return { ok: true, steps: finalSteps, combinations: combos.length, questions, fixedGroups, reachable: finalSteps.length };
 }
 
 class ConvertError extends Error {}
