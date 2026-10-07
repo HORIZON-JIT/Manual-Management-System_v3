@@ -6,6 +6,8 @@ import {
   buildFlowGraph,
   addStepAfter,
   addAnswerStep,
+  addAnswerQuestion,
+  isQuestionOnlyStep,
   addBranch,
   removeBranch,
   setBranchQuestion,
@@ -61,14 +63,46 @@ export default function FlowBuilderModal({ steps, onChange, onClose, onEditStep,
 
   const handleBoxClick = (box: LayoutBox) => {
     const node = box.node;
-    if (node.kind === 'placeholder' && node.stepId !== undefined) {
-      const result = addAnswerStep(sorted, node.stepId, node.jumpIndex ?? 0);
-      onChange(result.steps);
-      setSelectedId(result.newId);
-      return;
-    }
     if (node.kind === 'start' || node.kind === 'end') { setSelectedId(null); return; }
     setSelectedId(node.id);
+  };
+
+  // 「＋ 次を追加」の先に何を置くかを選ぶ欄
+  const renderPlaceholderPanel = (step: Step, jumpIndex: number) => {
+    const answer = step.jumps?.[jumpIndex];
+    const label = answer?.label || `（答え${jumpIndex + 1}）`;
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-2">
+          <h3 className="text-base font-bold text-slate-950">「{label}」の先に置くもの</h3>
+        </div>
+        <p className="text-sm leading-6 text-slate-600">
+          質問「{step.branchQuestion || 'どちらに進む？'}」で「{label}」と答えたあと、何に進みますか？
+        </p>
+        <div className="space-y-2">
+          <button
+            type="button"
+            onClick={() => { const r = addAnswerStep(sorted, step.id, jumpIndex); onChange(r.steps); setSelectedId(r.newId); }}
+            className={`${actionClass} border-slate-200 bg-white text-slate-700 hover:bg-slate-50`}
+          >
+            ＋ ステップを追加
+          </button>
+          <button
+            type="button"
+            onClick={() => { const r = addAnswerQuestion(sorted, step.id, jumpIndex); onChange(r.steps); setSelectedId(questionNodeId(r.newId)); }}
+            className={`${actionClass} border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100`}
+          >
+            ？ 質問を追加（続けて分岐する）
+          </button>
+          <p className="text-xs leading-5 text-slate-500">
+            「質問を追加」は、質問文をタイトルにした本文なしのステップを作り、すぐ次の分岐にします。
+          </p>
+          <button type="button" onClick={() => setSelectedId(questionNodeId(step.id))} className={`${actionClass} border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100`}>
+            質問に戻る
+          </button>
+        </div>
+      </div>
+    );
   };
 
   const renderStepPanel = (step: Step) => {
@@ -168,6 +202,9 @@ export default function FlowBuilderModal({ steps, onChange, onClose, onEditStep,
           className={inputClass}
           placeholder="例: 合格ですか？"
         />
+        {isQuestionOnlyStep(step) && (
+          <p className="mt-1.5 text-xs leading-5 text-slate-500">質問だけのステップです。ステップ名も同じ文になります。</p>
+        )}
       </div>
       <div>
         <label className={labelClass}>答えと進み先</label>
@@ -295,7 +332,9 @@ export default function FlowBuilderModal({ steps, onChange, onClose, onEditStep,
               <div className="mt-4"><FlowLegend /></div>
             </div>
             <div className="max-h-[45vh] overflow-auto border-t border-slate-200 p-4 lg:max-h-none lg:border-l lg:border-t-0">
-              {selectedStep && selectedNode?.kind === 'question'
+              {selectedStep && selectedNode?.kind === 'placeholder'
+                ? renderPlaceholderPanel(selectedStep, selectedNode.jumpIndex ?? 0)
+                : selectedStep && selectedNode?.kind === 'question'
                 ? renderQuestionPanel(selectedStep)
                 : selectedStep
                   ? renderStepPanel(selectedStep)

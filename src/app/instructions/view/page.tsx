@@ -807,7 +807,9 @@ function InstructionViewContent() {
 
                   {step.jumps && step.jumps.length > 0 && (
                     <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-4">
-                      <p className="text-sm font-semibold text-slate-800">{step.branchQuestion || '次の進行を選択'}</p>
+                      <p className="text-sm font-semibold text-slate-800">
+                        {step.branchQuestion && step.branchQuestion !== step.title ? step.branchQuestion : '次の進行を選択'}
+                      </p>
                       <p className="mt-1 text-xs text-slate-500">該当する内容を選ぶと、その先の手順を表示します。</p>
                       <div className="mt-3 grid gap-2 sm:grid-cols-2">
                       {step.jumps.map((jump, jumpIndex) => {

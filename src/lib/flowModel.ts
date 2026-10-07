@@ -213,6 +213,34 @@ export function addAnswerStep(steps: Step[], stepId: string, jumpIndex: number):
   return { steps: renumber([...next, created]), newId: created.id };
 }
 
+/**
+ * 選択肢の先に「質問だけのステップ」を作る（質問→質問をつなぐため）。
+ * タイトル＝質問文、本文なし、答えは「はい」「いいえ」とも未設定。
+ */
+export function addAnswerQuestion(steps: Step[], stepId: string, jumpIndex: number, question = ''): { steps: Step[]; newId: string } {
+  const result = addAnswerStep(steps, stepId, jumpIndex);
+  const next = result.steps.map((s) => {
+    if (s.id !== result.newId) return s;
+    const updated: Step = {
+      ...s,
+      title: question,
+      branchQuestion: question,
+      jumps: [
+        { id: uuidv4(), label: 'はい', targetStepId: '' },
+        { id: uuidv4(), label: 'いいえ', targetStepId: '' },
+      ],
+    };
+    delete updated.endsBranch;
+    return updated;
+  });
+  return { steps: next, newId: result.newId };
+}
+
+/** 質問だけのステップ（タイトルが質問文と同じ、本文なし）かどうか */
+export function isQuestionOnlyStep(step: Step): boolean {
+  return hasBranch(step) && !step.description.trim() && step.title === (step.branchQuestion ?? '');
+}
+
 /** ステップを質問にする。答え1は元の進み先へ、答え2は未設定。 */
 export function addBranch(steps: Step[], stepId: string): Step[] {
   const sorted = sortSteps(steps);
@@ -253,8 +281,13 @@ export function removeBranch(steps: Step[], stepId: string): Step[] {
   });
 }
 
+/** 質問文を変える。質問だけのステップならタイトルも同じ文に追従させる。 */
 export function setBranchQuestion(steps: Step[], stepId: string, question: string): Step[] {
-  return steps.map((step) => (step.id === stepId ? { ...step, branchQuestion: question } : step));
+  return steps.map((step) => {
+    if (step.id !== stepId) return step;
+    const followTitle = isQuestionOnlyStep(step) || !step.title.trim();
+    return { ...step, branchQuestion: question, title: followTitle ? question : step.title };
+  });
 }
 
 export function setAnswer(steps: Step[], stepId: string, jumpIndex: number, patch: Partial<Pick<StepJump, 'label' | 'targetStepId'>>): Step[] {
