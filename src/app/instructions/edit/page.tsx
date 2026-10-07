@@ -77,11 +77,11 @@ function EditInstructionContent() {
       return;
     }
 
-    Promise.resolve().then(() => {
-      const id = searchParams.get('id');
-      setInstruction(id ? getInstruction(id) || null : null);
-      setLoading(false);
-    });
+    const id = searchParams.get('id');
+    (id ? getInstruction(id) : Promise.resolve(undefined))
+      .then((found) => setInstruction(found || null))
+      .catch(() => setInstruction(null))
+      .finally(() => setLoading(false));
   }, [searchParams, auth.isSignedIn]);
 
   if (loading) {

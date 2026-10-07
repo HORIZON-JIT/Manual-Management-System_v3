@@ -528,12 +528,12 @@ export default function InstructionForm({ initialData, approvalMode = false }: I
     };
   };
 
-  const handleDraftSave = (continueEditing: boolean) => {
+  const handleDraftSave = async (continueEditing: boolean) => {
     const instruction = buildInstruction('draft');
     if (!instruction) return;
 
     try {
-      saveInstruction(instruction);
+      await saveInstruction(instruction);
     } catch (error) {
       alert(error instanceof Error ? error.message : '下書き保存に失敗しました。');
       return;
@@ -586,7 +586,7 @@ export default function InstructionForm({ initialData, approvalMode = false }: I
       const viewUrl = `${getViewPageBaseUrl()}?driveFileId=${driveFileId}`;
 
       try {
-        saveInstruction({ ...instruction, driveFileId });
+        await saveInstruction({ ...instruction, driveFileId });
       } catch {}
 
       setSaveSuccessModal({ folderName, folderUrl, viewUrl, excelExported });
