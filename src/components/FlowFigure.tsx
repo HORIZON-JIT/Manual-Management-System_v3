@@ -123,8 +123,9 @@ export default function FlowFigure({ steps, selectedId = null, onBoxClick, onGra
               <polygon
                 points={`${cx},${b.y} ${b.x + b.w},${cy} ${cx},${b.y + b.h} ${b.x},${cy}`}
                 fill="#fffbeb"
-                stroke={selected ? '#2563eb' : '#d97706'}
+                stroke={selected ? '#2563eb' : b.node.unreachable ? '#ef4444' : '#d97706'}
                 strokeWidth={selected ? 2.4 : 1.6}
+                strokeDasharray={b.node.unreachable ? '4 3' : undefined}
               />
               {lines.map((l, i) => (
                 <text key={i} x={cx} y={cy + 4 + (i - (lines.length - 1) / 2) * 14} textAnchor="middle" fontSize={12} fontWeight={600} fill="#1e293b">{l}</text>

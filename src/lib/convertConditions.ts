@@ -161,7 +161,7 @@ export function convertConditionsToFlow(source: ConvertSource): ConvertResult {
   }
   // --- 検証: 変換後にどこからもつながらないステップ（内容が実質的に失われる）があれば変換しない ---
   const finalSteps = converted.map((s, i) => ({ ...s, orderIndex: i }));
-  const unreachable = buildFlowGraph(finalSteps).nodes.filter((n) => n.kind === 'step' && n.unreachable);
+  const unreachable = buildFlowGraph(finalSteps).nodes.filter((n) => !!n.stepId && (n.kind === 'step' || n.kind === 'question') && n.unreachable);
   if (unreachable.length > 0) {
     const names = unreachable.map((n) => n.label).join('、');
     const hint = fixedGroups.length > 0
