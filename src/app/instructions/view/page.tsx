@@ -150,8 +150,11 @@ function InstructionViewContent() {
 
     const id = searchParams.get('id');
     if (id) {
-      const data = getInstruction(id);
-      setInstruction(data || null);
+      getInstruction(id)
+        .then((data) => setInstruction(data || null))
+        .catch(() => setInstruction(null))
+        .finally(() => setLoading(false));
+      return;
     }
     setLoading(false);
   }, [searchParams, auth.isSignedIn]);

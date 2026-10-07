@@ -1,17 +1,18 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { WorkInstruction, getCategoryLabel } from '@/types/instruction';
-import { getAllInstructions, deleteInstruction } from '@/lib/storage';
+import { getAllInstructions, deleteInstruction, estimateInstructionsSize, formatBytes } from '@/lib/storage';
 import { setTempData } from '@/lib/tempStorage';
 import EditorOnlyNotice from '@/components/EditorOnlyNotice';
 import { VIEWER_ONLY } from '@/lib/appMode';
 
-function loadDrafts(): WorkInstruction[] {
+async function loadDrafts(): Promise<WorkInstruction[]> {
   if (typeof window === 'undefined') return [];
-  return getAllInstructions()
+  const all = await getAllInstructions();
+  return all
     .filter((inst) => !inst.status || inst.status === 'draft')
     .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
 }
@@ -23,18 +24,30 @@ export default function DraftsPage() {
 
 function DraftsPageContent() {
   const router = useRouter();
-  const [drafts, setDrafts] = useState<WorkInstruction[]>(loadDrafts);
+  const [drafts, setDrafts] = useState<WorkInstruction[]>([]);
+  const [loaded, setLoaded] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleDelete = (id: string, title: string) => {
+  useEffect(() => {
+    let cancelled = false;
+    loadDrafts()
+      .then((list) => { if (!cancelled) setDrafts(list); })
+      .catch(() => { if (!cancelled) setDrafts([]); })
+      .finally(() => { if (!cancelled) setLoaded(true); });
+    return () => { cancelled = true; };
+  }, []);
+
+  const draftsSize = estimateInstructionsSize(drafts);
+
+  const handleDelete = async (id: string, title: string) => {
     if (!confirm(`「${title}」を削除しますか？`)) return;
-    deleteInstruction(id);
+    await deleteInstruction(id);
     setDrafts((prev) => prev.filter((d) => d.id !== id));
   };
 
-  const handleDeleteAll = () => {
+  const handleDeleteAll = async () => {
     if (!confirm(`下書き ${drafts.length} 件をすべて削除しますか？\nブラウザの保存容量が解放されます。`)) return;
-    drafts.forEach((d) => deleteInstruction(d.id));
+    for (const d of drafts) await deleteInstruction(d.id);
     setDrafts([]);
   };
 
@@ -70,7 +83,10 @@ function DraftsPageContent() {
             ホームへ戻る
           </Link>
           <h1 className="text-3xl font-bold tracking-tight text-slate-950">下書き一覧</h1>
-          <p className="mt-2 text-sm text-slate-500">{drafts.length} 件の下書きがあります。</p>
+          <p className="mt-2 text-sm text-slate-500">
+            {loaded ? `${drafts.length} 件の下書きがあります。` : '読み込み中...'}
+            {loaded && drafts.length > 0 && <span className="ml-2 text-slate-400">この端末の保存容量 約 {formatBytes(draftsSize)} を使用</span>}
+          </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <button onClick={() => fileInputRef.current?.click()} className="rounded-lg border border-blue-200 bg-white px-4 py-2 text-sm font-semibold text-blue-700 shadow-sm transition hover:bg-blue-50">

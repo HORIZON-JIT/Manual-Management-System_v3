@@ -13,7 +13,7 @@ import {
   getTargetFolder,
   DriveFolder,
 } from '@/lib/googleDrive';
-import { getAllInstructions } from '@/lib/storage';
+import { getAllInstructions, replaceAllInstructions } from '@/lib/storage';
 import { WorkInstruction } from '@/types/instruction';
 import DriveFolderPicker from './DriveFolderPicker';
 
@@ -49,7 +49,7 @@ export default function DriveSyncButtons({ onDataLoaded }: DriveSyncButtonsProps
   const handleSave = async () => {
     setSaving(true);
     try {
-      const instructions = getAllInstructions();
+      const instructions = await getAllInstructions();
       await saveInstructionsToDrive(instructions);
       const folderName = targetFolder?.name || 'WorkInstructions';
       setMessage({ text: `${instructions.length}件を「${folderName}」に保存しました`, type: 'success' });
@@ -70,7 +70,7 @@ export default function DriveSyncButtons({ onDataLoaded }: DriveSyncButtonsProps
         setMessage({ text: 'Driveにデータが見つかりません', type: 'error' });
         return;
       }
-      localStorage.setItem('work_instructions', JSON.stringify(data));
+      await replaceAllInstructions(data);
       onDataLoaded(data);
       setMessage({ text: `${data.length}件の手順書をDriveから読み込みました`, type: 'success' });
     } catch (err) {
