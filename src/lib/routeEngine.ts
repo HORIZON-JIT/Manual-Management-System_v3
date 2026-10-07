@@ -180,3 +180,21 @@ export function groupConditionsOf(conditions: Condition[]): { groupId: string; c
   }
   return order.map((groupId) => ({ groupId, conditions: map.get(groupId)! }));
 }
+
+/**
+ * 閲覧画面で「条件を選択」のタブとして実際に選べるグループ。
+ * タブは各ステップの先頭の表示条件が属するグループにしか出ないため、
+ * 2番目以降の条件だけで使われているグループは選べず、常に先頭の条件に固定される。
+ */
+export function selectableGroupIds(source: RouteSource): Set<string> {
+  const condGroupMap = new Map<string, string>();
+  for (const condition of source.conditions ?? []) condGroupMap.set(condition.id, condition.group || '__default');
+  const result = new Set<string>();
+  for (const step of source.steps) {
+    for (const conditionId of getStepConditionIds(step)) {
+      const groupId = condGroupMap.get(conditionId);
+      if (groupId) { result.add(groupId); break; } // 先頭の（グループが分かる）条件だけ
+    }
+  }
+  return result;
+}

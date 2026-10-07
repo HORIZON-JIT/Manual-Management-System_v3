@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import { Step, StepJump, Condition, ConditionGroup, JUMP_END_TARGET } from '../types/instruction';
-import { computeRoute, groupConditionsOf, DEFAULT_JUMP_VALUE, ConditionSelection, JumpSelection } from './routeEngine';
+import { computeRoute, groupConditionsOf, selectableGroupIds, DEFAULT_JUMP_VALUE, ConditionSelection, JumpSelection } from './routeEngine';
 import { implicitNextId, sortSteps } from './flowModel';
 
 /**
@@ -19,8 +19,16 @@ export interface ConvertSource {
   conditionGroups?: ConditionGroup[];
 }
 
+/** 閲覧画面で選べなかったため、先頭の条件に固定して変換したグループ */
+export interface FixedGroup {
+  /** グループの条件名（並び順） */
+  conditions: string[];
+  /** 採用した（先頭の）条件名 */
+  chosen: string;
+}
+
 export type ConvertResult =
-  | { ok: true; steps: Step[]; combinations: number; questions: number }
+  | { ok: true; steps: Step[]; combinations: number; questions: number; fixedGroups: FixedGroup[] }
   | { ok: false; reason: string };
 
 const MAX_COMBINATIONS = 512;
@@ -34,8 +42,14 @@ function stepName(step: Step | undefined, steps: Step[]): string {
 export function convertConditionsToFlow(source: ConvertSource): ConvertResult {
   const steps = sortSteps(source.steps);
   const conditions = source.conditions ?? [];
-  const groups = groupConditionsOf(conditions);
-  if (groups.length === 0) return { ok: true, steps, combinations: 1, questions: 0 };
+  const allGroups = groupConditionsOf(conditions);
+  if (allGroups.length === 0) return { ok: true, steps, combinations: 1, questions: 0, fixedGroups: [] };
+  // 閲覧画面で実際に選べるグループだけを列挙し、選べないグループは閲覧画面と同じく先頭の条件に固定する
+  const selectable = selectableGroupIds(source);
+  const groups = allGroups.filter((g) => selectable.has(g.groupId));
+  const fixedGroups: FixedGroup[] = allGroups
+    .filter((g) => !selectable.has(g.groupId))
+    .map((g) => ({ conditions: g.conditions.map((c) => c.label || '（未入力）'), chosen: g.conditions[0]?.label || '（未入力）' }));
 
   // --- 選び方の列挙（条件グループ × 既存の選択肢） ---
   type Combo = { cond: ConditionSelection; jumps: JumpSelection };
@@ -145,7 +159,7 @@ export function convertConditionsToFlow(source: ConvertSource): ConvertResult {
       return { ok: false, reason: `変換前後で手順の流れが一致しないため自動変換できません（「${stepName(convertedById.get(firstDiff?.id ?? '') ?? firstDiff, steps)}」付近）。` };
     }
   }
-  return { ok: true, steps: converted.map((s, i) => ({ ...s, orderIndex: i })), combinations: combos.length, questions };
+  return { ok: true, steps: converted.map((s, i) => ({ ...s, orderIndex: i })), combinations: combos.length, questions, fixedGroups };
 }
 
 class ConvertError extends Error {}

@@ -254,6 +254,18 @@ export default function FlowBuilderModal({ steps, onChange, onClose, onEditStep,
                     <li>条件グループは質問（{conversion.questions} 件）に置き換わり、閲覧時は「条件を選択」のタブではなく、質問の答えを押して進む形になります。</li>
                     <li>変換はこの編集画面の中だけで行われます。保存するまで手順書は変わりません。</li>
                   </ul>
+                  {conversion.fixedGroups.length > 0 && (
+                    <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs leading-5 text-slate-700">
+                      <p className="font-semibold">閲覧画面で選べなかった条件は、これまでどおりの流れに固定します</p>
+                      <ul className="mt-1 list-disc space-y-1 pl-5">
+                        {conversion.fixedGroups.map((g, i) => (
+                          <li key={i}>
+                            「{g.conditions.join('／')}」は閲覧画面にタブが出ない設定だったため、常に「{g.chosen}」の流れで変換します。分岐にしたい場合は、変換後に図で質問を追加してください。
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                   <button
                     type="button"
                     onClick={() => onConvert(conversion.steps)}
