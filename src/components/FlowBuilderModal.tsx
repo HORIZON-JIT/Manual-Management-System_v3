@@ -22,6 +22,7 @@ import {
   questionNodeId,
 } from '@/lib/flowModel';
 import { LayoutBox } from '@/lib/flowLayout';
+import type { ConvertResult } from '@/lib/convertConditions';
 import FlowFigure, { FlowLegend } from './FlowFigure';
 
 interface FlowBuilderModalProps {
@@ -32,6 +33,10 @@ interface FlowBuilderModalProps {
   onEditStep?: (stepId: string) => void;
   /** 使えない理由（条件グループを使う手順書など）。指定時は図を出さず説明だけ出す。 */
   disabledReason?: string;
+  /** 条件グループ→図方式の自動変換の結果（disabledReason があるときに使う） */
+  conversion?: ConvertResult | null;
+  /** 変換を実行する（変換後のステップを渡す） */
+  onConvert?: (steps: Step[]) => void;
 }
 
 const inputClass =
@@ -40,7 +45,7 @@ const labelClass = 'mb-1.5 block text-xs font-semibold text-slate-500';
 const actionClass =
   'w-full rounded-lg border px-3 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50';
 
-export default function FlowBuilderModal({ steps, onChange, onClose, onEditStep, disabledReason }: FlowBuilderModalProps) {
+export default function FlowBuilderModal({ steps, onChange, onClose, onEditStep, disabledReason, conversion, onConvert }: FlowBuilderModalProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const sorted = useMemo(() => sortSteps(steps), [steps]);
   const graph = useMemo(() => buildFlowGraph(sorted), [sorted]);
@@ -239,7 +244,31 @@ export default function FlowBuilderModal({ steps, onChange, onClose, onEditStep,
 
         {disabledReason ? (
           <div className="flex flex-1 items-center justify-center p-6">
-            <p className="max-w-md rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-800">{disabledReason}</p>
+            <div className="w-full max-w-lg space-y-4">
+              <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-800">{disabledReason}</p>
+              {conversion?.ok && onConvert && (
+                <div className="rounded-xl border border-slate-200 bg-white p-5">
+                  <p className="text-sm font-semibold text-slate-900">図で組み立てる方式に変換できます</p>
+                  <ul className="mt-2 list-disc space-y-1 pl-5 text-xs leading-5 text-slate-600">
+                    <li>条件の選び方 {conversion.combinations} 通りすべてで、変換前後の手順の流れが一致することを確認済みです。</li>
+                    <li>条件グループは質問（{conversion.questions} 件）に置き換わり、閲覧時は「条件を選択」のタブではなく、質問の答えを押して進む形になります。</li>
+                    <li>変換はこの編集画面の中だけで行われます。保存するまで手順書は変わりません。</li>
+                  </ul>
+                  <button
+                    type="button"
+                    onClick={() => onConvert(conversion.steps)}
+                    className="mt-4 w-full rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800"
+                  >
+                    図で組み立てる方式に変換する
+                  </button>
+                </div>
+              )}
+              {conversion && !conversion.ok && (
+                <p className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-xs leading-5 text-slate-600">
+                  自動変換は行えませんでした: {conversion.reason}
+                </p>
+              )}
+            </div>
           </div>
         ) : (
           <div className="grid min-h-0 flex-1 grid-rows-[1fr_auto] lg:grid-cols-[1fr_340px] lg:grid-rows-1">
