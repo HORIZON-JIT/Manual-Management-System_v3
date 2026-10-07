@@ -33,6 +33,17 @@ function decisionLabel(stepNum: Map<string, number>, step: Step): string {
   return `\"${esc(wrapLabel(text, 14))}\"`;
 }
 
+/** 線のラベル部分。空のラベルだと Mermaid がパースできないので、空なら無ラベルの矢印にする */
+function arrow(label: string | undefined): string {
+  const text = (label ?? '').trim();
+  return text ? ` -- \"${esc(text)}\" -->` : ' -->';
+}
+
+/** 選択肢のラベル（未入力なら「（答えN）」） */
+function jumpLabel(label: string, index: number): string {
+  return label.trim() || `（答え${index + 1}）`;
+}
+
 /** 選択肢の進み先ノードID（終了指定なら END） */
 function jumpTargetNodeId(nodeIds: Map<string, string>, targetStepId: string): string | undefined {
   if (targetStepId === JUMP_END_TARGET) return 'END';
@@ -118,21 +129,17 @@ function buildLinear(steps: Step[], stepNum: Map<string, number>, stepIndex: Map
       lines.push(`  START --> ${id}`);
     }
 
-    for (const jump of step.jumps ?? []) {
+    (step.jumps ?? []).forEach((jump, jumpIndex) => {
       const targetId = jumpTargetNodeId(nodeIds, jump.targetStepId);
-      if (targetId) lines.push(`  ${id} -- \"${esc(jump.label)}\" --> ${targetId}`);
-    }
+      if (targetId) lines.push(`  ${id}${arrow(jumpLabel(jump.label, jumpIndex))} ${targetId}`);
+    });
 
     // 選択肢がある場合、通常ルートは「通常ルートの選択肢名」があるときだけ閲覧時に出る
     if ((step.jumps?.length ?? 0) > 0 && !step.jumpDefaultLabel) return;
 
     const nextId = resolveNextId(step);
     if (nextId) {
-      if (step.jumpDefaultLabel) {
-        lines.push(`  ${id} -- \"${esc(step.jumpDefaultLabel)}\" --> ${nextId}`);
-      } else {
-        lines.push(`  ${id} --> ${nextId}`);
-      }
+      lines.push(`  ${id}${arrow(step.jumpDefaultLabel)} ${nextId}`);
     } else {
       lines.push(`  ${id} --> END`);
     }
@@ -244,21 +251,17 @@ export function buildFlowchartDefinition(instruction: WorkInstruction): string {
   for (const step of steps) {
     const id = nodeIds.get(step.id)!;
 
-    for (const jump of step.jumps ?? []) {
+    (step.jumps ?? []).forEach((jump, jumpIndex) => {
       const targetId = jumpTargetNodeId(nodeIds, jump.targetStepId);
-      if (targetId) lines.push(`  ${id} -- \"${esc(jump.label)}\" --> ${targetId}`);
-    }
+      if (targetId) lines.push(`  ${id}${arrow(jumpLabel(jump.label, jumpIndex))} ${targetId}`);
+    });
 
     if (anchorStepIds.has(step.id)) continue;
 
     const nextStep = resolveNextStep(step);
     if (nextStep) {
       const nextId = nodeIds.get(nextStep.id)!;
-      if (step.jumpDefaultLabel) {
-        lines.push(`  ${id} -- \"${esc(step.jumpDefaultLabel)}\" --> ${nextId}`);
-      } else {
-        lines.push(`  ${id} --> ${nextId}`);
-      }
+      lines.push(`  ${id}${arrow(step.jumpDefaultLabel)} ${nextId}`);
     } else {
       lines.push(`  ${id} --> END`);
     }
