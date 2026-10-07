@@ -13,6 +13,7 @@ import {
   getImageDisplaySize,
   getStepConditionIds,
   getStepImages,
+  JUMP_END_TARGET,
 } from '@/types/instruction';
 import { getInstruction } from '@/lib/storage';
 import { getViewPageBaseUrl, parseShareData } from '@/lib/shareLink';
@@ -456,6 +457,21 @@ function InstructionViewContent() {
 
   const handleJumpSelect = (stepId: string, targetStepId: string, visibleIndex: number) => {
     setChapterTargetStepId(null);
+    // 前に表示したステップへ戻る選択（やり直し）: 戻り先以降の選択を取り消して、そこからやり直す
+    const backIndex = visibleSteps.findIndex((step, index) => index < visibleIndex && step.id === targetStepId);
+    if (backIndex >= 0) {
+      const clearedIds = new Set(visibleSteps.slice(backIndex).map((step) => step.id));
+      setSelectedJumpTargets((previous) => {
+        const next = { ...previous };
+        for (const id of clearedIds) delete next[id];
+        return next;
+      });
+      setScrollTargetStepId(targetStepId);
+      if (isSequential) {
+        setRevealedCount(backIndex + 1);
+      }
+      return;
+    }
     setSelectedJumpTargets((previous) => ({ ...previous, [stepId]: targetStepId }));
     setScrollTargetStepId(targetStepId === DEFAULT_JUMP_VALUE ? null : targetStepId);
     if (isSequential) {
@@ -791,7 +807,7 @@ function InstructionViewContent() {
 
                   {step.jumps && step.jumps.length > 0 && (
                     <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-4">
-                      <p className="text-sm font-semibold text-slate-800">次の進行を選択</p>
+                      <p className="text-sm font-semibold text-slate-800">{step.branchQuestion || '次の進行を選択'}</p>
                       <p className="mt-1 text-xs text-slate-500">該当する内容を選ぶと、その先の手順を表示します。</p>
                       <div className="mt-3 grid gap-2 sm:grid-cols-2">
                       {step.jumps.map((jump) => {
@@ -812,6 +828,11 @@ function InstructionViewContent() {
                             {targetStep && (
                               <span className={`mt-1 block text-xs ${isSelected ? 'text-slate-300' : 'text-slate-500'}`}>
                                 {targetStep.title}
+                              </span>
+                            )}
+                            {!targetStep && jump.targetStepId === JUMP_END_TARGET && (
+                              <span className={`mt-1 block text-xs ${isSelected ? 'text-slate-300' : 'text-slate-500'}`}>
+                                ここで終了
                               </span>
                             )}
                           </button>

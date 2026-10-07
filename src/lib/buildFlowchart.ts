@@ -1,4 +1,4 @@
-import { WorkInstruction, Step, Condition, getStepConditionIds } from '@/types/instruction';
+import { WorkInstruction, Step, Condition, getStepConditionIds, JUMP_END_TARGET } from '@/types/instruction';
 
 function esc(text: string): string {
   return text.replace(/\"/g, '#quot;').replace(/[[\\]{}()]/g, '');
@@ -29,7 +29,14 @@ function processLabel(stepNum: Map<string, number>, step: Step): string {
 }
 
 function decisionLabel(stepNum: Map<string, number>, step: Step): string {
-  return `\"${esc(wrapLabel(stepTitle(stepNum, step), 14))}\"`;
+  const text = step.branchQuestion ? `${stepTitle(stepNum, step)}：${step.branchQuestion}` : stepTitle(stepNum, step);
+  return `\"${esc(wrapLabel(text, 14))}\"`;
+}
+
+/** 選択肢の進み先ノードID（終了指定なら END） */
+function jumpTargetNodeId(nodeIds: Map<string, string>, targetStepId: string): string | undefined {
+  if (targetStepId === JUMP_END_TARGET) return 'END';
+  return nodeIds.get(targetStepId);
 }
 
 function plainDecisionLabel(text: string): string {
@@ -112,9 +119,12 @@ function buildLinear(steps: Step[], stepNum: Map<string, number>, stepIndex: Map
     }
 
     for (const jump of step.jumps ?? []) {
-      const targetId = nodeIds.get(jump.targetStepId);
+      const targetId = jumpTargetNodeId(nodeIds, jump.targetStepId);
       if (targetId) lines.push(`  ${id} -- \"${esc(jump.label)}\" --> ${targetId}`);
     }
+
+    // 選択肢がある場合、通常ルートは「通常ルートの選択肢名」があるときだけ閲覧時に出る
+    if ((step.jumps?.length ?? 0) > 0 && !step.jumpDefaultLabel) return;
 
     const nextId = resolveNextId(step);
     if (nextId) {
@@ -235,7 +245,7 @@ export function buildFlowchartDefinition(instruction: WorkInstruction): string {
     const id = nodeIds.get(step.id)!;
 
     for (const jump of step.jumps ?? []) {
-      const targetId = nodeIds.get(jump.targetStepId);
+      const targetId = jumpTargetNodeId(nodeIds, jump.targetStepId);
       if (targetId) lines.push(`  ${id} -- \"${esc(jump.label)}\" --> ${targetId}`);
     }
 

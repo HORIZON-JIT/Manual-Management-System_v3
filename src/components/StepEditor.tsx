@@ -13,6 +13,7 @@ import {
   getStepConditionIds,
   getStepImages,
   getImageDisplaySize,
+  JUMP_END_TARGET,
 } from '@/types/instruction';
 import { compressImage } from '@/lib/compressImage';
 import { setTempData, getTempData, removeTempData } from '@/lib/tempStorage';
@@ -94,7 +95,9 @@ export default function StepEditor({
   const selectedConditionIds = getStepConditionIds(step);
   const selectedConditionSet = new Set(selectedConditionIds);
   const isConditionalStep = selectedConditionIds.length > 0;
-  const hasConditionGroups = (conditions?.length ?? 0) > 0;
+  // 条件グループがある手順書、または「図で分岐を組み立てる」で進み先が設定済みのステップでは進み先の設定を表示する
+  const hasConditionGroups =
+    (conditions?.length ?? 0) > 0 || (step.jumps?.length ?? 0) > 0 || !!step.nextStepId || !!step.endsBranch;
   const selectedConditionLabels = (conditions ?? [])
     .filter((condition) => selectedConditionSet.has(condition.id))
     .map((condition) => condition.label)
@@ -1317,6 +1320,18 @@ export default function StepEditor({
 
           {hasConditionGroups && <div id={`jump-settings-${step.id}`} className="rounded-lg border border-slate-200 p-4">
             <p className="mb-3 text-sm font-semibold text-slate-800">選択肢別の進み先</p>
+            {(step.jumps?.length ?? 0) > 0 && (
+              <div className="mb-3">
+                <label className={labelClass}>質問文（閲覧時に選択肢の上に表示）</label>
+                <input
+                  type="text"
+                  value={step.branchQuestion ?? ''}
+                  onChange={(e) => onChange({ ...step, branchQuestion: e.target.value })}
+                  className={inputClass}
+                  placeholder="例: 合格ですか？"
+                />
+              </div>
+            )}
             {allSteps && allSteps.length > 1 ? (
               <div className="space-y-2">
                 {(step.jumps ?? []).map((jump) => {
@@ -1332,10 +1347,12 @@ export default function StepEditor({
                     >
                       <div className="flex gap-2">
                         <span className="flex-1 truncate">
-                          {jump.label} →{' '}
+                          {jump.label || '(選択肢名なし)'} →{' '}
                           {targetIndex >= 0
                             ? `${targetIndex + 1}. ${targetStep?.title || '(未入力)'}`
-                            : '(対象なし)'}
+                            : jump.targetStepId === JUMP_END_TARGET
+                              ? '終了'
+                              : '(未設定)'}
                         </span>
                         <button
                           type="button"
