@@ -35,8 +35,8 @@ export function FlowLegend() {
   return (
     <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500">
       <span className="inline-flex items-center gap-1.5"><span className="inline-block h-3 w-4 rounded border border-slate-400 bg-white" />ステップ</span>
-      <span className="inline-flex items-center gap-1.5"><span className="inline-block h-3 w-3 rotate-45 border border-amber-600 bg-amber-50" />質問</span>
-      <span className="inline-flex items-center gap-1.5"><span className="inline-block h-0 w-5 border-t-2 border-dashed border-blue-600" />前に戻る（やり直し）</span>
+      <span className="inline-flex items-center gap-1.5"><span className="brand-border brand-surface inline-block h-3 w-3 rotate-45 border" />質問</span>
+      <span className="inline-flex items-center gap-1.5"><span className="brand-border inline-block h-0 w-5 border-t-2 border-dashed" />前に戻る（やり直し）</span>
     </div>
   );
 }
@@ -91,11 +91,11 @@ export default function FlowFigure({ steps, selectedId = null, onBoxClick, onGra
         const d = e.points.map((p, k) => (k ? 'L' : 'M') + p.x.toFixed(1) + ',' + p.y.toFixed(1)).join(' ');
         return (
           <g key={i}>
-            <path d={d} fill="none" stroke={e.loop ? '#2563eb' : '#64748b'} strokeWidth={1.6} strokeDasharray={e.loop ? '5 4' : undefined} markerEnd="url(#flow-arrow)" />
+            <path d={d} fill="none" stroke={e.loop ? '#a48149' : '#64748b'} strokeWidth={1.6} strokeDasharray={e.loop ? '5 4' : undefined} markerEnd="url(#flow-arrow)" />
             {e.label && (
               <>
-                <rect x={e.label.x} y={e.label.y} width={e.label.w} height={e.label.h} rx={3} fill="#f8fafc" />
-                <text x={e.label.x + e.label.w / 2} y={e.label.y + e.label.h / 2 + 4} textAnchor="middle" fontSize={12} fill={e.loop ? '#2563eb' : '#b45309'}>
+                <rect x={e.label.x} y={e.label.y} width={e.label.w} height={e.label.h} rx={3} fill="#fcfbf8" />
+                <text x={e.label.x + e.label.w / 2} y={e.label.y + e.label.h / 2 + 4} textAnchor="middle" fontSize={12} fill={e.loop ? '#a48149' : '#8a6a37'}>
                   {e.label.text}
                 </text>
               </>
@@ -111,8 +111,8 @@ export default function FlowFigure({ steps, selectedId = null, onBoxClick, onGra
         if (b.kind === 'start' || b.kind === 'end') {
           return (
             <g key={b.id} {...common}>
-              <circle cx={cx} cy={cy} r={b.w / 2 - 2} fill="#f0fdf4" stroke="#15803d" strokeWidth={1.6} />
-              <text x={cx} y={cy + 4} textAnchor="middle" fontSize={11} fill="#166534">{b.label}</text>
+              <circle cx={cx} cy={cy} r={b.w / 2 - 2} fill="#ffffff" stroke="#0f172a" strokeWidth={1.6} />
+              <text x={cx} y={cy + 4} textAnchor="middle" fontSize={11} fontWeight={600} fill="#0f172a">{b.label}</text>
             </g>
           );
         }
@@ -122,9 +122,9 @@ export default function FlowFigure({ steps, selectedId = null, onBoxClick, onGra
             <g key={b.id} {...common}>
               <polygon
                 points={`${cx},${b.y} ${b.x + b.w},${cy} ${cx},${b.y + b.h} ${b.x},${cy}`}
-                fill="#fffbeb"
-                stroke={selected ? '#2563eb' : b.node.unreachable ? '#ef4444' : '#d97706'}
-                strokeWidth={selected ? 2.4 : 1.6}
+                fill={selected ? '#f0e9db' : '#f7f3ec'}
+                stroke={selected ? '#0f172a' : b.node.unreachable ? '#ef4444' : '#a48149'}
+                strokeWidth={selected ? 2.2 : 1.6}
                 strokeDasharray={b.node.unreachable ? '4 3' : undefined}
               />
               {lines.map((l, i) => (
@@ -136,8 +136,8 @@ export default function FlowFigure({ steps, selectedId = null, onBoxClick, onGra
         if (b.kind === 'placeholder') {
           return (
             <g key={b.id} {...common}>
-              <rect x={b.x} y={b.y} width={b.w} height={b.h} rx={8} fill={interactive ? '#eff6ff' : '#f8fafc'} stroke={interactive ? '#60a5fa' : '#cbd5e1'} strokeWidth={1.4} strokeDasharray="4 3" />
-              <text x={cx} y={cy + 4} textAnchor="middle" fontSize={12} fill={interactive ? '#1d4ed8' : '#64748b'}>{placeholderLabel}</text>
+              <rect x={b.x} y={b.y} width={b.w} height={b.h} rx={8} fill="#ffffff" stroke={interactive ? '#a48149' : '#cbd5e1'} strokeWidth={1.4} strokeDasharray="4 3" />
+              <text x={cx} y={cy + 4} textAnchor="middle" fontSize={12} fill={interactive ? '#8a6a37' : '#64748b'}>{placeholderLabel}</text>
             </g>
           );
         }
@@ -150,9 +150,9 @@ export default function FlowFigure({ steps, selectedId = null, onBoxClick, onGra
               width={b.w}
               height={b.h}
               rx={8}
-              fill={selected ? '#dbeafe' : '#ffffff'}
-              stroke={selected ? '#2563eb' : b.node.unreachable ? '#ef4444' : '#94a3b8'}
-              strokeWidth={selected ? 2.4 : 1.4}
+              fill={selected ? '#f1f5f9' : '#ffffff'}
+              stroke={selected ? '#0f172a' : b.node.unreachable ? '#ef4444' : '#94a3b8'}
+              strokeWidth={selected ? 2.2 : 1.4}
               strokeDasharray={b.node.unreachable ? '4 3' : undefined}
             />
             {lines.map((l, i) => (

@@ -42,10 +42,15 @@ interface FlowBuilderModalProps {
 }
 
 const inputClass =
-  'w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:ring-4 focus:ring-blue-100';
-const labelClass = 'mb-1.5 block text-xs font-semibold text-slate-500';
+  'w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-slate-400 focus:ring-4 focus:ring-slate-100';
+const labelClass = 'mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400';
 const actionClass =
   'w-full rounded-lg border px-3 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50';
+// 控えめな通常ボタン／ブランド色の主ボタン／文字だけのボタン／削除
+const neutralBtn = `${actionClass} border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50`;
+const accentBtn = `${actionClass} brand-border brand-text bg-white hover:bg-[#faf7f1]`;
+const ghostBtn = `${actionClass} border-transparent bg-transparent text-slate-500 hover:bg-slate-50 hover:text-slate-900`;
+const dangerBtn = `${actionClass} border-transparent bg-transparent text-red-600 hover:bg-red-50`;
 
 export default function FlowBuilderModal({ steps, onChange, onClose, onEditStep, disabledReason, conversion, onConvert }: FlowBuilderModalProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -83,21 +88,21 @@ export default function FlowBuilderModal({ steps, onChange, onClose, onEditStep,
           <button
             type="button"
             onClick={() => { const r = addAnswerStep(sorted, step.id, jumpIndex); onChange(r.steps); setSelectedId(r.newId); }}
-            className={`${actionClass} border-slate-200 bg-white text-slate-700 hover:bg-slate-50`}
+            className={neutralBtn}
           >
             ＋ ステップを追加
           </button>
           <button
             type="button"
             onClick={() => { const r = addAnswerQuestion(sorted, step.id, jumpIndex); onChange(r.steps); setSelectedId(questionNodeId(r.newId)); }}
-            className={`${actionClass} border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100`}
+            className={accentBtn}
           >
             ？ 質問を追加（続けて分岐する）
           </button>
           <p className="text-xs leading-5 text-slate-500">
             「質問を追加」は、質問文をタイトルにした本文なしのステップを作り、すぐ次の分岐にします。
           </p>
-          <button type="button" onClick={() => setSelectedId(questionNodeId(step.id))} className={`${actionClass} border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100`}>
+          <button type="button" onClick={() => setSelectedId(questionNodeId(step.id))} className={ghostBtn}>
             質問に戻る
           </button>
         </div>
@@ -113,7 +118,7 @@ export default function FlowBuilderModal({ steps, onChange, onClose, onEditStep,
       <div className="space-y-4">
         <div className="flex items-center gap-2">
           <h3 className="text-base font-bold text-slate-950">ステップ {sorted.indexOf(step) + 1}</h3>
-          <span className="rounded-full border border-slate-200 px-2 py-0.5 text-[11px] font-semibold text-slate-500">ステップ</span>
+          <span className="rounded-full border border-slate-200 px-2 py-0.5 text-[11px] font-semibold tracking-wide text-slate-500">ステップ</span>
         </div>
         <div>
           <label className={labelClass}>タイトル</label>
@@ -126,9 +131,9 @@ export default function FlowBuilderModal({ steps, onChange, onClose, onEditStep,
           />
         </div>
         {branched ? (
-          <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-800">
+          <div className="brand-border-soft brand-panel rounded-lg border px-3 py-2.5 text-sm text-slate-700">
             このステップの後は質問で分かれます。
-            <button type="button" onClick={() => setSelectedId(questionNodeId(step.id))} className="ml-2 font-semibold underline">
+            <button type="button" onClick={() => setSelectedId(questionNodeId(step.id))} className="brand-text ml-2 font-semibold underline">
               質問を開く
             </button>
           </div>
@@ -142,7 +147,7 @@ export default function FlowBuilderModal({ steps, onChange, onClose, onEditStep,
               ))}
             </select>
             <p className="mt-1.5 text-xs leading-5 text-slate-500">
-              すでにある箱を選ぶと線がつながります（合流）。前の箱に戻す場合は青い点線「↩ 戻る」になります。
+              すでにある箱を選ぶと線がつながります（合流）。前の箱に戻す場合は点線の「↩ 戻る」になります。
             </p>
           </div>
         )}
@@ -151,7 +156,7 @@ export default function FlowBuilderModal({ steps, onChange, onClose, onEditStep,
             <button
               type="button"
               onClick={() => { const r = addStepAfter(sorted, step.id); onChange(r.steps); setSelectedId(r.newId); }}
-              className={`${actionClass} border-slate-200 bg-white text-slate-700 hover:bg-slate-50`}
+              className={neutralBtn}
             >
               ＋ 次に新しいステップを追加
             </button>
@@ -160,7 +165,7 @@ export default function FlowBuilderModal({ steps, onChange, onClose, onEditStep,
             <button
               type="button"
               onClick={() => { onChange(addBranch(sorted, step.id)); setSelectedId(questionNodeId(step.id)); }}
-              className={`${actionClass} border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100`}
+              className={accentBtn}
             >
               ？ ここで分岐（質問を入れる）
             </button>
@@ -169,7 +174,7 @@ export default function FlowBuilderModal({ steps, onChange, onClose, onEditStep,
             <button
               type="button"
               onClick={() => { onClose(); onEditStep(step.id); }}
-              className={`${actionClass} border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100`}
+              className={ghostBtn}
             >
               本文・画像を編集する
             </button>
@@ -178,7 +183,7 @@ export default function FlowBuilderModal({ steps, onChange, onClose, onEditStep,
             type="button"
             disabled={sorted.length <= 1}
             onClick={() => { onChange(removeStep(sorted, step.id)); setSelectedId(null); }}
-            className={`${actionClass} border-red-200 bg-white text-red-600 hover:bg-red-50`}
+            className={dangerBtn}
           >
             このステップを削除
           </button>
@@ -191,7 +196,7 @@ export default function FlowBuilderModal({ steps, onChange, onClose, onEditStep,
     <div className="space-y-4">
       <div className="flex items-center gap-2">
         <h3 className="text-base font-bold text-slate-950">質問</h3>
-        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800">分岐</span>
+        <span className="brand-surface brand-text rounded-full px-2 py-0.5 text-[11px] font-semibold tracking-wide">分岐</span>
       </div>
       <div>
         <label className={labelClass}>質問文</label>
@@ -210,7 +215,7 @@ export default function FlowBuilderModal({ steps, onChange, onClose, onEditStep,
         <label className={labelClass}>答えと進み先</label>
         <div className="space-y-2">
           {(step.jumps ?? []).map((jump, index) => (
-            <div key={jump.id} className="space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-2.5">
+            <div key={jump.id} className="space-y-2 rounded-lg border border-slate-200/80 bg-slate-50/70 p-2.5">
               <div className="flex items-center gap-2">
                 <input
                   type="text"
@@ -222,7 +227,7 @@ export default function FlowBuilderModal({ steps, onChange, onClose, onEditStep,
                 <button
                   type="button"
                   onClick={() => onChange(removeAnswer(sorted, step.id, index))}
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-red-500 hover:bg-red-50"
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-red-50 hover:text-red-600"
                   aria-label="この答えを削除"
                 >
                   ×
@@ -244,10 +249,10 @@ export default function FlowBuilderModal({ steps, onChange, onClose, onEditStep,
         </div>
       </div>
       <div className="space-y-2">
-        <button type="button" onClick={() => onChange(addAnswer(sorted, step.id))} className={`${actionClass} border-slate-200 bg-white text-slate-700 hover:bg-slate-50`}>
+        <button type="button" onClick={() => onChange(addAnswer(sorted, step.id))} className={neutralBtn}>
           ＋ 答えを増やす
         </button>
-        <button type="button" onClick={() => setSelectedId(step.id)} className={`${actionClass} border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100`}>
+        <button type="button" onClick={() => setSelectedId(step.id)} className={ghostBtn}>
           ステップ {sorted.indexOf(step) + 1} に戻る
         </button>
         {isQuestionOnlyStep(step) ? (
@@ -255,7 +260,7 @@ export default function FlowBuilderModal({ steps, onChange, onClose, onEditStep,
             type="button"
             disabled={sorted.length <= 1}
             onClick={() => { onChange(removeStep(sorted, step.id)); setSelectedId(null); }}
-            className={`${actionClass} border-red-200 bg-white text-red-600 hover:bg-red-50`}
+            className={dangerBtn}
           >
             この質問を削除（枝は切り離されます）
           </button>
@@ -263,7 +268,7 @@ export default function FlowBuilderModal({ steps, onChange, onClose, onEditStep,
           <button
             type="button"
             onClick={() => { onChange(removeBranch(sorted, step.id)); setSelectedId(step.id); }}
-            className={`${actionClass} border-red-200 bg-white text-red-600 hover:bg-red-50`}
+            className={dangerBtn}
           >
             この質問を削除（枝は切り離されます）
           </button>
@@ -285,7 +290,7 @@ export default function FlowBuilderModal({ steps, onChange, onClose, onEditStep,
             <h2 className="text-lg font-bold text-slate-950">図で分岐を組み立てる</h2>
             <p className="truncate text-xs text-slate-500">箱を押すと右（スマホでは下）に操作が出ます。並びは自動で整います。変更はすぐ手順ステップに反映されます。</p>
           </div>
-          <button type="button" onClick={onClose} className="shrink-0 rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-semibold text-slate-600 hover:bg-slate-50">
+          <button type="button" onClick={onClose} className="shrink-0 rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50">
             閉じる
           </button>
         </div>
@@ -293,9 +298,9 @@ export default function FlowBuilderModal({ steps, onChange, onClose, onEditStep,
         {disabledReason ? (
           <div className="flex flex-1 items-center justify-center p-6">
             <div className="w-full max-w-lg space-y-4">
-              <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-800">{disabledReason}</p>
+              <p className="brand-border-soft brand-panel rounded-lg border px-4 py-3 text-sm leading-6 text-slate-700">{disabledReason}</p>
               {conversion?.ok && onConvert && (
-                <div className="rounded-xl border border-slate-200 bg-white p-5">
+                <div className="rounded-xl border border-slate-200/80 bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
                   <p className="text-sm font-semibold text-slate-900">図で組み立てる方式に変換できます</p>
                   <ul className="mt-2 list-disc space-y-1 pl-5 text-xs leading-5 text-slate-600">
                     <li>条件の選び方 {conversion.combinations} 通りすべてで、変換前後の手順の流れが一致することを確認済みです。</li>
@@ -333,16 +338,16 @@ export default function FlowBuilderModal({ steps, onChange, onClose, onEditStep,
           </div>
         ) : (
           <div className="grid min-h-0 flex-1 grid-rows-[1fr_auto] lg:grid-cols-[1fr_340px] lg:grid-rows-1">
-            <div className="min-h-0 overflow-auto bg-slate-50 p-4">
+            <div className="brand-panel min-h-0 overflow-auto p-4">
               {unreachableCount > 0 && (
-                <p className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                <p className="mb-3 rounded-lg border border-red-200/80 bg-red-50 px-3 py-2 text-xs text-red-700">
                   赤い点線の箱（{unreachableCount}件）はどこからもつながっていません。閲覧時には表示されません。
                 </p>
               )}
               <FlowFigure steps={sorted} selectedId={selectedId} onBoxClick={handleBoxClick} />
               <div className="mt-4"><FlowLegend /></div>
             </div>
-            <div className="max-h-[45vh] overflow-auto border-t border-slate-200 p-4 lg:max-h-none lg:border-l lg:border-t-0">
+            <div className="max-h-[45vh] overflow-auto border-t border-slate-200 p-5 lg:max-h-none lg:border-l lg:border-t-0">
               {selectedStep && selectedNode?.kind === 'placeholder'
                 ? renderPlaceholderPanel(selectedStep, selectedNode.jumpIndex ?? 0)
                 : selectedStep && selectedNode?.kind === 'question'
@@ -351,7 +356,7 @@ export default function FlowBuilderModal({ steps, onChange, onClose, onEditStep,
                   ? renderStepPanel(selectedStep)
                   : (
                     <div className="space-y-3 text-sm leading-6 text-slate-600">
-                      <p className="font-semibold text-slate-800">図の箱を押すと操作が出ます。</p>
+                      <p className="font-semibold text-slate-900">図の箱を押すと操作が出ます。</p>
                       <ul className="list-disc space-y-1 pl-5">
                         <li>ステップの箱：次を追加、ここで分岐、進み先の変更、削除</li>
                         <li>菱形（質問）：質問文と答え、各答えの進み先</li>
