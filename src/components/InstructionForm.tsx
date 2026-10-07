@@ -35,6 +35,7 @@ import StepEditor from './StepEditor';
 import VersionHistoryModal from './VersionHistoryModal';
 import FlowchartModal from './FlowchartModal';
 import FlowBuilderModal from './FlowBuilderModal';
+import { tryConvertConditionsToFlow } from '@/lib/convertConditions';
 
 const LAST_AUTHOR_KEY = 'last_author_name';
 const fieldClass =
@@ -1692,9 +1693,25 @@ export default function InstructionForm({ initialData, approvalMode = false }: I
           onEditStep={scrollToEditStep}
           disabledReason={
             conditions.length > 0
-              ? 'この手順書は「条件グループ」で分岐を設定しています。図で組み立てる方式と条件グループは同時に使えないため、条件グループをすべて削除してからお使いください。既存の条件グループの設定はこれまでどおり使えます。'
+              ? 'この手順書は「条件グループ」で分岐を設定しています。図で組み立てる方式と条件グループは同時に使えません。下の変換を使うか、条件グループをすべて削除してからお使いください。'
               : undefined
           }
+          conversion={
+            conditions.length > 0
+              ? tryConvertConditionsToFlow({
+                  steps,
+                  conditions,
+                  conditionGroups: Object.entries(groupParents)
+                    .filter((entry): entry is [string, string] => !!entry[1])
+                    .map(([id, parentConditionId]) => ({ id, parentConditionId })),
+                })
+              : null
+          }
+          onConvert={(convertedSteps) => {
+            setSteps(convertedSteps);
+            setConditions([]);
+            setGroupParents({});
+          }}
         />
       )}
 
