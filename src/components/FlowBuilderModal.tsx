@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Step, JUMP_END_TARGET } from '@/types/instruction';
 import {
   buildFlowGraph,
@@ -21,7 +21,8 @@ import {
   stepLabel,
   questionNodeId,
 } from '@/lib/flowModel';
-import { layoutFlow, FlowLayout, LayoutBox } from '@/lib/flowLayout';
+import { LayoutBox } from '@/lib/flowLayout';
+import FlowFigure, { FlowLegend } from './FlowFigure';
 
 interface FlowBuilderModalProps {
   steps: Step[];
@@ -39,50 +40,10 @@ const labelClass = 'mb-1.5 block text-xs font-semibold text-slate-500';
 const actionClass =
   'w-full rounded-lg border px-3 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50';
 
-function wrapText(text: string, max: number): string[] {
-  const out: string[] = [];
-  let cur = '';
-  for (const ch of text) {
-    cur += ch;
-    if (cur.length >= max) { out.push(cur); cur = ''; }
-  }
-  if (cur) out.push(cur);
-  if (out.length > 2) return [out[0], out[1].slice(0, max - 1) + '…'];
-  return out;
-}
-
 export default function FlowBuilderModal({ steps, onChange, onClose, onEditStep, disabledReason }: FlowBuilderModalProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [layout, setLayout] = useState<FlowLayout | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const seqRef = useRef(0);
-  const figureRef = useRef<HTMLDivElement>(null);
-  const centredRef = useRef(false);
-
   const sorted = useMemo(() => sortSteps(steps), [steps]);
   const graph = useMemo(() => buildFlowGraph(sorted), [sorted]);
-
-  useEffect(() => {
-    if (disabledReason) return;
-    const seq = ++seqRef.current;
-    layoutFlow(graph)
-      .then((result) => {
-        if (seq !== seqRef.current) return;
-        setLayout(result);
-        setError(null);
-      })
-      .catch((e) => {
-        if (seq !== seqRef.current) return;
-        setError(e instanceof Error ? e.message : String(e));
-      });
-  }, [graph, disabledReason]);
-
-  useEffect(() => {
-    if (!layout || centredRef.current) return;
-    const fig = figureRef.current;
-    if (fig && fig.scrollWidth > fig.clientWidth) fig.scrollLeft = (fig.scrollWidth - fig.clientWidth) / 2;
-    centredRef.current = true;
-  }, [layout]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -258,100 +219,6 @@ export default function FlowBuilderModal({ steps, onChange, onClose, onEditStep,
     </div>
   );
 
-  const renderFigure = () => {
-    if (error) return <p className="py-8 text-center text-sm text-red-600">図の計算に失敗しました: {error}</p>;
-    if (!layout) return <p className="py-8 text-center text-sm text-slate-500">図を描いています…</p>;
-    const { minX, width, height } = layout;
-    return (
-      <svg
-        viewBox={`${minX} 0 ${width} ${height}`}
-        width={width}
-        height={height}
-        className="mx-auto block max-w-none select-none"
-        role="img"
-        aria-label="手順の流れ図"
-      >
-        <defs>
-          <marker id="flow-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-            <path d="M0,0 L10,5 L0,10 z" fill="#64748b" />
-          </marker>
-        </defs>
-        {layout.edges.map((e, i) => {
-          const d = e.points.map((p, k) => (k ? 'L' : 'M') + p.x.toFixed(1) + ',' + p.y.toFixed(1)).join(' ');
-          return (
-            <g key={i}>
-              <path d={d} fill="none" stroke={e.loop ? '#2563eb' : '#64748b'} strokeWidth={1.6} strokeDasharray={e.loop ? '5 4' : undefined} markerEnd="url(#flow-arrow)" />
-              {e.label && (
-                <>
-                  <rect x={e.label.x} y={e.label.y} width={e.label.w} height={e.label.h} rx={3} fill="#f8fafc" />
-                  <text x={e.label.x + e.label.w / 2} y={e.label.y + e.label.h / 2 + 4} textAnchor="middle" fontSize={12} fill={e.loop ? '#2563eb' : '#b45309'}>
-                    {e.label.text}
-                  </text>
-                </>
-              )}
-            </g>
-          );
-        })}
-        {layout.boxes.map((b) => {
-          const cx = b.x + b.w / 2, cy = b.y + b.h / 2;
-          const selected = b.id === selectedId;
-          const common = { onClick: () => handleBoxClick(b), className: 'cursor-pointer' };
-          if (b.kind === 'start' || b.kind === 'end') {
-            return (
-              <g key={b.id} {...common} style={{ cursor: 'default' }}>
-                <circle cx={cx} cy={cy} r={b.w / 2 - 2} fill="#f0fdf4" stroke="#15803d" strokeWidth={1.6} />
-                <text x={cx} y={cy + 4} textAnchor="middle" fontSize={11} fill="#166534">{b.label}</text>
-              </g>
-            );
-          }
-          if (b.kind === 'question') {
-            const lines = wrapText(b.label, 11);
-            return (
-              <g key={b.id} {...common}>
-                <polygon
-                  points={`${cx},${b.y} ${b.x + b.w},${cy} ${cx},${b.y + b.h} ${b.x},${cy}`}
-                  fill="#fffbeb"
-                  stroke={selected ? '#2563eb' : '#d97706'}
-                  strokeWidth={selected ? 2.4 : 1.6}
-                />
-                {lines.map((l, i) => (
-                  <text key={i} x={cx} y={cy + 4 + (i - (lines.length - 1) / 2) * 14} textAnchor="middle" fontSize={12} fontWeight={600} fill="#1e293b">{l}</text>
-                ))}
-              </g>
-            );
-          }
-          if (b.kind === 'placeholder') {
-            return (
-              <g key={b.id} {...common}>
-                <rect x={b.x} y={b.y} width={b.w} height={b.h} rx={8} fill="#eff6ff" stroke="#60a5fa" strokeWidth={1.4} strokeDasharray="4 3" />
-                <text x={cx} y={cy + 4} textAnchor="middle" fontSize={12} fill="#1d4ed8">{b.label}</text>
-              </g>
-            );
-          }
-          const lines = wrapText(b.label, 12);
-          return (
-            <g key={b.id} {...common}>
-              <rect
-                x={b.x}
-                y={b.y}
-                width={b.w}
-                height={b.h}
-                rx={8}
-                fill={selected ? '#dbeafe' : '#ffffff'}
-                stroke={selected ? '#2563eb' : b.node.unreachable ? '#ef4444' : '#94a3b8'}
-                strokeWidth={selected ? 2.4 : 1.4}
-                strokeDasharray={b.node.unreachable ? '4 3' : undefined}
-              />
-              {lines.map((l, i) => (
-                <text key={i} x={cx} y={cy + 4 + (i - (lines.length - 1) / 2) * 14} textAnchor="middle" fontSize={12} fontWeight={600} fill="#1e293b">{l}</text>
-              ))}
-            </g>
-          );
-        })}
-      </svg>
-    );
-  };
-
   const unreachableCount = graph.nodes.filter((n) => n.kind === 'step' && n.unreachable).length;
 
   return (
@@ -376,18 +243,14 @@ export default function FlowBuilderModal({ steps, onChange, onClose, onEditStep,
           </div>
         ) : (
           <div className="grid min-h-0 flex-1 grid-rows-[1fr_auto] lg:grid-cols-[1fr_340px] lg:grid-rows-1">
-            <div ref={figureRef} className="min-h-0 overflow-auto bg-slate-50 p-4">
+            <div className="min-h-0 overflow-auto bg-slate-50 p-4">
               {unreachableCount > 0 && (
                 <p className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
                   赤い点線の箱（{unreachableCount}件）はどこからもつながっていません。閲覧時には表示されません。
                 </p>
               )}
-              {renderFigure()}
-              <div className="mt-4 flex flex-wrap items-center gap-4 text-xs text-slate-500">
-                <span className="inline-flex items-center gap-1.5"><span className="inline-block h-3 w-4 rounded border border-slate-400 bg-white" />ステップ</span>
-                <span className="inline-flex items-center gap-1.5"><span className="inline-block h-3 w-3 rotate-45 border border-amber-600 bg-amber-50" />質問</span>
-                <span className="inline-flex items-center gap-1.5"><span className="inline-block h-0 w-5 border-t-2 border-dashed border-blue-600" />前に戻る（やり直し）</span>
-              </div>
+              <FlowFigure steps={sorted} selectedId={selectedId} onBoxClick={handleBoxClick} />
+              <div className="mt-4"><FlowLegend /></div>
             </div>
             <div className="max-h-[45vh] overflow-auto border-t border-slate-200 p-4 lg:max-h-none lg:border-l lg:border-t-0">
               {selectedStep && selectedNode?.kind === 'question'

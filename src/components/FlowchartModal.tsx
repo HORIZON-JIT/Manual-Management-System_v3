@@ -3,6 +3,7 @@
 import { WorkInstruction } from '@/types/instruction';
 import { useEffect, useRef, useState } from 'react';
 import { buildFlowchartDefinition } from '@/lib/buildFlowchart';
+import FlowFigure, { FlowLegend } from './FlowFigure';
 
 interface Props {
   instruction: WorkInstruction;
@@ -10,6 +11,9 @@ interface Props {
 }
 
 export default function FlowchartModal({ instruction, onClose }: Props) {
+  // 条件グループを使わない手順書は「図で分岐を組み立てる」と同じ図（ELK）で表示する。
+  // 条件グループを使う手順書は従来どおり Mermaid で描く。
+  const useFlowFigure = (instruction.conditions?.length ?? 0) === 0;
   const containerRef = useRef<HTMLDivElement>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -19,6 +23,10 @@ export default function FlowchartModal({ instruction, onClose }: Props) {
 
   useEffect(() => {
     let cancelled = false;
+    if (useFlowFigure) {
+      setLoading(false);
+      return;
+    }
 
     async function render() {
       try {
@@ -72,10 +80,12 @@ export default function FlowchartModal({ instruction, onClose }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [instruction]);
+  }, [instruction, useFlowFigure]);
 
   const downloadSvg = () => {
-    const blob = new Blob([svgRef.current], { type: 'image/svg+xml' });
+    const svgText = useFlowFigure ? containerRef.current?.querySelector('svg')?.outerHTML ?? '' : svgRef.current;
+    if (!svgText) return;
+    const blob = new Blob([svgText], { type: 'image/svg+xml' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = `${instruction.title}_フロー図.svg`;
@@ -106,33 +116,47 @@ export default function FlowchartModal({ instruction, onClose }: Props) {
       }}
     >
       <div className="flex h-[calc(100vh-24px)] w-[calc(100vw-24px)] max-w-none flex-col rounded-2xl bg-white shadow-xl">
-        <div className="flex items-center justify-between border-b px-6 py-4">
-          <h2 className="text-lg font-bold text-gray-800">フロー図</h2>
-          <button onClick={onClose} className="text-xl leading-none text-gray-400 hover:text-gray-600">
-            &times;
+        <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3 sm:px-6">
+          <div className="min-w-0">
+            <h2 className="text-lg font-bold text-slate-950">フロー図</h2>
+            <p className="truncate text-xs text-slate-500">{instruction.title || '（無題）'}</p>
+          </div>
+          <button type="button" onClick={onClose} className="shrink-0 rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-semibold text-slate-600 hover:bg-slate-50">
+            閉じる
           </button>
         </div>
 
-        <div className="flex-1 overflow-auto p-6">
+        <div className={`flex-1 overflow-auto ${useFlowFigure ? 'bg-slate-50 p-4' : 'p-6'}`}>
           {loading && <p className="py-8 text-center text-sm text-gray-500">読み込み中...</p>}
           {error && <p className="py-8 text-center text-sm text-red-600">{error}</p>}
-          <div ref={containerRef} className="flex min-w-max justify-center overflow-visible" />
+          {useFlowFigure ? (
+            <div ref={containerRef}>
+              <FlowFigure steps={instruction.steps} />
+              <div className="mt-4"><FlowLegend /></div>
+            </div>
+          ) : (
+            <div ref={containerRef} className="flex min-w-max justify-center overflow-visible" />
+          )}
         </div>
 
         {!loading && !error && (
-          <div className="flex flex-wrap items-center justify-end gap-2 border-t px-6 py-3">
+          <div className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-200 px-6 py-3">
+            {!useFlowFigure && (
             <button
               onClick={copyMermaid}
               className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm text-slate-600 transition hover:bg-slate-100"
             >
               {mermaidCopied ? 'コピー済み' : 'Mermaidをコピー'}
             </button>
+            )}
+            {!useFlowFigure && (
             <button
               onClick={downloadMermaid}
               className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm text-slate-600 transition hover:bg-slate-100"
             >
               Mermaidを保存
             </button>
+            )}
             <button
               onClick={downloadSvg}
               className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm text-slate-600 transition hover:bg-slate-100"
