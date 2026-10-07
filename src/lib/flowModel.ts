@@ -104,8 +104,15 @@ export function buildFlowGraph(input: Step[]): FlowGraph {
   addNode({ id: START_NODE, kind: 'start', label: '開始' });
 
   const ensureEnd = () => addNode({ id: END_NODE, kind: 'end', label: '終了' });
-  const ensureStep = (step: Step, unreachable = false) =>
+  // 質問だけのステップ（本文なし・タイトル＝質問文）は箱を描かず、菱形だけで表す
+  const nodeIdFor = (step: Step) => (isQuestionOnlyStep(step) ? questionNodeId(step.id) : step.id);
+  const ensureStep = (step: Step, unreachable = false) => {
+    if (isQuestionOnlyStep(step)) {
+      addNode({ id: questionNodeId(step.id), kind: 'question', label: step.branchQuestion || '質問', stepId: step.id, unreachable });
+      return;
+    }
     addNode({ id: step.id, kind: 'step', label: stepLabel(steps, step), stepId: step.id, unreachable });
+  };
 
   const visited = new Set<string>();
   const stack = new Set<string>();
@@ -116,11 +123,13 @@ export function buildFlowGraph(input: Step[]): FlowGraph {
     visited.add(step.id);
     stack.add(step.id);
     const outs: { from: string; target: string; label: string; jumpIndex?: number }[] = [];
-    let from = step.id;
+    let from = nodeIdFor(step);
     if (hasBranch(step)) {
       const qid = questionNodeId(step.id);
-      addNode({ id: qid, kind: 'question', label: step.branchQuestion || 'どちらに進む？', stepId: step.id });
-      edges.push({ from: step.id, to: qid, label: '', loop: false });
+      if (!isQuestionOnlyStep(step)) {
+        addNode({ id: qid, kind: 'question', label: step.branchQuestion || 'どちらに進む？', stepId: step.id });
+        edges.push({ from: step.id, to: qid, label: '', loop: false });
+      }
       from = qid;
       (step.jumps ?? []).forEach((jump, index) => {
         outs.push({ from, target: jump.targetStepId, label: jump.label || `（答え${index + 1}）`, jumpIndex: index });
@@ -144,7 +153,7 @@ export function buildFlowGraph(input: Step[]): FlowGraph {
         edges.push({ from: out.from, to, label: out.label, loop: false });
       } else {
         ensureStep(targetStep);
-        edges.push({ from: out.from, to: targetStep.id, label: out.label, loop: stack.has(targetStep.id) });
+        edges.push({ from: out.from, to: nodeIdFor(targetStep), label: out.label, loop: stack.has(targetStep.id) });
         if (!visited.has(targetStep.id)) visit(targetStep);
       }
     }
@@ -156,7 +165,7 @@ export function buildFlowGraph(input: Step[]): FlowGraph {
     edges.push({ from: START_NODE, to: END_NODE, label: '', loop: false });
   } else {
     ensureStep(steps[0]);
-    edges.push({ from: START_NODE, to: steps[0].id, label: '', loop: false });
+    edges.push({ from: START_NODE, to: nodeIdFor(steps[0]), label: '', loop: false });
     visit(steps[0]);
   }
   for (const step of steps) {

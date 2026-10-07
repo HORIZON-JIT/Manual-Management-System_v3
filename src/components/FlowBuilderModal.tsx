@@ -250,18 +250,29 @@ export default function FlowBuilderModal({ steps, onChange, onClose, onEditStep,
         <button type="button" onClick={() => setSelectedId(step.id)} className={`${actionClass} border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100`}>
           ステップ {sorted.indexOf(step) + 1} に戻る
         </button>
-        <button
-          type="button"
-          onClick={() => { onChange(removeBranch(sorted, step.id)); setSelectedId(step.id); }}
-          className={`${actionClass} border-red-200 bg-white text-red-600 hover:bg-red-50`}
-        >
-          この質問を削除（枝は切り離されます）
-        </button>
+        {isQuestionOnlyStep(step) ? (
+          <button
+            type="button"
+            disabled={sorted.length <= 1}
+            onClick={() => { onChange(removeStep(sorted, step.id)); setSelectedId(null); }}
+            className={`${actionClass} border-red-200 bg-white text-red-600 hover:bg-red-50`}
+          >
+            この質問を削除（枝は切り離されます）
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => { onChange(removeBranch(sorted, step.id)); setSelectedId(step.id); }}
+            className={`${actionClass} border-red-200 bg-white text-red-600 hover:bg-red-50`}
+          >
+            この質問を削除（枝は切り離されます）
+          </button>
+        )}
       </div>
     </div>
   );
 
-  const unreachableCount = graph.nodes.filter((n) => n.kind === 'step' && n.unreachable).length;
+  const unreachableCount = graph.nodes.filter((n) => !!n.stepId && (n.kind === 'step' || n.kind === 'question') && n.unreachable).length;
 
   return (
     <div
