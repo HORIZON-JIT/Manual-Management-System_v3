@@ -34,6 +34,7 @@ import { getCustomDepartments, addCustomDepartment } from '@/lib/customDepartmen
 import StepEditor from './StepEditor';
 import VersionHistoryModal from './VersionHistoryModal';
 import FlowchartModal from './FlowchartModal';
+import FlowBuilderModal from './FlowBuilderModal';
 
 const LAST_AUTHOR_KEY = 'last_author_name';
 const fieldClass =
@@ -115,6 +116,7 @@ export default function InstructionForm({ initialData, approvalMode = false }: I
   const [excelNavMode, setExcelNavMode] = useState<ExcelNavMode>('none');
   const [showVersionHistory, setShowVersionHistory] = useState(false);
   const [showFlowchart, setShowFlowchart] = useState(false);
+  const [showFlowBuilder, setShowFlowBuilder] = useState(false);
   const [showStepIndex, setShowStepIndex] = useState(false);
   const [showDescriptionGuide, setShowDescriptionGuide] = useState(false);
   const [showUpdateHistoryGuide, setShowUpdateHistoryGuide] = useState(false);
@@ -1344,6 +1346,13 @@ export default function InstructionForm({ initialData, approvalMode = false }: I
 
                 <button
                   type="button"
+                  onClick={() => setShowFlowBuilder(true)}
+                  className="w-full rounded-lg border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm font-semibold text-amber-800 transition hover:bg-amber-100"
+                >
+                  図で分岐を組み立てる
+                </button>
+                <button
+                  type="button"
                   onClick={() => setShowFlowchart(true)}
                   className="w-full rounded-lg border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-semibold text-blue-700 transition hover:bg-blue-100"
                 >
@@ -1653,6 +1662,20 @@ export default function InstructionForm({ initialData, approvalMode = false }: I
         <FlowchartModal
           instruction={buildPreviewInstruction()}
           onClose={() => setShowFlowchart(false)}
+        />
+      )}
+
+      {showFlowBuilder && (
+        <FlowBuilderModal
+          steps={steps}
+          onChange={setSteps}
+          onClose={() => setShowFlowBuilder(false)}
+          onEditStep={scrollToEditStep}
+          disabledReason={
+            conditions.length > 0
+              ? 'この手順書は「条件グループ」で分岐を設定しています。図で組み立てる方式と条件グループは同時に使えないため、条件グループをすべて削除してからお使いください。既存の条件グループの設定はこれまでどおり使えます。'
+              : undefined
+          }
         />
       )}
 

@@ -16,8 +16,12 @@ export interface StepLink {
 export interface StepJump {
   id: string;
   label: string;
+  /** 進み先のステップID。JUMP_END_TARGET を入れると、その選択肢でフローが終了する。 */
   targetStepId: string;
 }
+
+/** StepJump.targetStepId に入れると「その選択肢で終了」を表す特別値（ビューアは該当ステップなし＝終了として扱う） */
+export const JUMP_END_TARGET = '__end__';
 
 export interface Condition {
   id: string;
@@ -57,6 +61,8 @@ export interface Step {
   originalImageDataUrls?: string[];
   links?: StepLink[];
   jumps?: StepJump[];
+  /** 選択肢（jumps）を出すときの質問文。例「合格ですか？」。未設定なら従来の見出しを表示。 */
+  branchQuestion?: string;
   jumpDefaultLabel?: string;
   nextStepId?: string;
   endsBranch?: boolean;
