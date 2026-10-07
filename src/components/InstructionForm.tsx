@@ -652,7 +652,7 @@ export default function InstructionForm({ initialData, approvalMode = false }: I
   })();
 
   const renderConditionPanel = (compact: boolean, visibilityClass: string) => (
-    <section className={`${visibilityClass} rounded-lg border border-slate-200 bg-white p-5 shadow-sm`}>
+    <section className={`${visibilityClass} rounded-xl border border-slate-200/80 bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04)]`}>
       <div
         className={`flex gap-3 ${
           compact ? 'items-start justify-between' : 'mb-4 flex-wrap items-center justify-between'
@@ -671,7 +671,7 @@ export default function InstructionForm({ initialData, approvalMode = false }: I
             type="button"
             onClick={() => setShowSidebarConditions((shown) => !shown)}
             aria-expanded={showSidebarConditions}
-            className="rounded-lg border border-slate-200 p-2 text-slate-500 transition hover:bg-slate-50 hover:text-slate-900"
+            className="rounded-full p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-900"
             title={showSidebarConditions ? '折りたたむ' : '展開する'}
           >
             <svg
@@ -687,7 +687,7 @@ export default function InstructionForm({ initialData, approvalMode = false }: I
           <button
             type="button"
             onClick={addGroup}
-            className="rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm font-semibold text-blue-700 transition hover:bg-blue-50"
+            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
           >
             グループを追加
           </button>
@@ -706,7 +706,7 @@ export default function InstructionForm({ initialData, approvalMode = false }: I
             <button
               type="button"
               onClick={addGroup}
-              className="mb-4 w-full rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm font-semibold text-blue-700 transition hover:bg-blue-50"
+              className="mb-4 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
             >
               グループを追加
             </button>
@@ -722,10 +722,10 @@ export default function InstructionForm({ initialData, approvalMode = false }: I
             return (
               <div
                 key={groupId}
-                className={`rounded-lg border border-blue-100 bg-blue-50/50 ${compact ? 'p-3' : 'p-4'}`}
+                className={`rounded-lg border border-slate-200 bg-slate-50 ${compact ? 'p-3' : 'p-4'}`}
               >
                 <div className="mb-3 flex items-center justify-between gap-3">
-                  <span className="text-sm font-bold text-blue-800">
+                  <span className="brand-text text-sm font-bold">
                     グループ {String.fromCharCode(65 + groupIndex)}
                   </span>
                   <button
@@ -795,7 +795,7 @@ export default function InstructionForm({ initialData, approvalMode = false }: I
                 <button
                   type="button"
                   onClick={() => addConditionToGroup(groupId)}
-                  className="mt-3 text-sm font-medium text-blue-700 hover:text-blue-900"
+                  className="brand-text mt-3 text-sm font-medium hover:underline"
                 >
                   + 条件を追加
                 </button>
@@ -1336,66 +1336,85 @@ export default function InstructionForm({ initialData, approvalMode = false }: I
               </div>
               {renderApprovalPanel()}
             </section>
-            <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm lg:shrink-0">
-              <div className="space-y-3">
-                {draftSaveMessage && (
-                  <p className="rounded-lg bg-emerald-50 px-3 py-2 text-center text-sm font-medium text-emerald-700">
-                    {draftSaveMessage}
-                  </p>
-                )}
+            <section className="rounded-xl border border-slate-200/80 bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04)] lg:shrink-0">
+              {draftSaveMessage && (
+                <p className="mb-4 rounded-lg bg-emerald-50 px-3 py-2 text-center text-sm font-medium text-emerald-700">
+                  {draftSaveMessage}
+                </p>
+              )}
 
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">分岐</p>
+              <div className="mt-2.5 space-y-2">
                 <button
                   type="button"
                   onClick={() => setShowFlowBuilder(true)}
-                  className="w-full rounded-lg border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm font-semibold text-amber-800 transition hover:bg-amber-100"
+                  className="brand-border brand-text flex w-full items-center justify-center gap-2 rounded-lg border bg-white px-4 py-2.5 text-sm font-semibold transition hover:bg-[#faf7f1]"
                 >
+                  <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24" aria-hidden="true">
+                    <rect x="8" y="3" width="8" height="5" rx="1.5" />
+                    <rect x="3" y="16" width="7" height="5" rx="1.5" />
+                    <rect x="14" y="16" width="7" height="5" rx="1.5" />
+                    <path strokeLinecap="round" d="M12 8v3M12 11H6.5v5M12 11h5.5v5" />
+                  </svg>
                   図で分岐を組み立てる
                 </button>
                 <button
                   type="button"
                   onClick={() => setShowFlowchart(true)}
-                  className="w-full rounded-lg border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-semibold text-blue-700 transition hover:bg-blue-100"
+                  className="flex w-full items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-slate-500 transition hover:bg-slate-50 hover:text-slate-900"
                 >
+                  <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24" aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.5 12s3.5-6.5 9.5-6.5 9.5 6.5 9.5 6.5-3.5 6.5-9.5 6.5S2.5 12 2.5 12Z" />
+                    <circle cx="12" cy="12" r="2.5" />
+                  </svg>
                   作成中のフローチャートを表示
                 </button>
-                <button
-                  type="button"
-                  onClick={() => handleDraftSave(true)}
-                  disabled={saving}
-                  className="w-full rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
-                >
-                  下書き保存して継続
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleDraftSave(false)}
-                  disabled={saving}
-                  className="w-full rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm font-semibold text-amber-800 transition hover:bg-amber-100 disabled:opacity-50"
-                >
-                  下書き保存して終了
-                </button>
+              </div>
+
+              <div className="my-5 border-t border-slate-100" />
+
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">保存</p>
+              <div className="mt-2.5 space-y-2">
                 <button
                   type="button"
                   onClick={handleCompleteClick}
                   disabled={saving}
-                  className="w-full rounded-lg bg-slate-950 px-4 py-2.5 text-base font-bold text-white shadow-sm transition hover:bg-slate-800 disabled:opacity-50"
+                  className="w-full rounded-lg bg-slate-950 px-4 py-3 text-sm font-semibold text-white shadow-[0_8px_18px_rgba(15,23,42,0.18)] transition hover:bg-slate-800 disabled:opacity-50"
                 >
                   {saving ? '保存中...' : '完成してDriveへ保存'}
                 </button>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleDraftSave(true)}
+                    disabled={saving}
+                    className="whitespace-nowrap rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:opacity-50"
+                  >
+                    下書き保存
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDraftSave(false)}
+                    disabled={saving}
+                    className="whitespace-nowrap rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:opacity-50"
+                  >
+                    保存して終了
+                  </button>
+                </div>
                 {saveMessage && (
                   <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
                     {saveMessage.text}
                   </p>
                 )}
               </div>
-              <p className="mt-3 text-[11px] leading-5 text-slate-500">
+              <p className="mt-3 text-[11px] leading-5 text-slate-400">
                 完成時は、指定した Google Drive フォルダに JSON を保存します。Excel出力を選んだ場合のみ、
                 スプレッドシートも保存します。
               </p>
             </section>
             <div className="hidden min-h-0 flex-1 flex-col gap-3 overflow-y-auto pr-1 lg:flex">
             {renderConditionPanel(true, '')}
-            <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+            <section className="rounded-xl border border-slate-200/80 bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
               <button
                 type="button"
                 onClick={handleToggleSaveSettings}
@@ -1410,7 +1429,7 @@ export default function InstructionForm({ initialData, approvalMode = false }: I
                     </span>
                   )}
                 </span>
-                <span className="rounded-lg border border-slate-200 p-2 text-slate-500">
+                <span className="rounded-full p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-900">
                   <svg
                     className={`h-4 w-4 transition ${showSaveSettings ? 'rotate-180' : ''}`}
                     fill="none"
