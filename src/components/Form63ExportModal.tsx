@@ -76,12 +76,12 @@ export default function Form63ExportModal({ instruction, onClose }: Props) {
       const mermaid = mermaidModule.default;
       mermaid.initialize({ startOnLoad: false, theme: 'base', flowchart: { useMaxWidth: false, htmlLabels: false, curve: 'linear', padding: 24, nodeSpacing: 64, rankSpacing: 84 } });
       const { svg } = await mermaid.render(`f63-${Date.now()}`, buildFlowchartDefinition(instruction));
-      return svgStringToPng(svg, 2);
+      return svgStringToPng(svg, 3);
     }
     // 図の計算が終わるまで少し待つ
     for (let i = 0; i < 40; i++) {
       const svg = figureRef.current?.querySelector('svg');
-      if (svg) return svgElementToPng(svg as SVGSVGElement, 2);
+      if (svg) return svgElementToPng(svg as SVGSVGElement, 3);
       await new Promise((r) => setTimeout(r, 150));
     }
     return null;
@@ -159,7 +159,7 @@ export default function Form63ExportModal({ instruction, onClose }: Props) {
           <section>
             <p className={sectionLabel}>2. 含めるもの</p>
             <div className="mt-2 flex flex-wrap gap-4 text-sm text-slate-700">
-              <label className="flex cursor-pointer items-center gap-2"><input type="checkbox" checked={includeFlow} onChange={(e) => setIncludeFlow(e.target.checked)} className="h-4 w-4 rounded border-slate-300" />フロー図（〈業務フロー〉として先頭に）</label>
+              <label className="flex cursor-pointer items-center gap-2"><input type="checkbox" checked={includeFlow} onChange={(e) => setIncludeFlow(e.target.checked)} className="h-4 w-4 rounded border-slate-300" />フロー図（1ページ使って〈業務フロー〉として）</label>
               <label className="flex cursor-pointer items-center gap-2"><input type="checkbox" checked={includeImages} onChange={(e) => setIncludeImages(e.target.checked)} className="h-4 w-4 rounded border-slate-300" />各ステップの画像</label>
             </div>
           </section>
