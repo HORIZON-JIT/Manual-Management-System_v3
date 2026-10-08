@@ -23,10 +23,11 @@ export interface Form63Options {
 }
 
 const EMU_PER_PX = 9525;
-const STEP_IMAGE_WIDTH_PX = 265; // 約70mm
-const FLOW_IMAGE_MAX_WIDTH_PX = 460; // 約120mm
-const FLOW_IMAGE_MAX_HEIGHT_PX = 640;
-const IMAGE_MAX_HEIGHT_PX = 400;
+const STEP_IMAGE_WIDTH_PX = 416; // 約110mm（本文幅の約2/3）
+const IMAGE_MAX_HEIGHT_PX = 500;
+// フロー図は1ページ丸ごと使う（本文幅 9921dxa ≒ 661px、本文高さ 14456dxa ≒ 963px から見出し分を引く）
+const FLOW_IMAGE_MAX_WIDTH_PX = 660;
+const FLOW_IMAGE_MAX_HEIGHT_PX = 880;
 
 function esc(text: string): string {
   return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -180,8 +181,9 @@ function buildBody(instruction: WorkInstruction, options: Form63Options, media: 
     let h = Math.round(w * ratio);
     if (h > FLOW_IMAGE_MAX_HEIGHT_PX) { h = FLOW_IMAGE_MAX_HEIGHT_PX; w = Math.round(h / ratio); }
     const { rId, docPrId } = media.add(options.flowImage.data, 'png');
+    // 図は段落として分割されないので、入りきらなければ Word が見出しごと次のページへ送る
     parts.push(bodyParagraph('〈業務フロー〉', { keepNext: true }));
-    parts.push(drawingParagraph(rId, docPrId, w, h, 200));
+    parts.push(drawingParagraph(rId, docPrId, w, h, 0));
     parts.push(emptyParagraph());
   }
 
