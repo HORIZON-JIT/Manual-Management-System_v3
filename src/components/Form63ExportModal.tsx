@@ -93,7 +93,7 @@ export default function Form63ExportModal({ instruction, onClose }: Props) {
 
         <div className="min-h-0 flex-1 space-y-6 overflow-auto px-4 py-5 sm:px-6">
           <section>
-            <p className={sectionLabel}>1. 文章を堅い文体にする（任意）</p>
+            <p className={sectionLabel}>1. AI で文章を社内文書の文体に整える（任意）</p>
             <p className="mt-1.5 text-xs leading-5 text-slate-500">
               手順書の文章をそのまま載せる場合は飛ばせます。書き直す場合は、指示文つきの文章を AI に渡し、返ってきた文章を下の欄に貼り付けてください。画像はアプリ側で付けます。
             </p>
