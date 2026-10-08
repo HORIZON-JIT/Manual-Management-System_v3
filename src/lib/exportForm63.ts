@@ -74,8 +74,9 @@ function mapCells(tableXml: string, fn: (cellXml: string, index: number) => stri
 }
 
 function bodyParagraph(text: string, opt: { keepNext?: boolean; indentLeft?: number; hanging?: number; tab?: number; bold?: boolean } = {}): string {
+  // 雛形の標準段落は両端揃えのため、長い英数字（メールアドレスなど）があると文字間が開く。本文は左揃えにする
   const ppr = [
-    '<w:spacing w:line="240" w:lineRule="atLeast"/>',
+    '<w:spacing w:line="240" w:lineRule="atLeast"/><w:jc w:val="left"/>',
     opt.keepNext ? '<w:keepNext/>' : '',
     opt.tab ? `<w:tabs><w:tab w:val="left" w:pos="${opt.tab}"/></w:tabs>` : '',
     opt.indentLeft ? `<w:ind w:left="${opt.indentLeft}"${opt.hanging ? ` w:hanging="${opt.hanging}"` : ''}/>` : '',
@@ -85,7 +86,7 @@ function bodyParagraph(text: string, opt: { keepNext?: boolean; indentLeft?: num
 }
 
 function numberedParagraph(no: number, text: string): string {
-  return `<w:p><w:pPr><w:spacing w:line="240" w:lineRule="atLeast"/><w:tabs><w:tab w:val="left" w:pos="700"/></w:tabs><w:ind w:left="700" w:hanging="500"/></w:pPr>` +
+  return `<w:p><w:pPr><w:spacing w:line="240" w:lineRule="atLeast"/><w:jc w:val="left"/><w:tabs><w:tab w:val="left" w:pos="700"/></w:tabs><w:ind w:left="700" w:hanging="500"/></w:pPr>` +
     `<w:r><w:rPr><w:rFonts w:hint="eastAsia"/></w:rPr><w:t>${no}.</w:t></w:r><w:r><w:tab/></w:r><w:r><w:rPr><w:rFonts w:hint="eastAsia"/></w:rPr><w:t xml:space="preserve">${esc(text)}</w:t></w:r></w:p>`;
 }
 

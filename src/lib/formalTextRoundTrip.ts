@@ -132,6 +132,9 @@ export function cleanLine(line: string): string {
   t = t.replace(/^(?:[-*・]\s+)/, '');
   t = t.replace(/^(?:\(?\d+[.)）]\s*)/, '');
   t = t.replace(/^(?:[（(]\d+[)）]\s*)/, '');
+  // AI が付けがちな Markdown の飾りを外す: [表示](mailto:… や URL) → 表示、**太字** → 太字
+  t = t.replace(/\[([^\]]+)\]\((?:mailto:)?[^)]*\)/g, '$1');
+  t = t.replace(/\*\*([^*]+)\*\*/g, '$1');
   return t.trim();
 }
 
