@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useEffect, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { v4 as uuidv4 } from 'uuid';
 import {
@@ -17,7 +17,7 @@ import {
   getInstructionRevision,
   getStepConditionIds,
 } from '@/types/instruction';
-import { saveInstruction } from '@/lib/storage';
+import { saveInstruction, getStorageEstimate, formatBytesShort, LOW_STORAGE_BYTES } from '@/lib/storage';
 import { buildExcelBuffer, ExcelNavMode } from '@/lib/exportSpreadsheet';
 import { uploadAsGoogleSheet, saveFileToDrive, getTargetFolder } from '@/lib/googleDrive';
 import { addStepNavLinks, addSheetCheckboxes, addResetScript } from '@/lib/sheetsNavLinks';
@@ -118,6 +118,7 @@ export default function InstructionForm({ initialData, approvalMode = false }: I
   const [showVersionHistory, setShowVersionHistory] = useState(false);
   const [showFlowchart, setShowFlowchart] = useState(false);
   const [showFlowBuilder, setShowFlowBuilder] = useState(false);
+  const [storageEstimate, setStorageEstimate] = useState<{ usage: number; quota: number } | null>(null);
   const [showStepIndex, setShowStepIndex] = useState(false);
   const [showDescriptionGuide, setShowDescriptionGuide] = useState(false);
   const [showUpdateHistoryGuide, setShowUpdateHistoryGuide] = useState(false);
@@ -528,6 +529,14 @@ export default function InstructionForm({ initialData, approvalMode = false }: I
     };
   };
 
+  const refreshStorageEstimate = useCallback(() => {
+    getStorageEstimate().then(setStorageEstimate).catch(() => setStorageEstimate(null));
+  }, []);
+
+  useEffect(() => {
+    refreshStorageEstimate();
+  }, [refreshStorageEstimate]);
+
   const handleDraftSave = async (continueEditing: boolean) => {
     const instruction = buildInstruction('draft');
     if (!instruction) return;
@@ -539,6 +548,7 @@ export default function InstructionForm({ initialData, approvalMode = false }: I
       return;
     }
 
+    refreshStorageEstimate();
     if (continueEditing) {
       setDraftSaveMessage('下書きを保存しました。');
       setTimeout(() => setDraftSaveMessage(null), 3000);
@@ -1412,6 +1422,12 @@ export default function InstructionForm({ initialData, approvalMode = false }: I
                 完成時は、指定した Google Drive フォルダに JSON を保存します。Excel出力を選んだ場合のみ、
                 スプレッドシートも保存します。
               </p>
+              {storageEstimate && (
+                <p className={`mt-1.5 text-[11px] leading-5 ${storageEstimate.quota - storageEstimate.usage < LOW_STORAGE_BYTES ? 'font-semibold text-red-600' : 'text-slate-400'}`}>
+                  下書きの保存領域: 残り {formatBytesShort(Math.max(storageEstimate.quota - storageEstimate.usage, 0))}
+                  {storageEstimate.quota - storageEstimate.usage < LOW_STORAGE_BYTES && '（不要な下書きを削除してください）'}
+                </p>
+              )}
             </section>
             <div className="hidden min-h-0 flex-1 flex-col gap-3 overflow-y-auto pr-1 lg:flex">
             {renderConditionPanel(true, '')}
