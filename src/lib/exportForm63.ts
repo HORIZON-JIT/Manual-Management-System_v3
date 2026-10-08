@@ -289,6 +289,8 @@ export async function buildForm63(instruction: WorkInstruction, options: Form63O
   });
 
   const doc = new Document({
+    // ページの色を白に固定（Word のダークモードでも紙面が黒く表示されないように）
+    background: { color: 'FFFFFF' },
     styles: { default: { document: { run: { font: FONT, size: 20 } } } },
     sections: [{
       properties: { page: { size: { width: PAGE_WIDTH, height: PAGE_HEIGHT }, margin: { top: 1000, bottom: 900, left: MARGIN, right: MARGIN, header: 500, footer: 450 } } },
