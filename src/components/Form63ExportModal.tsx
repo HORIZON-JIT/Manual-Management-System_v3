@@ -170,7 +170,7 @@ export default function Form63ExportModal({ instruction, onClose }: Props) {
               {busy ? '作成中...' : 'Word を作成'}
             </button>
             <p className="mt-2 text-[11px] leading-5 text-slate-400">
-              文書番号と承認・審査の欄は空欄で出力します。改訂履歴は更新履歴から入れます。本文のフォントは MS 明朝です。
+              正式な雛形（様式6-3号）に内容を流し込みます。文書番号と承認・審査の欄は空欄、改訂履歴は更新履歴から入れます。
             </p>
             {message && (
               <p className={`mt-2 rounded-lg px-3 py-2 text-xs leading-5 ${message.kind === 'error' ? 'bg-red-50 text-red-700' : message.kind === 'warn' ? 'bg-amber-50 text-amber-800' : 'bg-emerald-50 text-emerald-700'}`}>{message.text}</p>
