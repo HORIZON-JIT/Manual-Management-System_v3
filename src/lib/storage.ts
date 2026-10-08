@@ -223,3 +223,23 @@ export function formatBytes(bytes: number): string {
   if (bytes >= 1024) return `${Math.round(bytes / 1024)} KB`;
   return `${bytes} B`;
 }
+
+/** このサイトがブラウザ内で使える保存領域の目安（使用量と上限、バイト）。取得できない環境では null。 */
+export async function getStorageEstimate(): Promise<{ usage: number; quota: number } | null> {
+  if (typeof navigator === 'undefined' || !navigator.storage?.estimate) return null;
+  try {
+    const { usage, quota } = await navigator.storage.estimate();
+    if (typeof usage !== 'number' || typeof quota !== 'number' || quota <= 0) return null;
+    return { usage, quota };
+  } catch {
+    return null;
+  }
+}
+
+/** 残り容量がこれを下回ったら注意表示にする（50MB） */
+export const LOW_STORAGE_BYTES = 50 * 1024 * 1024;
+
+export function formatBytesShort(bytes: number): string {
+  if (bytes >= 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+  return formatBytes(bytes);
+}

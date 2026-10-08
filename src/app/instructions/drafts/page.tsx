@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { WorkInstruction, getCategoryLabel } from '@/types/instruction';
-import { getAllInstructions, deleteInstruction, estimateInstructionsSize, formatBytes } from '@/lib/storage';
+import { getAllInstructions, deleteInstruction, estimateInstructionsSize, formatBytes, formatBytesShort, getStorageEstimate, LOW_STORAGE_BYTES } from '@/lib/storage';
 import { setTempData } from '@/lib/tempStorage';
 import EditorOnlyNotice from '@/components/EditorOnlyNotice';
 import { VIEWER_ONLY } from '@/lib/appMode';
@@ -26,14 +26,17 @@ function DraftsPageContent() {
   const router = useRouter();
   const [drafts, setDrafts] = useState<WorkInstruction[]>([]);
   const [loaded, setLoaded] = useState(false);
+  const [estimate, setEstimate] = useState<{ usage: number; quota: number } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const refreshEstimate = () => { getStorageEstimate().then(setEstimate).catch(() => setEstimate(null)); };
 
   useEffect(() => {
     let cancelled = false;
     loadDrafts()
       .then((list) => { if (!cancelled) setDrafts(list); })
       .catch(() => { if (!cancelled) setDrafts([]); })
-      .finally(() => { if (!cancelled) setLoaded(true); });
+      .finally(() => { if (!cancelled) setLoaded(true); refreshEstimate(); });
     return () => { cancelled = true; };
   }, []);
 
@@ -43,12 +46,14 @@ function DraftsPageContent() {
     if (!confirm(`「${title}」を削除しますか？`)) return;
     await deleteInstruction(id);
     setDrafts((prev) => prev.filter((d) => d.id !== id));
+    refreshEstimate();
   };
 
   const handleDeleteAll = async () => {
     if (!confirm(`下書き ${drafts.length} 件をすべて削除しますか？\nブラウザの保存容量が解放されます。`)) return;
     for (const d of drafts) await deleteInstruction(d.id);
     setDrafts([]);
+    refreshEstimate();
   };
 
   const handleJsonFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -85,8 +90,18 @@ function DraftsPageContent() {
           <h1 className="text-3xl font-bold tracking-tight text-slate-950">下書き一覧</h1>
           <p className="mt-2 text-sm text-slate-500">
             {loaded ? `${drafts.length} 件の下書きがあります。` : '読み込み中...'}
-            {loaded && drafts.length > 0 && <span className="ml-2 text-slate-400">この端末の保存容量 約 {formatBytes(draftsSize)} を使用</span>}
           </p>
+          {loaded && (
+            estimate ? (
+              <p className={`mt-1 text-xs ${estimate.quota - estimate.usage < LOW_STORAGE_BYTES ? 'font-semibold text-red-600' : 'text-slate-400'}`}>
+                この端末の下書き保存領域: 残り {formatBytesShort(Math.max(estimate.quota - estimate.usage, 0))}
+                （使用 {formatBytesShort(estimate.usage)} ／ 上限 {formatBytesShort(estimate.quota)}）
+                {estimate.quota - estimate.usage < LOW_STORAGE_BYTES && ' 残りが少なくなっています。不要な下書きを削除してください。'}
+              </p>
+            ) : (
+              <p className="mt-1 text-xs text-slate-400">下書きの合計 約 {formatBytes(draftsSize)}</p>
+            )
+          )}
         </div>
         <div className="flex flex-wrap gap-2">
           <button onClick={() => fileInputRef.current?.click()} className="rounded-lg border border-blue-200 bg-white px-4 py-2 text-sm font-semibold text-blue-700 shadow-sm transition hover:bg-blue-50">
