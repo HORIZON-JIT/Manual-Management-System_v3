@@ -29,6 +29,7 @@ import {
 import { getTempData } from '@/lib/tempStorage';
 import ViewHistoryModal from '@/components/ViewHistoryModal';
 import FlowchartModal from '@/components/FlowchartModal';
+import Form63ExportModal from '@/components/Form63ExportModal';
 import { VIEWER_ONLY } from '@/lib/appMode';
 
 const DEFAULT_JUMP_VALUE = '__default__';
@@ -50,6 +51,7 @@ function InstructionViewContent() {
   const [showHistory, setShowHistory] = useState(false);
   const [showApprovalHistory, setShowApprovalHistory] = useState(false);
   const [showFlowchart, setShowFlowchart] = useState(false);
+  const [showForm63, setShowForm63] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showChapters, setShowChapters] = useState(false);
@@ -562,6 +564,12 @@ function InstructionViewContent() {
         >
           フロー図
         </button>
+        <button
+          onClick={() => setShowForm63(true)}
+          className="px-3 py-1.5 bg-slate-50 border border-slate-200 text-slate-600 rounded-lg text-sm hover:bg-slate-100 transition"
+        >
+          様式6-3号（Word）
+        </button>
         {!isPreviewView && (
           <button
             onClick={handlePrint}
@@ -1025,6 +1033,9 @@ function InstructionViewContent() {
         </div>
       )}
 
+      {showForm63 && (
+        <Form63ExportModal instruction={instruction} onClose={() => setShowForm63(false)} />
+      )}
       {showFlowchart && (
         <FlowchartModal instruction={instruction} onClose={() => setShowFlowchart(false)} />
       )}

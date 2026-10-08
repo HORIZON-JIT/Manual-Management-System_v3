@@ -35,6 +35,7 @@ import StepEditor from './StepEditor';
 import VersionHistoryModal from './VersionHistoryModal';
 import FlowchartModal from './FlowchartModal';
 import FlowBuilderModal from './FlowBuilderModal';
+import Form63ExportModal from './Form63ExportModal';
 import { tryConvertConditionsToFlow } from '@/lib/convertConditions';
 
 const LAST_AUTHOR_KEY = 'last_author_name';
@@ -118,6 +119,7 @@ export default function InstructionForm({ initialData, approvalMode = false }: I
   const [showVersionHistory, setShowVersionHistory] = useState(false);
   const [showFlowchart, setShowFlowchart] = useState(false);
   const [showFlowBuilder, setShowFlowBuilder] = useState(false);
+  const [showForm63, setShowForm63] = useState(false);
   const [storageEstimate, setStorageEstimate] = useState<{ usage: number; quota: number } | null>(null);
   const [showStepIndex, setShowStepIndex] = useState(false);
   const [showDescriptionGuide, setShowDescriptionGuide] = useState(false);
@@ -1384,6 +1386,23 @@ export default function InstructionForm({ initialData, approvalMode = false }: I
 
               <div className="my-5 border-t border-slate-100" />
 
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">出力</p>
+              <div className="mt-2.5">
+                <button
+                  type="button"
+                  onClick={() => setShowForm63(true)}
+                  className="flex w-full items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+                >
+                  <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24" aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M7 3h7l5 5v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z" />
+                    <path strokeLinecap="round" d="M14 3v5h5M9 13h6M9 17h6" />
+                  </svg>
+                  様式6-3号（Word）で出力
+                </button>
+              </div>
+
+              <div className="my-5 border-t border-slate-100" />
+
               <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">保存</p>
               <div className="mt-2.5 space-y-2">
                 <button
@@ -1699,6 +1718,10 @@ export default function InstructionForm({ initialData, approvalMode = false }: I
           instruction={buildPreviewInstruction()}
           onClose={() => setShowFlowchart(false)}
         />
+      )}
+
+      {showForm63 && (
+        <Form63ExportModal instruction={buildPreviewInstruction()} onClose={() => setShowForm63(false)} />
       )}
 
       {showFlowBuilder && (
