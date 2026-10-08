@@ -568,7 +568,7 @@ function InstructionViewContent() {
           onClick={() => setShowForm63(true)}
           className="px-3 py-1.5 bg-slate-50 border border-slate-200 text-slate-600 rounded-lg text-sm hover:bg-slate-100 transition"
         >
-          様式6-3号（Word）
+          社内規定作業手順書
         </button>
         {!isPreviewView && (
           <button
