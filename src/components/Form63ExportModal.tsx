@@ -1,13 +1,10 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { saveAs } from 'file-saver';
 import { WorkInstruction } from '@/types/instruction';
 import { buildForm63, form63FileName } from '@/lib/exportForm63';
 import { exportTextForAI, exportTextBody, parseRewrittenText, summarizeRewritten, RewrittenText } from '@/lib/formalTextRoundTrip';
-import { svgElementToPng, svgStringToPng } from '@/lib/flowImage';
-import { buildFlowchartDefinition } from '@/lib/buildFlowchart';
-import FlowFigure from './FlowFigure';
 
 interface Props {
   instruction: WorkInstruction;
@@ -23,12 +20,9 @@ const primaryBtn = 'rounded-lg bg-slate-950 px-4 py-3 text-sm font-semibold text
 
 export default function Form63ExportModal({ instruction, onClose }: Props) {
   const [pasted, setPasted] = useState('');
-  const [includeFlow, setIncludeFlow] = useState(true);
   const [includeImages, setIncludeImages] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState<{ text: string; kind: 'info' | 'warn' | 'error' } | null>(null);
-  const figureRef = useRef<HTMLDivElement>(null);
-  const hasConditions = (instruction.conditions?.length ?? 0) > 0;
+  const [message, setMessage] = useState<{ text: string; kind: 'info' | 'error' } | null>(null);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -69,43 +63,14 @@ export default function Form63ExportModal({ instruction, onClose }: Props) {
     if (ok) setMessage({ text: '指示文と手順書の文章をコピーしました。お使いの AI に貼り付けてください。', kind: 'info' });
   };
 
-  const captureFlowImage = async () => {
-    if (!includeFlow) return null;
-    if (hasConditions) {
-      const mermaidModule = await import('mermaid');
-      const mermaid = mermaidModule.default;
-      mermaid.initialize({ startOnLoad: false, theme: 'base', flowchart: { useMaxWidth: false, htmlLabels: false, curve: 'linear', padding: 24, nodeSpacing: 64, rankSpacing: 84 } });
-      const { svg } = await mermaid.render(`f63-${Date.now()}`, buildFlowchartDefinition(instruction));
-      return svgStringToPng(svg, 3);
-    }
-    // 図の計算が終わるまで少し待つ
-    for (let i = 0; i < 40; i++) {
-      const svg = figureRef.current?.querySelector('svg');
-      if (svg) return svgElementToPng(svg as SVGSVGElement, 3);
-      await new Promise((r) => setTimeout(r, 150));
-    }
-    return null;
-  };
-
   const handleExport = async () => {
     setBusy(true);
     setMessage(null);
     try {
-      let flowImage: Awaited<ReturnType<typeof captureFlowImage>> = null;
-      let flowFailed = false;
-      if (includeFlow) {
-        try {
-          flowImage = await captureFlowImage();
-        } catch {
-          flowImage = null;
-        }
-        flowFailed = !flowImage;
-      }
       const source = includeImages ? instruction : { ...instruction, steps: instruction.steps.map((s) => ({ ...s, imageDataUrl: undefined, imageDataUrls: undefined })) };
-      const blob = await buildForm63(source, { flowImage, rewritten });
+      const blob = await buildForm63(source, { rewritten });
       saveAs(blob, form63FileName(instruction));
-      if (flowFailed) setMessage({ text: 'Word ファイルを作成しました。フロー図を画像にできなかったため、図なしで作成しています（フロー図の画面からSVGを保存して貼る方法もあります）。', kind: 'warn' });
-      else setMessage({ text: 'Word ファイルを作成しました。ダウンロード先を確認してください。', kind: 'info' });
+      setMessage({ text: 'Word ファイルを作成しました。ダウンロード先を確認してください。', kind: 'info' });
     } catch (e) {
       setMessage({ text: `Word の作成に失敗しました: ${e instanceof Error ? e.message : String(e)}`, kind: 'error' });
     } finally {
@@ -118,8 +83,8 @@ export default function Form63ExportModal({ instruction, onClose }: Props) {
       <div className="flex max-h-[calc(100vh-16px)] w-full max-w-2xl flex-col rounded-2xl bg-white shadow-xl">
         <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3 sm:px-6">
           <div className="min-w-0">
-            <h2 className="text-lg font-bold text-slate-950">様式6-3号（Word）で出力</h2>
-            <p className="truncate text-xs text-slate-500">会社規定の作業手順書用紙に、画像とフロー図つきで書き出します。</p>
+            <h2 className="text-lg font-bold text-slate-950">社内規定作業手順書（様式6-3号）で出力</h2>
+            <p className="truncate text-xs text-slate-500">会社規定の作業手順書用紙に、画像つきで Word として書き出します。</p>
           </div>
           <button type="button" onClick={onClose} className="shrink-0 rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50">
             閉じる
@@ -130,7 +95,7 @@ export default function Form63ExportModal({ instruction, onClose }: Props) {
           <section>
             <p className={sectionLabel}>1. 文章を堅い文体にする（任意）</p>
             <p className="mt-1.5 text-xs leading-5 text-slate-500">
-              手順書の文章をそのまま載せる場合は飛ばせます。書き直す場合は、指示文つきの文章を AI に渡し、返ってきた文章を下の欄に貼り付けてください。画像とフロー図はアプリ側で付けます。
+              手順書の文章をそのまま載せる場合は飛ばせます。書き直す場合は、指示文つきの文章を AI に渡し、返ってきた文章を下の欄に貼り付けてください。画像はアプリ側で付けます。
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
               <button type="button" onClick={handleGemini} className={accentBtn}>Gemini で文章を書き直す（コピーして開く）</button>
@@ -159,7 +124,6 @@ export default function Form63ExportModal({ instruction, onClose }: Props) {
           <section>
             <p className={sectionLabel}>2. 含めるもの</p>
             <div className="mt-2 flex flex-wrap gap-4 text-sm text-slate-700">
-              <label className="flex cursor-pointer items-center gap-2"><input type="checkbox" checked={includeFlow} onChange={(e) => setIncludeFlow(e.target.checked)} className="h-4 w-4 rounded border-slate-300" />フロー図（1ページ使って〈業務フロー〉として）</label>
               <label className="flex cursor-pointer items-center gap-2"><input type="checkbox" checked={includeImages} onChange={(e) => setIncludeImages(e.target.checked)} className="h-4 w-4 rounded border-slate-300" />各ステップの画像</label>
             </div>
           </section>
@@ -173,17 +137,11 @@ export default function Form63ExportModal({ instruction, onClose }: Props) {
               正式な雛形（様式6-3号）に内容を流し込みます。文書番号と承認・審査の欄は空欄、改訂履歴は更新履歴から入れます。
             </p>
             {message && (
-              <p className={`mt-2 rounded-lg px-3 py-2 text-xs leading-5 ${message.kind === 'error' ? 'bg-red-50 text-red-700' : message.kind === 'warn' ? 'bg-amber-50 text-amber-800' : 'bg-emerald-50 text-emerald-700'}`}>{message.text}</p>
+              <p className={`mt-2 rounded-lg px-3 py-2 text-xs leading-5 ${message.kind === 'error' ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-700'}`}>{message.text}</p>
             )}
           </section>
         </div>
 
-        {/* フロー図を画像にするための非表示の描画領域 */}
-        {!hasConditions && (
-          <div ref={figureRef} aria-hidden="true" style={{ position: 'absolute', left: -99999, top: 0, width: 1200 }}>
-            <FlowFigure steps={instruction.steps} />
-          </div>
-        )}
       </div>
     </div>
   );

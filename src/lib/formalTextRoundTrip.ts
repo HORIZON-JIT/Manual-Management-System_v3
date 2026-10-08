@@ -4,7 +4,7 @@ import { Step, WorkInstruction, JUMP_END_TARGET } from '@/types/instruction';
  * 文章の書き直しを外部の AI（Gemini など）に任せるための往復用テキスト。
  * - exportTextForAI: 指示文＋手順書の文章（見出しと本文）を決まった形式で書き出す
  * - parseRewrittenText: AI が同じ形式で返した文章を読み取り、ステップごとに対応づける
- * 画像・フロー図・改訂履歴はアプリ側で付けるので、ここでは扱わない。
+ * 画像・改訂履歴はアプリ側で付けるので、ここでは扱わない。
  */
 
 export interface RewrittenStep {
