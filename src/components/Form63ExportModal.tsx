@@ -26,7 +26,7 @@ export default function Form63ExportModal({ instruction, onClose }: Props) {
   const [includeFlow, setIncludeFlow] = useState(true);
   const [includeImages, setIncludeImages] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState<{ text: string; kind: 'info' | 'error' } | null>(null);
+  const [message, setMessage] = useState<{ text: string; kind: 'info' | 'warn' | 'error' } | null>(null);
   const figureRef = useRef<HTMLDivElement>(null);
   const hasConditions = (instruction.conditions?.length ?? 0) > 0;
 
@@ -91,11 +91,21 @@ export default function Form63ExportModal({ instruction, onClose }: Props) {
     setBusy(true);
     setMessage(null);
     try {
-      const flowImage = await captureFlowImage();
+      let flowImage: Awaited<ReturnType<typeof captureFlowImage>> = null;
+      let flowFailed = false;
+      if (includeFlow) {
+        try {
+          flowImage = await captureFlowImage();
+        } catch {
+          flowImage = null;
+        }
+        flowFailed = !flowImage;
+      }
       const source = includeImages ? instruction : { ...instruction, steps: instruction.steps.map((s) => ({ ...s, imageDataUrl: undefined, imageDataUrls: undefined })) };
       const blob = await buildForm63(source, { flowImage, rewritten });
       saveAs(blob, form63FileName(instruction));
-      setMessage({ text: 'Word ファイルを作成しました。ダウンロード先を確認してください。', kind: 'info' });
+      if (flowFailed) setMessage({ text: 'Word ファイルを作成しました。フロー図を画像にできなかったため、図なしで作成しています（フロー図の画面からSVGを保存して貼る方法もあります）。', kind: 'warn' });
+      else setMessage({ text: 'Word ファイルを作成しました。ダウンロード先を確認してください。', kind: 'info' });
     } catch (e) {
       setMessage({ text: `Word の作成に失敗しました: ${e instanceof Error ? e.message : String(e)}`, kind: 'error' });
     } finally {
@@ -163,7 +173,7 @@ export default function Form63ExportModal({ instruction, onClose }: Props) {
               文書番号と承認・審査の欄は空欄で出力します。改訂履歴は更新履歴から入れます。本文のフォントは MS 明朝です。
             </p>
             {message && (
-              <p className={`mt-2 rounded-lg px-3 py-2 text-xs leading-5 ${message.kind === 'error' ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-700'}`}>{message.text}</p>
+              <p className={`mt-2 rounded-lg px-3 py-2 text-xs leading-5 ${message.kind === 'error' ? 'bg-red-50 text-red-700' : message.kind === 'warn' ? 'bg-amber-50 text-amber-800' : 'bg-emerald-50 text-emerald-700'}`}>{message.text}</p>
             )}
           </section>
         </div>
