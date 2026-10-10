@@ -1062,7 +1062,7 @@ export default function StepEditor({
                               type="button"
                               onClick={() => moveImage(imgIdx, 'up')}
                               disabled={imgIdx === 0}
-                              className="rounded-full bg-slate-700 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-slate-900 disabled:bg-slate-200 disabled:text-slate-400"
+                              className="rounded-full border border-slate-300 bg-white px-3.5 py-2 text-sm font-semibold text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 disabled:border-slate-200 disabled:bg-slate-50 disabled:text-slate-400 disabled:shadow-none"
                             >
                               前へ
                             </button>
@@ -1070,7 +1070,7 @@ export default function StepEditor({
                               type="button"
                               onClick={() => moveImage(imgIdx, 'down')}
                               disabled={imgIdx === images.length - 1}
-                              className="rounded-full bg-slate-700 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-slate-900 disabled:bg-slate-200 disabled:text-slate-400"
+                              className="rounded-full border border-slate-300 bg-white px-3.5 py-2 text-sm font-semibold text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 disabled:border-slate-200 disabled:bg-slate-50 disabled:text-slate-400 disabled:shadow-none"
                             >
                               次へ
                             </button>
@@ -1081,14 +1081,14 @@ export default function StepEditor({
                           onClick={() =>
                             setReplaceTargetIdx((cur) => (cur === imgIdx ? null : imgIdx))
                           }
-                          className={`inline-flex min-h-9 items-center gap-1.5 rounded-full px-3.5 py-2 text-sm font-semibold text-white shadow-sm transition active:scale-[0.98] ${
+                          className={`inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3.5 py-2 text-sm font-semibold shadow-sm transition active:scale-[0.98] ${
                             replaceTargetIdx === imgIdx
-                              ? 'bg-blue-800 ring-2 ring-blue-300 ring-offset-1'
-                              : 'bg-blue-600 hover:bg-blue-700'
+                              ? 'border-slate-950 bg-slate-950 text-white'
+                              : 'border-slate-300 bg-white text-slate-900 hover:border-slate-400 hover:bg-slate-50'
                           }`}
                           title="この画像だけを差し替えます"
                         >
-                          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <svg className={`h-4 w-4 ${replaceTargetIdx === imgIdx ? '' : 'brand-text'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v6h6M20 20v-6h-6M5 19a8 8 0 0013-3M19 5a8 8 0 00-13 3" />
                           </svg>
                           差し替え
@@ -1096,10 +1096,10 @@ export default function StepEditor({
                         <button
                           type="button"
                           onClick={() => openAnnotation(imgIdx)}
-                          className="inline-flex min-h-9 items-center gap-1.5 rounded-full bg-violet-600 px-3.5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-violet-700 active:scale-[0.98]"
+                          className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-slate-300 bg-white px-3.5 py-2 text-sm font-semibold text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 active:scale-[0.98]"
                           title={popupSupported ? '別ウィンドウで注釈を編集します' : undefined}
                         >
-                          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <svg className="brand-text h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536M4 20h4.5L19 9.5 14.5 5 4 15.5V20z" />
                           </svg>
                           注釈
@@ -1107,7 +1107,7 @@ export default function StepEditor({
                         <button
                           type="button"
                           onClick={() => removeImage(imgIdx)}
-                          className="inline-flex min-h-9 items-center gap-1.5 rounded-full bg-red-600 px-3.5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700 active:scale-[0.98]"
+                          className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-red-200 bg-white px-3.5 py-2 text-sm font-semibold text-red-600 shadow-sm transition hover:border-red-300 hover:bg-red-50 active:scale-[0.98]"
                         >
                           <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 7h12M9 7V5h6v2m-7 3l.6 9h6.8l.6-9" />
