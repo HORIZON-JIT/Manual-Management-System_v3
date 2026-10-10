@@ -7,7 +7,7 @@ import { isGoogleConfigured, getAuthState, signIn } from '@/lib/googleAuth';
 import { DriveFileInfo } from '@/lib/googleDrive';
 import DriveJsonFilePicker from '@/components/DriveJsonFilePicker';
 import InstructionLibrary from '@/components/InstructionLibrary';
-import XmbMenu, { XmbCategory, XmbItem } from '@/components/XmbMenu';
+import XmbMenu, { XmbCategory } from '@/components/XmbMenu';
 import { exportToExcel } from '@/lib/exportSpreadsheet';
 import { getViewPageBaseUrl } from '@/lib/shareLink';
 import { setTempData } from '@/lib/tempStorage';
@@ -329,14 +329,14 @@ function EditorHomePage() {
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 4H4v16h16v-7M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
       ),
       items: [
-        { ...find('/instructions/new'), description: '空のテンプレートから手順書を作成します。' },
+        { ...find('/instructions/new'), description: '空の手順書から作ります。' },
         {
           title: '既存の手順書から作成',
-          description: 'Drive上の手順書をひな形にして、新しい手順書を作ります。',
+          description: 'Drive の手順書をひな形に複製します。',
           icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />,
           onClick: handleTemplateClick,
         },
-        { ...find('/instructions/drafts'), description: '保存済みの下書きを開いて編集します。' },
+        { ...find('/instructions/drafts'), description: '端末内の下書きを開きます。' },
       ],
     },
     {
@@ -348,13 +348,13 @@ function EditorHomePage() {
       items: [
         {
           title: 'Driveの手順書を編集',
-          description: 'Drive上のJSONを読み込んで編集します。',
+          description: 'Drive の手順書を開いて編集します。',
           icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />,
           onClick: handleUpdateClick,
         },
         {
           title: 'Driveの手順書を表示',
-          description: 'Drive上のJSONをそのまま表示します。',
+          description: 'Drive の手順書をそのまま閲覧します。',
           icon: (
             <>
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -363,29 +363,7 @@ function EditorHomePage() {
           ),
           onClick: handlePreviewClick,
         },
-        {
-          title: '承認を依頼',
-          description: '完成済み手順書を選び、Gmailで承認依頼メールを作成します。',
-          icon: (
-            <>
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12.75 11.25 15 15 9.75" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 8.25v8.25A2.25 2.25 0 0118.75 18.75H5.25A2.25 2.25 0 013 16.5V8.25m18 0A2.25 2.25 0 0018.75 6H5.25A2.25 2.25 0 003 8.25m18 0-9 5.25-9-5.25" />
-            </>
-          ),
-          onClick: handleApprovalRequestClick,
-        },
-        {
-          title: '手順書作成/改版を通知',
-          description: '完成済み手順書を選び、Gmailで対象者向けの閲覧案内を作成します。',
-          icon: (
-            <>
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21.75 6.75v10.5A2.25 2.25 0 0119.5 19.5h-15A2.25 2.25 0 012.25 17.25V6.75" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="m2.25 6.75 8.954 5.37a2.25 2.25 0 002.292 0l8.954-5.37" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15.75h.008v.008H12z" />
-            </>
-          ),
-          onClick: handleNotifyClick,
-        },
+        { ...find('/instructions/backup'), description: 'Drive の「バックアップ/日付」へコピー。' },
       ],
     },
     {
@@ -395,22 +373,21 @@ function EditorHomePage() {
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3l8 4-8 4-8-4 8-4zM4 12l8 4 8-4M4 17l8 4 8-4" />
       ),
       items: [
-        { ...find('/instructions/bulk-department'), description: '複数の手順書の部署をまとめて設定します。' },
-        { ...find('/instructions/bulk-category'), description: '複数の手順書のカテゴリをまとめて設定します。' },
-        { ...find('/instructions/bulk-sequential'), description: '読み飛ばし防止の設定をまとめて変更します。' },
+        { ...find('/instructions/bulk-department'), description: '複数の手順書の部署をまとめて変更。' },
+        { ...find('/instructions/bulk-category'), description: '複数の手順書のカテゴリをまとめて変更。' },
+        { ...find('/instructions/bulk-sequential'), description: '読み飛ばし防止をまとめて変更。' },
       ],
     },
     {
       key: 'output',
-      label: '出力・保存',
+      label: '出力',
       icon: (
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
       ),
       items: [
-        { ...find('/instructions/backup'), description: '手順書のバックアップをDriveに作成します。' },
         {
           title: 'Excelで出力',
-          description: '選択したJSONからExcel形式の手順書を出力します。',
+          description: '手順書を Excel 形式で出力します。',
           icon: (
             <>
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 13h6m-6 4h6m2 4H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -421,7 +398,7 @@ function EditorHomePage() {
         },
         {
           title: 'QRコードを出力',
-          description: '手順書を選び、ビューアで開くQRコードを表示・保存・印刷します。',
+          description: 'ビューアで開く QR を保存・印刷。',
           icon: (
             <>
               <rect x="3" y="3" width="7" height="7" rx="1" strokeWidth={2} />
@@ -434,7 +411,7 @@ function EditorHomePage() {
         },
         {
           title: '手順書一覧出力',
-          description: '作成者・更新者・作成日・更新日・改版などの一覧をExcel形式で出力します。',
+          description: '作成者・更新日・承認の一覧を Excel で。',
           href: '/instructions/list-export',
           icon: (
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-6h6v6m-9 4h12a2 2 0 002-2V7a2 2 0 00-2-2h-1.586a1 1 0 01-.707-.293l-1.121-1.121A1 1 0 0013.172 3h-2.344a1 1 0 00-.707.293L9 4.414A1 1 0 018.293 4.707L8 5H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -442,36 +419,39 @@ function EditorHomePage() {
         },
       ],
     },
+    {
+      key: 'share',
+      label: '共有・承認',
+      icon: (
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.25 12 11 14.75 15.75 9.5M21 8.25v8.25A2.25 2.25 0 0 1 18.75 18.75H5.25A2.25 2.25 0 0 1 3 16.5V8.25m18 0A2.25 2.25 0 0 0 18.75 6H5.25A2.25 2.25 0 0 0 3 8.25" />
+      ),
+      items: [
+        {
+          title: '承認を依頼',
+          description: 'Gmail で承認依頼メールを作ります。',
+          icon: (
+            <>
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12.75 11.25 15 15 9.75" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 8.25v8.25A2.25 2.25 0 0118.75 18.75H5.25A2.25 2.25 0 013 16.5V8.25m18 0A2.25 2.25 0 0018.75 6H5.25A2.25 2.25 0 003 8.25m18 0-9 5.25-9-5.25" />
+            </>
+          ),
+          onClick: handleApprovalRequestClick,
+        },
+        {
+          title: '手順書作成/改版を通知',
+          description: 'Gmail で閲覧案内メールを作ります。',
+          icon: (
+            <>
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21.75 6.75v10.5A2.25 2.25 0 0119.5 19.5h-15A2.25 2.25 0 012.25 17.25V6.75" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="m2.25 6.75 8.954 5.37a2.25 2.25 0 002.292 0l8.954-5.37" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15.75h.008v.008H12z" />
+            </>
+          ),
+          onClick: handleNotifyClick,
+        },
+      ],
+    },
   ];
-  const shareItems: XmbItem[] =
-    categories
-      .find((category) => category.key === 'drive')
-      ?.items.filter(
-        (item) =>
-          item.onClick === handleApprovalRequestClick ||
-          item.onClick === handleNotifyClick,
-      ) ?? [];
-  const displayCategories: XmbCategory[] = categories.map((category) => {
-    if (category.key === 'drive') {
-      return {
-        ...category,
-        items: category.items.filter(
-          (item) =>
-            item.onClick !== handleApprovalRequestClick &&
-            item.onClick !== handleNotifyClick,
-        ),
-      };
-    }
-    if (category.key === 'output') {
-      return {
-        ...category,
-        label: '出力・共有',
-        items: [...category.items, ...shareItems],
-      };
-    }
-    return category;
-  });
-
   return (
     <div className="mx-auto flex min-h-[calc(100vh-76px)] max-w-7xl flex-col px-6 py-8 lg:py-10">
       <div className="mb-5 flex items-end justify-between gap-4">
@@ -482,7 +462,7 @@ function EditorHomePage() {
         <p className="text-sm font-semibold text-neutral-500">Manual Management</p>
       </div>
 
-      <XmbMenu categories={displayCategories} className="flex-none" />
+      <XmbMenu categories={categories} className="flex-none" />
 
       {showAuthPrompt && (
         <section className="mt-6 rounded-lg border border-neutral-200 bg-white px-5 py-5 shadow-[0_18px_44px_rgba(0,0,0,0.06)]">
