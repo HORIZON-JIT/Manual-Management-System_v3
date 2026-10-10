@@ -53,6 +53,65 @@ export function setTargetFolder(folder: DriveFolder | null): void {
   }
 }
 
+// --- Recent / pinned folders (よく使うフォルダ) ---
+
+const STORAGE_KEY_RECENT = 'drive_recent_folders';
+const RECENT_LIMIT = 8;
+
+export interface RecentFolder extends DriveFolder {
+  /** 「共有ドライブ / 資材課 / 手順書」のような場所の表記 */
+  path?: string;
+  pinned?: boolean;
+  lastUsedAt: number;
+}
+
+export function getRecentFolders(): RecentFolder[] {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY_RECENT);
+    const list: RecentFolder[] = stored ? JSON.parse(stored) : [];
+    return Array.isArray(list) ? sortRecent(list) : [];
+  } catch {
+    return [];
+  }
+}
+
+function sortRecent(list: RecentFolder[]): RecentFolder[] {
+  return [...list].sort((a, b) => Number(!!b.pinned) - Number(!!a.pinned) || b.lastUsedAt - a.lastUsedAt);
+}
+
+function saveRecent(list: RecentFolder[]): void {
+  try {
+    localStorage.setItem(STORAGE_KEY_RECENT, JSON.stringify(list));
+  } catch {
+    // 容量超過などは無視（履歴は利便性のためだけの情報）
+  }
+}
+
+/** 選んだフォルダを履歴に残す。ピン留め分は上限に数えない。 */
+export function rememberFolder(folder: DriveFolder, path?: string): RecentFolder[] {
+  const list = getRecentFolders();
+  const existing = list.find((f) => f.id === folder.id);
+  const entry: RecentFolder = { ...folder, path: path ?? existing?.path, pinned: existing?.pinned, lastUsedAt: Date.now() };
+  const rest = list.filter((f) => f.id !== folder.id);
+  const pinned = rest.filter((f) => f.pinned);
+  const unpinned = rest.filter((f) => !f.pinned);
+  const next = sortRecent([entry, ...pinned, ...unpinned.slice(0, Math.max(0, RECENT_LIMIT - 1))]);
+  saveRecent(next);
+  return next;
+}
+
+export function removeRecentFolder(id: string): RecentFolder[] {
+  const next = getRecentFolders().filter((f) => f.id !== id);
+  saveRecent(next);
+  return next;
+}
+
+export function toggleFolderPin(id: string): RecentFolder[] {
+  const next = sortRecent(getRecentFolders().map((f) => (f.id === id ? { ...f, pinned: !f.pinned } : f)));
+  saveRecent(next);
+  return next;
+}
+
 // --- Drive location types ---
 
 export type DriveLocation = 'my-drive' | 'shared-drives' | 'shared-with-me';
