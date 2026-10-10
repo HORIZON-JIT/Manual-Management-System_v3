@@ -3,8 +3,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import AuthErrorNotice, { AuthChecking, driveErrorMessage } from '@/components/AuthErrorNotice';
 import Link from 'next/link';
+import JSZip from 'jszip';
+import { saveAs } from 'file-saver';
 import {
   copyDriveFile,
+  downloadDriveFile,
   findOrCreateChildFolder,
   getTargetFolder,
   listJsonFilesInFolder,
@@ -42,6 +45,7 @@ function BackupTool() {
   const [applying, setApplying] = useState(false);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
   const [result, setResult] = useState<{ ok: number; ng: number; path: string } | null>(null);
+  const [destination, setDestination] = useState<'drive' | 'local'>('drive');
   const [error, setError] = useState<string | null>(null);
   const applyingRef = useRef(false);
 
@@ -92,7 +96,59 @@ function BackupTool() {
   const setAll = (selected: boolean) =>
     setRows((prev) => prev.map((row) => ({ ...row, selected })));
 
+  // この端末に ZIP（1 件なら JSON そのまま）でダウンロードする
+  const downloadLocal = async () => {
+    if (applyingRef.current) return;
+    if (selectedRows.length === 0) return alert('バックアップする JSON を選択してください。');
+    applyingRef.current = true;
+    setApplying(true);
+    setResult(null);
+    setError(null);
+    setProgress({ done: 0, total: selectedRows.length });
+    try {
+      const zip = new JSZip();
+      let ok = 0;
+      let ng = 0;
+      let single: { name: string; text: string } | null = null;
+      for (const row of selectedRows) {
+        try {
+          const text = await downloadDriveFile(row.id);
+          const name = row.name.toLowerCase().endsWith('.json') ? row.name : `${row.name}.json`;
+          zip.file(name, text, { date: row.modifiedTime ? new Date(row.modifiedTime) : undefined });
+          single = { name, text };
+          ok += 1;
+        } catch (err) {
+          console.error('Failed to download', row.name, err);
+          ng += 1;
+        }
+        setProgress((prev) => ({ ...prev, done: prev.done + 1 }));
+      }
+      if (ok === 0) {
+        setError('ダウンロードできたファイルがありません。ログイン状態を確認してください。');
+        return;
+      }
+      let fileName: string;
+      if (ok === 1 && single) {
+        saveAs(new Blob([single.text], { type: 'application/json' }), single.name);
+        fileName = single.name;
+      } else {
+        fileName = `手順書バックアップ_${dateFolderName}.zip`;
+        const blob = await zip.generateAsync({ type: 'blob' });
+        saveAs(blob, fileName);
+      }
+      setRows((prev) => prev.map((item) => (item.selected ? { ...item, selected: false } : item)));
+      setResult({ ok, ng, path: `この端末のダウンロード先（${fileName}）` });
+    } catch (err) {
+      console.error('Failed to download backup', err);
+      setError(driveErrorMessage(err, 'ダウンロードに失敗しました。'));
+    } finally {
+      applyingRef.current = false;
+      setApplying(false);
+    }
+  };
+
   const apply = async () => {
+    if (destination === 'local') return downloadLocal();
     if (applyingRef.current) return;
     const targetFolder = getTargetFolder();
     if (!targetFolder) return alert('保存先の Drive フォルダを設定してください。');
@@ -147,20 +203,35 @@ function BackupTool() {
       <BackLink />
       <h1 className="text-3xl font-bold tracking-tight text-slate-950">バックアップを作成</h1>
       <p className="mt-2 text-sm text-slate-500">
-        選択した JSON を「バックアップ/{dateFolderName}」へコピーします。元ファイルとコピーの更新日は変更しません。
+        選択した JSON を Drive の「バックアップ/{dateFolderName}」へコピーするか、この端末にダウンロードします。元ファイルの更新日は変更しません。
         {folderName && `（フォルダ: ${folderName}）`}
       </p>
 
-      <div className="mt-6 flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-white p-4">
-        <ToolButton onClick={() => setAll(true)}>全選択</ToolButton>
-        <ToolButton onClick={() => setAll(false)}>全解除</ToolButton>
-        <button
-          onClick={apply}
-          disabled={applying || selectedRows.length === 0}
-          className="ml-auto rounded-lg bg-slate-950 px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50"
-        >
-          {applying ? `コピー中... (${progress.done}/${progress.total})` : `選択した ${selectedRows.length} 件をバックアップ`}
-        </button>
+      <div className="mt-6 rounded-lg border border-slate-200 bg-white p-4">
+        <p className="text-xs font-semibold text-slate-500">バックアップ先</p>
+        <div className="mt-2 flex flex-wrap gap-4 text-sm text-slate-700">
+          <label className="flex cursor-pointer items-center gap-2">
+            <input type="radio" name="backup-destination" checked={destination === 'drive'} onChange={() => setDestination('drive')} disabled={applying} className="accent-slate-900" />
+            Drive の「バックアップ/{dateFolderName}」へコピー
+          </label>
+          <label className="flex cursor-pointer items-center gap-2">
+            <input type="radio" name="backup-destination" checked={destination === 'local'} onChange={() => setDestination('local')} disabled={applying} className="accent-slate-900" />
+            この端末にダウンロード（複数は ZIP、1 件は JSON）
+          </label>
+        </div>
+        <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-4">
+          <ToolButton onClick={() => setAll(true)}>全選択</ToolButton>
+          <ToolButton onClick={() => setAll(false)}>全解除</ToolButton>
+          <button
+            onClick={apply}
+            disabled={applying || selectedRows.length === 0}
+            className="ml-auto rounded-lg bg-slate-950 px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50"
+          >
+            {applying
+              ? `${destination === 'local' ? 'ダウンロード中' : 'コピー中'}... (${progress.done}/${progress.total})`
+              : `選択した ${selectedRows.length} 件を${destination === 'local' ? 'ダウンロード' : 'バックアップ'}`}
+          </button>
+        </div>
       </div>
 
       {result && (
