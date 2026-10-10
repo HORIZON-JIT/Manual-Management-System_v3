@@ -18,6 +18,7 @@ import {
 import { getInstruction } from '@/lib/storage';
 import { getViewPageBaseUrl, parseShareData } from '@/lib/shareLink';
 import { downloadDriveFile } from '@/lib/googleDrive';
+import AuthErrorNotice, { AUTH_EXPIRED_MESSAGE, driveErrorMessage } from '@/components/AuthErrorNotice';
 import {
   isGoogleConfigured,
   getAuthState,
@@ -41,6 +42,8 @@ function InstructionViewContent() {
   const [isSharedView, setIsSharedView] = useState(false);
   const [isPreviewView, setIsPreviewView] = useState(false);
   const [auth, setAuth] = useState<GoogleAuthState>(getAuthState());
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
   const [checkStates, setCheckStates] = useState<Record<string, Record<string, boolean>>>({});
   const [selectedConditions, setSelectedConditions] = useState<Record<string, string | null>>({});
   const [selectedJumpTargets, setSelectedJumpTargets] = useState<Record<string, string>>({});
@@ -139,12 +142,16 @@ function InstructionViewContent() {
             setLoading(false);
             return;
           }
+          setLoadError(null);
           return downloadDriveFile(driveFileId)
             .then((text) => {
               const data = JSON.parse(text) as WorkInstruction;
               setInstruction(data);
             })
-            .catch(() => setInstruction(null));
+            .catch((err) => {
+              setInstruction(null);
+              setLoadError(driveErrorMessage(err, '手順書が見つかりません'));
+            });
         })
         .finally(() => setLoading(false));
       return;
@@ -159,7 +166,7 @@ function InstructionViewContent() {
       return;
     }
     setLoading(false);
-  }, [searchParams, auth.isSignedIn]);
+  }, [searchParams, auth.isSignedIn, reloadKey]);
 
   useEffect(() => {
     if (!scrollTargetStepId) return;
@@ -216,6 +223,17 @@ function InstructionViewContent() {
               Googleでログイン
             </button>
           )}
+          <Link href="/" className="text-sm text-blue-600 hover:text-blue-800">
+            ホームへ戻る
+          </Link>
+        </div>
+      );
+    }
+
+    if (loadError === AUTH_EXPIRED_MESSAGE) {
+      return (
+        <div className="flex flex-col items-center justify-center min-h-[50vh] gap-4 px-4">
+          <AuthErrorNotice error={loadError} onRetry={() => setReloadKey((k) => k + 1)} className="w-full max-w-xl" />
           <Link href="/" className="text-sm text-blue-600 hover:text-blue-800">
             ホームへ戻る
           </Link>

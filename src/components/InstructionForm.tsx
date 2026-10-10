@@ -28,6 +28,9 @@ import {
   addAuthListener,
   initGoogleAuth,
   ensureGoogleUserInfo,
+  ensureAccessToken,
+  isAuthRequiredError,
+  signIn,
   GoogleAuthState,
 } from '@/lib/googleAuth';
 import { getCustomDepartments, addCustomDepartment } from '@/lib/customDepartments';
@@ -142,7 +145,7 @@ export default function InstructionForm({ initialData, approvalMode = false }: I
   });
   const [sequential, setSequential] = useState<boolean>(initialData?.sequential ?? false);
   const [saving, setSaving] = useState(false);
-  const [saveMessage, setSaveMessage] = useState<{ text: string; type: 'error'; folderUrl?: string } | null>(null);
+  const [saveMessage, setSaveMessage] = useState<{ text: string; type: 'error'; folderUrl?: string; retry?: WorkInstruction } | null>(null);
   const [saveSuccessModal, setSaveSuccessModal] = useState<{
     folderName: string;
     folderUrl?: string;
@@ -605,16 +608,33 @@ export default function InstructionForm({ initialData, approvalMode = false }: I
       void scriptAttached;
     } catch (error) {
       console.error('Drive save error:', error);
-      const message =
-        error instanceof Error
-          ? error.message
-          : typeof error === 'object' && error !== null && 'result' in error
-            ? JSON.stringify((error as { result: unknown }).result)
-            : String(error);
-      setSaveMessage({
-        text: `Driveへの保存に失敗しました: ${message}`,
-        type: 'error',
-      });
+      // 失敗しても編集内容を失わないよう、先に端末内の下書きへ残す
+      let draftKept = false;
+      try {
+        await saveInstruction({ ...instruction, status: 'draft' });
+        draftKept = true;
+        refreshStorageEstimate();
+      } catch {}
+      const kept = draftKept ? ' 編集内容は下書きに保存しました。' : '';
+      if (isAuthRequiredError(error)) {
+        setSaveMessage({
+          text: `Google ログインの有効期限が切れたため保存できませんでした。${kept}「再ログインして保存をやり直す」を押してください。`,
+          type: 'error',
+          retry: instruction,
+        });
+      } else {
+        const message =
+          error instanceof Error
+            ? error.message
+            : typeof error === 'object' && error !== null && 'result' in error
+              ? JSON.stringify((error as { result: unknown }).result)
+              : String(error);
+        setSaveMessage({
+          text: `Driveへの保存に失敗しました: ${message}${kept}`,
+          type: 'error',
+          retry: instruction,
+        });
+      }
     } finally {
       setSaving(false);
     }
@@ -630,8 +650,8 @@ export default function InstructionForm({ initialData, approvalMode = false }: I
     const instruction = buildInstruction('completed', approvalAuthState);
     if (!instruction) return;
 
-    if (!isGoogleConfigured() || !getAuthState().isSignedIn) {
-      alert('Google にサインインしてから Google Drive 保存を実行してください。');
+    if (!isGoogleConfigured()) {
+      alert('Google 連携が設定されていないため、Drive に保存できません。');
       return;
     }
 
@@ -640,6 +660,29 @@ export default function InstructionForm({ initialData, approvalMode = false }: I
       return;
     }
 
+    // ボタン押下の直後なので、必要ならここでログインのポップアップを出せる
+    setSaving(true);
+    try {
+      await ensureAccessToken({ interactive: true });
+    } catch {
+      setSaving(false);
+      alert('Google にサインインしてから Google Drive 保存を実行してください。');
+      return;
+    }
+
+    void saveToFolder(instruction);
+  };
+
+  const handleRetrySave = async () => {
+    const instruction = saveMessage?.retry;
+    if (!instruction) return;
+    setSaving(true);
+    const ok = await signIn();
+    if (!ok) {
+      setSaving(false);
+      setSaveMessage({ ...saveMessage, text: 'ログインできませんでした。もう一度「再ログインして保存をやり直す」を押してください。' });
+      return;
+    }
     void saveToFolder(instruction);
   };
 
@@ -1415,9 +1458,19 @@ export default function InstructionForm({ initialData, approvalMode = false }: I
                   </button>
                 </div>
                 {saveMessage && (
-                  <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
-                    {saveMessage.text}
-                  </p>
+                  <div className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+                    <p>{saveMessage.text}</p>
+                    {saveMessage.retry && (
+                      <button
+                        type="button"
+                        onClick={handleRetrySave}
+                        disabled={saving}
+                        className="mt-2 w-full rounded-lg bg-slate-950 px-3 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-50"
+                      >
+                        {saving ? '保存中...' : '再ログインして保存をやり直す'}
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
               <p className="mt-3 text-[11px] leading-5 text-slate-400">

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import AuthErrorNotice, { driveErrorMessage } from '@/components/AuthErrorNotice';
 import {
   DriveFolder,
   DriveLocation,
@@ -37,6 +38,7 @@ const LOCATION_LABELS: Record<DriveLocation, string> = {
 export default function DriveFolderPicker({ open, onClose, onSelect }: DriveFolderPickerProps) {
   const [folders, setFolders] = useState<DriveFolder[]>([]);
   const [loading, setLoading] = useState(false);
+  const [listError, setListError] = useState<string | null>(null);
   const [location, setLocation] = useState<DriveLocation>('my-drive');
   const [breadcrumbs, setBreadcrumbs] = useState<BreadcrumbItem[]>([{ id: undefined, name: 'マイドライブ' }]);
   const [creating, setCreating] = useState(false);
@@ -53,12 +55,14 @@ export default function DriveFolderPicker({ open, onClose, onSelect }: DriveFold
 
   const loadFolderList = useCallback(async (parentId?: string, driveId?: string) => {
     setLoading(true);
+    setListError(null);
     try {
       const result = await listFolders(parentId, driveId ? { driveId } : undefined);
       setFolders(result);
     } catch (err) {
       console.error('Failed to list folders:', err);
       setFolders([]);
+      setListError(driveErrorMessage(err, 'フォルダ一覧を取得できませんでした。'));
     } finally {
       setLoading(false);
     }
@@ -66,12 +70,14 @@ export default function DriveFolderPicker({ open, onClose, onSelect }: DriveFold
 
   const loadSharedDrives = useCallback(async () => {
     setLoading(true);
+    setListError(null);
     try {
       const result = await listSharedDrives();
       setFolders(result);
     } catch (err) {
       console.error('Failed to list shared drives:', err);
       setFolders([]);
+      setListError(driveErrorMessage(err, 'フォルダ一覧を取得できませんでした。'));
     } finally {
       setLoading(false);
     }
@@ -79,12 +85,14 @@ export default function DriveFolderPicker({ open, onClose, onSelect }: DriveFold
 
   const loadSharedWithMe = useCallback(async () => {
     setLoading(true);
+    setListError(null);
     try {
       const result = await listSharedWithMeFolders();
       setFolders(result);
     } catch (err) {
       console.error('Failed to list shared folders:', err);
       setFolders([]);
+      setListError(driveErrorMessage(err, 'フォルダ一覧を取得できませんでした。'));
     } finally {
       setLoading(false);
     }
@@ -311,6 +319,7 @@ export default function DriveFolderPicker({ open, onClose, onSelect }: DriveFold
 
         {/* Folder list */}
         <div className="flex-1 overflow-y-auto p-2 min-h-[200px]">
+          {listError && <AuthErrorNotice error={listError} tone="red" onRetry={() => navigateTo(breadcrumbs.length - 1)} className="mb-2" />}
           {loading ? (
             <div className="flex items-center justify-center h-32 text-gray-400 text-sm">
               読み込み中...

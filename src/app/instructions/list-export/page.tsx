@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import AuthErrorNotice, { AuthChecking, driveErrorMessage } from '@/components/AuthErrorNotice';
 import Link from 'next/link';
 import { WorkInstruction, getApprovalStatus, getCategoryLabel } from '@/types/instruction';
 import { downloadDriveFile, getTargetFolder, listJsonFilesInFolder, saveFileToDrive } from '@/lib/googleDrive';
@@ -68,7 +69,7 @@ function ListExportTool() {
         setInstructions(valid);
         if (valid.length === 0) setError('このフォルダに手順書がありません。');
       })
-      .catch(() => setError('一覧の取得に失敗しました。'))
+      .catch((err) => setError(driveErrorMessage(err, '一覧の取得に失敗しました。')))
       .finally(() => setLoading(false));
   }, []);
 
@@ -101,12 +102,15 @@ function ListExportTool() {
       }
     } catch (err) {
       console.error('list export failed', err);
-      setError(err instanceof Error ? err.message : '出力に失敗しました。');
+      setError(driveErrorMessage(err, err instanceof Error ? err.message : '出力に失敗しました。'));
     } finally {
       setExporting(false);
     }
   };
 
+  if (configured && !auth.isInitialized) {
+    return <div className="mx-auto max-w-5xl px-4 py-8"><BackLink /><AuthChecking /></div>;
+  }
   if (configured && !auth.isSignedIn) {
     return (
       <div className="mx-auto max-w-5xl px-4 py-8">
@@ -164,9 +168,7 @@ function ListExportTool() {
           )}
         </div>
       )}
-      {error && (
-        <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">{error}</div>
-      )}
+      <AuthErrorNotice error={error} onRetry={load} className="mt-4" />
 
       <div className="mt-4 overflow-hidden rounded-lg border border-slate-200 bg-white">
         <div className="flex items-center justify-between border-b border-slate-200 px-4 py-2.5 text-xs text-slate-500">

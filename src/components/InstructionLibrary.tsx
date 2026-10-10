@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback, useRef } from 'react';
+import AuthErrorNotice, { AuthChecking, driveErrorMessage } from '@/components/AuthErrorNotice';
 import { useRouter } from 'next/navigation';
 import { WorkInstruction, getApprovalStatus, getCategoryLabel } from '@/types/instruction';
 import {
@@ -194,7 +195,7 @@ export default function InstructionLibrary() {
       })
       .catch((err) => {
         console.error('Failed to list instructions:', err);
-        setError('手順書一覧の取得に失敗しました。通信状況を確認して再読み込みしてください。');
+        setError(driveErrorMessage(err, '手順書一覧の取得に失敗しました。通信状況を確認して再読み込みしてください。'));
       })
       .finally(() => setLoading(false));
   }, []);
@@ -357,6 +358,7 @@ export default function InstructionLibrary() {
     });
 
   const needsSignIn = configured && !auth.isSignedIn;
+  const authChecking = configured && !auth.isInitialized;
 
   const chipBase =
     'inline-flex min-h-11 shrink-0 items-center rounded-full border px-4 text-sm font-medium transition';
@@ -365,7 +367,9 @@ export default function InstructionLibrary() {
 
   return (
     <div className="mx-auto flex min-h-[calc(100vh-76px)] max-w-7xl flex-col px-4 py-6 sm:px-6 lg:py-8">
-      {needsSignIn ? (
+      {authChecking ? (
+        <AuthChecking />
+      ) : needsSignIn ? (
         <section className="rounded-lg border border-neutral-200 bg-white px-5 py-6 shadow-[0_18px_44px_rgba(0,0,0,0.06)]">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -623,11 +627,7 @@ export default function InstructionLibrary() {
               </ul>
             )}
 
-            {error && (
-              <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                {error}
-              </div>
-            )}
+            <AuthErrorNotice error={error} onRetry={loadFiles} className="mt-4" />
           </section>
         </>
       )}

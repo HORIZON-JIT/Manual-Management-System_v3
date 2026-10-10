@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { WorkInstruction } from '@/types/instruction';
 import { downloadDriveFile } from '@/lib/googleDrive';
+import AuthErrorNotice, { AuthChecking, driveErrorMessage } from '@/components/AuthErrorNotice';
 import {
   addAuthListener,
   getAuthState,
@@ -25,6 +26,7 @@ function EditInstructionContent() {
   const [loading, setLoading] = useState(true);
   const [auth, setAuth] = useState<GoogleAuthState>(getAuthState());
   const [error, setError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
   const approvalMode = searchParams.get('mode') === 'approval';
 
   useEffect(() => {
@@ -57,7 +59,7 @@ function EditInstructionContent() {
           .catch((err) => {
             console.error('failed to load drive instruction', err);
             setInstruction(null);
-            setError('Drive上の手順書を読み込めませんでした。ログイン状態とファイル権限を確認してください。');
+            setError(driveErrorMessage(err, 'Drive上の手順書を読み込めませんでした。ログイン状態とファイル権限を確認してください。'));
           })
           .finally(() => setLoading(false));
         return;
@@ -82,7 +84,7 @@ function EditInstructionContent() {
       .then((found) => setInstruction(found || null))
       .catch(() => setInstruction(null))
       .finally(() => setLoading(false));
-  }, [searchParams, auth.isSignedIn]);
+  }, [searchParams, auth.isSignedIn, reloadKey]);
 
   if (loading) {
     return (
@@ -94,6 +96,9 @@ function EditInstructionContent() {
 
   if (!instruction) {
     const driveFileId = searchParams.get('driveFileId');
+    if (driveFileId && isGoogleConfigured() && !auth.isInitialized) {
+      return <AuthChecking className="min-h-[50vh]" />;
+    }
     if (driveFileId && isGoogleConfigured() && !auth.isSignedIn) {
       return (
         <div className="flex min-h-[50vh] flex-col items-center justify-center gap-4 px-4 text-center">
@@ -111,7 +116,11 @@ function EditInstructionContent() {
 
     return (
       <div className="flex min-h-[50vh] flex-col items-center justify-center gap-4 px-4 text-center">
-        <p className="text-lg font-semibold text-slate-700">{error || '手順書が見つかりません'}</p>
+        {error ? (
+          <AuthErrorNotice error={error} onRetry={() => setReloadKey((k) => k + 1)} className="w-full max-w-xl text-left" />
+        ) : (
+          <p className="text-lg font-semibold text-slate-700">手順書が見つかりません</p>
+        )}
         <Link href="/" className="text-sm font-medium text-blue-700 hover:text-blue-900">
           ホームへ戻る
         </Link>

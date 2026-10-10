@@ -13,14 +13,24 @@ import {
 
 export default function GoogleSignInButton() {
   const [auth, setAuth] = useState<GoogleAuthState>(getAuthState());
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     if (!isGoogleConfigured()) return;
-    initGoogleAuth();
+    initGoogleAuth().catch(() => {});
     return addAuthListener(setAuth);
   }, []);
 
   if (!isGoogleConfigured() || !auth.isInitialized) return null;
+
+  const handleSignIn = async () => {
+    setBusy(true);
+    try {
+      await signIn();
+    } finally {
+      setBusy(false);
+    }
+  };
 
   if (auth.isSignedIn) {
     return (
@@ -36,20 +46,32 @@ export default function GoogleSignInButton() {
         <span className="hidden max-w-32 truncate text-sm text-neutral-600 lg:inline">
           {auth.userName || auth.userEmail}
         </span>
-        <button
-          onClick={signOut}
-          className="rounded-md border border-neutral-200 px-2.5 py-1.5 text-xs font-medium text-neutral-600 transition hover:bg-neutral-100 hover:text-neutral-950"
-        >
-          サインアウト
-        </button>
+        {auth.needsReauth ? (
+          <button
+            onClick={handleSignIn}
+            disabled={busy}
+            title="ログインの有効期限が切れています。押すと再ログインします"
+            className="rounded-md border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-xs font-semibold text-amber-800 transition hover:bg-amber-100 disabled:opacity-50"
+          >
+            {busy ? 'ログイン中...' : '再ログイン'}
+          </button>
+        ) : (
+          <button
+            onClick={signOut}
+            className="rounded-md border border-neutral-200 px-2.5 py-1.5 text-xs font-medium text-neutral-600 transition hover:bg-neutral-100 hover:text-neutral-950"
+          >
+            サインアウト
+          </button>
+        )}
       </div>
     );
   }
 
   return (
     <button
-      onClick={signIn}
-      className="flex min-w-40 items-center justify-center gap-2 rounded-md border border-neutral-200 bg-white px-4 py-2 text-sm font-semibold text-neutral-700 shadow-[0_8px_18px_rgba(0,0,0,0.06)] transition hover:border-neutral-300 hover:bg-neutral-50"
+      onClick={handleSignIn}
+      disabled={busy}
+      className="flex min-w-40 items-center justify-center gap-2 rounded-md border border-neutral-200 bg-white px-4 py-2 text-sm font-semibold text-neutral-700 shadow-[0_8px_18px_rgba(0,0,0,0.06)] transition hover:border-neutral-300 hover:bg-neutral-50 disabled:opacity-50"
     >
       <svg className="h-4 w-4" viewBox="0 0 24 24">
         <path
@@ -69,7 +91,7 @@ export default function GoogleSignInButton() {
           d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
         />
       </svg>
-      Google Drive
+      {busy ? 'ログイン中...' : 'Google Drive'}
     </button>
   );
 }

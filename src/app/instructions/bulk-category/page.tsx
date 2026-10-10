@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import AuthErrorNotice, { AuthChecking, driveErrorMessage } from '@/components/AuthErrorNotice';
 import Link from 'next/link';
 import { DEFAULT_CATEGORIES, WorkInstruction, getCategoryLabel } from '@/types/instruction';
 import { downloadDriveFile, getTargetFolder, listJsonFilesInFolder, saveFileToDrive } from '@/lib/googleDrive';
@@ -66,7 +67,7 @@ function BulkCategoryTool() {
         setRows(loaded);
         if (loaded.length === 0) setError('このフォルダに手順書がありません。');
       })
-      .catch(() => setError('一覧の取得に失敗しました。'))
+      .catch((err) => setError(driveErrorMessage(err, '一覧の取得に失敗しました。')))
       .finally(() => setLoading(false));
   }, []);
 
@@ -109,6 +110,9 @@ function BulkCategoryTool() {
     setResult({ ok, ng });
   };
 
+  if (configured && !auth.isInitialized) {
+    return <div className="mx-auto max-w-5xl px-4 py-8"><BackLink /><AuthChecking /></div>;
+  }
   if (configured && !auth.isSignedIn) {
     return <SignInNotice />;
   }
@@ -142,7 +146,7 @@ function BulkCategoryTool() {
           {applying ? `設定中... (${progress.done}/${progress.total})` : `選択した ${selectedRows.length} 件に設定`}
         </button>
       </div>
-      <Result result={result} error={error} />
+      <Result result={result} error={error} onRetry={load} />
       <FileList rows={rows} loading={loading} applying={applying} selectedCount={selectedRows.length} onReload={load} onToggle={toggle} />
     </div>
   );
@@ -160,8 +164,8 @@ function ToolButton({ onClick, children }: { onClick: () => void; children: Reac
   return <button onClick={onClick} className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50">{children}</button>;
 }
 
-function Result({ result, error }: { result: { ok: number; ng: number } | null; error: string | null }) {
-  return <>{result && <div className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">完了しました。成功 {result.ok} 件{result.ng > 0 && `／失敗 ${result.ng} 件`}。</div>}{error && <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">{error}</div>}</>;
+function Result({ result, error, onRetry }: { result: { ok: number; ng: number } | null; error: string | null; onRetry: () => void }) {
+  return <>{result && <div className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">完了しました。成功 {result.ok} 件{result.ng > 0 && `／失敗 ${result.ng} 件`}。</div>}<AuthErrorNotice error={error} onRetry={onRetry} className="mt-4" /></>;
 }
 
 function FileList({ rows, loading, applying, selectedCount, onReload, onToggle }: { rows: Row[]; loading: boolean; applying: boolean; selectedCount: number; onReload: () => void; onToggle: (id: string) => void }) {
