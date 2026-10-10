@@ -123,14 +123,15 @@ export default function StepEditor({
 
   // 注釈結果を step に反映する（インライン・別ウィンドウ両方で共用）
   const applyAnnotationSave = useCallback(
-    (idx: number, url: string, annotations: ImageAnnotation[]) => {
+    (idx: number, url: string, annotations: ImageAnnotation[], base?: string) => {
       const s = stepRef.current;
       const imgs = imagesRef.current;
       if (idx < 0 || idx >= imgs.length) return;
       const updated = [...imgs];
       const originals = [...(s.originalImageDataUrls ?? [])];
       while (originals.length <= idx) originals.push('');
-      if (!originals[idx]) originals[idx] = imgs[idx]; // 初回の素の画像を下地として保持
+      if (base) originals[idx] = base; // 切り抜きで下地が変わった
+      else if (!originals[idx]) originals[idx] = imgs[idx]; // 初回の素の画像を下地として保持
       updated[idx] = url;
       const anns = [...(s.imageAnnotations ?? [])];
       while (anns.length <= idx) anns.push(null);
@@ -186,7 +187,7 @@ export default function StepEditor({
       if (!token || !pendingPopups.current.has(token)) return;
       const idx = pendingPopups.current.get(token)!;
       pendingPopups.current.delete(token);
-      let res: { action?: string; url?: string; annotations?: ImageAnnotation[] } | null = null;
+      let res: { action?: string; url?: string; annotations?: ImageAnnotation[]; base?: string } | null = null;
       if (!event.data?.fallbackCancel) {
         const raw = await getTempData('annotate_res_' + token);
         if (raw) {
@@ -197,7 +198,7 @@ export default function StepEditor({
           }
         }
       }
-      if (res?.action === 'save' && res.url) applyAnnotationSave(idx, res.url, res.annotations ?? []);
+      if (res?.action === 'save' && res.url) applyAnnotationSave(idx, res.url, res.annotations ?? [], res.base);
       else if (res?.action === 'restore') applyAnnotationRestore(idx);
       // cancel / fallbackCancel / null は何もしない
       await removeTempData('annotate_src_' + token);
@@ -1586,8 +1587,8 @@ export default function StepEditor({
           imageDataUrl={inlineAnnotationSource.base}
           originalImageDataUrl={inlineAnnotationSource.base}
           initialAnnotations={inlineAnnotationSource.initial}
-          onSave={(url, annotations) => {
-            applyAnnotationSave(annotatingIdx, url, annotations);
+          onSave={(url, annotations, base) => {
+            applyAnnotationSave(annotatingIdx, url, annotations, base);
             setAnnotatingIdx(null);
           }}
           onRestore={() => {
