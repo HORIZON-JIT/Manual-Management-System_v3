@@ -39,6 +39,9 @@ import VersionHistoryModal from './VersionHistoryModal';
 import FlowchartModal from './FlowchartModal';
 import FlowBuilderModal from './FlowBuilderModal';
 import Form63ExportModal from './Form63ExportModal';
+import RoutePlayModal from './RoutePlayModal';
+import { checkRoutes } from '@/lib/routeCheck';
+import { buildDriveMeta, buildSearchText } from '@/lib/driveMeta';
 import { tryConvertConditionsToFlow } from '@/lib/convertConditions';
 
 const LAST_AUTHOR_KEY = 'last_author_name';
@@ -83,9 +86,15 @@ function formatDate(value?: string): string {
   }).format(date);
 }
 
+const AUTO_SAVE_DELAY_MS = 3000;
+
 export default function InstructionForm({ initialData, approvalMode = false }: InstructionFormProps) {
   const router = useRouter();
   const isEdit = !!initialData;
+  // 下書き・自動保存・完成保存で同じ id を使う（新規作成でも保存のたびに増えない）
+  const instructionIdRef = useRef<string>(initialData?.id ?? uuidv4());
+  const buildPreviewRef = useRef<() => WorkInstruction>(() => ({} as WorkInstruction));
+  const titleRef = useRef('');
   const descriptionGuideRef = useRef<HTMLDivElement>(null);
   const updateHistoryGuideRef = useRef<HTMLDivElement>(null);
   const approvalPanelRef = useRef<HTMLDivElement>(null);
@@ -123,6 +132,8 @@ export default function InstructionForm({ initialData, approvalMode = false }: I
   const [showFlowchart, setShowFlowchart] = useState(false);
   const [showFlowBuilder, setShowFlowBuilder] = useState(false);
   const [showForm63, setShowForm63] = useState(false);
+  const [showRoutePlay, setShowRoutePlay] = useState(false);
+  const [routeIssueCount, setRouteIssueCount] = useState(0);
   const [storageEstimate, setStorageEstimate] = useState<{ usage: number; quota: number } | null>(null);
   const [showStepIndex, setShowStepIndex] = useState(false);
   const [showDescriptionGuide, setShowDescriptionGuide] = useState(false);
@@ -154,6 +165,7 @@ export default function InstructionForm({ initialData, approvalMode = false }: I
   } | null>(null);
   const [viewUrlCopied, setViewUrlCopied] = useState(false);
   const [draftSaveMessage, setDraftSaveMessage] = useState<string | null>(null);
+  const [autoSave, setAutoSave] = useState<{ kind: 'idle' | 'saving' | 'saved' | 'error'; at?: string; message?: string }>({ kind: 'idle' });
   const [auth, setAuth] = useState(getAuthState());
   const [authorEdited, setAuthorEdited] = useState(false);
   const [approveOnSave, setApproveOnSave] = useState(false);
@@ -369,7 +381,10 @@ export default function InstructionForm({ initialData, approvalMode = false }: I
     const updatedByEmail = initialData ? googleEmail || initialData.updatedByEmail : undefined;
 
     return {
-      id: initialData?.id || 'preview',
+      id: instructionIdRef.current,
+      driveFileId: initialData?.driveFileId,
+      updateHistory: initialData?.updateHistory,
+      approval: initialData?.approval,
       title: title.trim() || '作成中の手順書',
       category,
       department: department || undefined,
@@ -392,6 +407,9 @@ export default function InstructionForm({ initialData, approvalMode = false }: I
       sequential: sequential || undefined,
     };
   };
+
+  buildPreviewRef.current = buildPreviewInstruction;
+  titleRef.current = title;
 
   const buildInstruction = (
     status: InstructionStatus,
@@ -507,7 +525,8 @@ export default function InstructionForm({ initialData, approvalMode = false }: I
       .filter(Boolean);
 
     return {
-      id: initialData?.id || uuidv4(),
+      id: instructionIdRef.current,
+      driveFileId: initialData?.driveFileId,
       title: title.trim(),
       category,
       department: department || undefined,
@@ -542,6 +561,83 @@ export default function InstructionForm({ initialData, approvalMode = false }: I
     refreshStorageEstimate();
   }, [refreshStorageEstimate]);
 
+  // 分岐の問題（表示されないステップ・未設定の答えなど）の件数を、入力が落ち着いてから数える
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      try {
+        const groups = Object.entries(groupParents)
+          .filter((entry): entry is [string, string] => !!entry[1])
+          .map(([id, parentConditionId]) => ({ id, parentConditionId }));
+        setRouteIssueCount(checkRoutes({ steps, conditions, conditionGroups: groups }).filter((i) => i.kind !== 'too-many').length);
+      } catch {
+        setRouteIssueCount(0);
+      }
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [steps, conditions, groupParents]);
+
+  /* ---- 自動下書き保存 ----
+   * 入力が止まって 3 秒後に端末内（IndexedDB）へ保存する。タブを閉じる・ブラウザが落ちても編集内容が残る。
+   * 空のフォームは保存しない。画面を離れるときは待たずに保存する。
+   */
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const autoSaveStoppedRef = useRef(false);
+  const autoSaveMountedRef = useRef(false);
+  const autoSaveDirtyRef = useRef(false);
+
+  const runAutoSave = useCallback(async () => {
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+      autoSaveTimerRef.current = null;
+    }
+    if (autoSaveStoppedRef.current || !autoSaveDirtyRef.current) return;
+    const preview = buildPreviewRef.current();
+    const realTitle = titleRef.current.trim();
+    const hasContent = !!realTitle || preview.steps.some((s) => s.title.trim() || s.description.trim());
+    if (!hasContent) return;
+    autoSaveDirtyRef.current = false;
+    setAutoSave({ kind: 'saving' });
+    try {
+      await saveInstruction({ ...preview, title: realTitle, status: 'draft', updatedAt: new Date().toISOString() });
+      setAutoSave({ kind: 'saved', at: new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }) });
+      refreshStorageEstimate();
+    } catch (error) {
+      autoSaveDirtyRef.current = true;
+      setAutoSave({ kind: 'error', message: error instanceof Error ? error.message : '自動保存できませんでした。' });
+    }
+  }, [refreshStorageEstimate]);
+  const runAutoSaveRef = useRef(runAutoSave);
+  runAutoSaveRef.current = runAutoSave;
+
+  useEffect(() => {
+    if (!autoSaveMountedRef.current) {
+      autoSaveMountedRef.current = true;
+      return;
+    }
+    autoSaveDirtyRef.current = true;
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    autoSaveTimerRef.current = setTimeout(() => { void runAutoSave(); }, AUTO_SAVE_DELAY_MS);
+    return () => {
+      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    };
+    // 手順書の内容を構成する state が変わったときだけ走らせる
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [title, category, customCategory, department, description, steps, authorName, keywordsText, conditions, groupParents, sequential, excelNavMode]);
+
+  useEffect(() => {
+    const flush = () => { void runAutoSaveRef.current(); };
+    const onVisibility = () => { if (document.hidden) flush(); };
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('pagehide', flush);
+    return () => {
+      // アンマウント時（画面遷移）は待たずに保存してから止める
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('pagehide', flush);
+      flush();
+      autoSaveStoppedRef.current = true;
+    };
+  }, []);
+
   const handleDraftSave = async (continueEditing: boolean) => {
     const instruction = buildInstruction('draft');
     if (!instruction) return;
@@ -554,6 +650,7 @@ export default function InstructionForm({ initialData, approvalMode = false }: I
     }
 
     refreshStorageEstimate();
+    autoSaveDirtyRef.current = false;
     if (continueEditing) {
       setDraftSaveMessage('下書きを保存しました。');
       setTimeout(() => setDraftSaveMessage(null), 3000);
@@ -592,6 +689,7 @@ export default function InstructionForm({ initialData, approvalMode = false }: I
         jsonBuffer,
         `${instruction.title}.json`,
         'application/json',
+        { appProperties: buildDriveMeta(instruction), description: buildSearchText(instruction) },
       );
       const targetFolder = getTargetFolder();
       const folderName = targetFolder?.name || 'WorkInstructions';
@@ -1425,6 +1523,21 @@ export default function InstructionForm({ initialData, approvalMode = false }: I
                   </svg>
                   作成中のフローチャートを表示
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setShowRoutePlay(true)}
+                  className="flex w-full items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-slate-500 transition hover:bg-slate-50 hover:text-slate-900"
+                >
+                  <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24" aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 4.5v15l12-7.5-12-7.5Z" />
+                  </svg>
+                  試し読み（分岐を確認）
+                  {routeIssueCount > 0 && (
+                    <span className="ml-1 inline-flex min-w-5 items-center justify-center rounded-full bg-amber-100 px-1.5 text-[11px] font-bold text-amber-800" title="確認が必要な箇所">
+                      {routeIssueCount}
+                    </span>
+                  )}
+                </button>
               </div>
 
               <div className="my-5 border-t border-slate-100" />
@@ -1477,6 +1590,13 @@ export default function InstructionForm({ initialData, approvalMode = false }: I
                 完成時は、指定した Google Drive フォルダに JSON を保存します。Excel出力を選んだ場合のみ、
                 スプレッドシートも保存します。
               </p>
+              {autoSave.kind !== 'idle' && (
+                <p className={`mt-1 text-[11px] leading-5 ${autoSave.kind === 'error' ? 'text-red-600' : 'text-slate-400'}`}>
+                  {autoSave.kind === 'saving' && '自動保存中...'}
+                  {autoSave.kind === 'saved' && `自動保存: ${autoSave.at}（下書き）`}
+                  {autoSave.kind === 'error' && `自動保存できませんでした: ${autoSave.message}`}
+                </p>
+              )}
               {storageEstimate && (
                 <p className={`mt-1.5 text-[11px] leading-5 ${storageEstimate.quota - storageEstimate.usage < LOW_STORAGE_BYTES ? 'font-semibold text-red-600' : 'text-slate-400'}`}>
                   下書きの保存領域: 残り {formatBytesShort(Math.max(storageEstimate.quota - storageEstimate.usage, 0))}
@@ -1775,6 +1895,10 @@ export default function InstructionForm({ initialData, approvalMode = false }: I
 
       {showForm63 && (
         <Form63ExportModal instruction={buildPreviewInstruction()} onClose={() => setShowForm63(false)} />
+      )}
+
+      {showRoutePlay && (
+        <RoutePlayModal instruction={buildPreviewInstruction()} onClose={() => setShowRoutePlay(false)} onEditStep={scrollToEditStep} />
       )}
 
       {showFlowBuilder && (

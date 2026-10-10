@@ -17,6 +17,10 @@ interface FlowFigureProps {
   onBoxClick?: (box: LayoutBox) => void;
   /** 図の計算が終わったときに呼ばれる（グラフと寸法を渡す） */
   onGraph?: (graph: FlowGraph) => void;
+  /** 通った経路として強調する箱（ノードID） */
+  highlightIds?: Set<string>;
+  /** 通った経路として強調する線（"from>to"） */
+  highlightEdges?: Set<string>;
 }
 
 function wrapText(text: string, max: number): string[] {
@@ -41,7 +45,7 @@ export function FlowLegend() {
   );
 }
 
-export default function FlowFigure({ steps, selectedId = null, onBoxClick, onGraph }: FlowFigureProps) {
+export default function FlowFigure({ steps, selectedId = null, onBoxClick, onGraph, highlightIds, highlightEdges }: FlowFigureProps) {
   const [layout, setLayout] = useState<FlowLayout | null>(null);
   const [error, setError] = useState<string | null>(null);
   const seqRef = useRef(0);
@@ -86,12 +90,16 @@ export default function FlowFigure({ steps, selectedId = null, onBoxClick, onGra
         <marker id="flow-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
           <path d="M0,0 L10,5 L0,10 z" fill="#64748b" />
         </marker>
+        <marker id="flow-arrow-hl" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="#0f172a" />
+        </marker>
       </defs>
       {layout.edges.map((e, i) => {
         const d = e.points.map((p, k) => (k ? 'L' : 'M') + p.x.toFixed(1) + ',' + p.y.toFixed(1)).join(' ');
+        const hl = !!highlightEdges?.has(`${e.from}>${e.to}`);
         return (
           <g key={i}>
-            <path d={d} fill="none" stroke={e.loop ? '#a48149' : '#64748b'} strokeWidth={1.6} strokeDasharray={e.loop ? '5 4' : undefined} markerEnd="url(#flow-arrow)" />
+            <path d={d} fill="none" stroke={hl ? '#0f172a' : e.loop ? '#a48149' : '#64748b'} strokeWidth={hl ? 3 : 1.6} strokeDasharray={e.loop ? '5 4' : undefined} markerEnd={hl ? 'url(#flow-arrow-hl)' : 'url(#flow-arrow)'} />
             {e.label && (
               <>
                 <rect x={e.label.x} y={e.label.y} width={e.label.w} height={e.label.h} rx={3} fill="#fcfbf8" />
@@ -106,12 +114,13 @@ export default function FlowFigure({ steps, selectedId = null, onBoxClick, onGra
       {layout.boxes.map((b) => {
         const cx = b.x + b.w / 2, cy = b.y + b.h / 2;
         const selected = b.id === selectedId;
+        const hl = !selected && !!highlightIds?.has(b.id);
         const clickable = interactive && b.kind !== 'start' && b.kind !== 'end';
         const common = { onClick: clickable ? () => onBoxClick?.(b) : undefined, className: clickable ? 'cursor-pointer' : undefined };
         if (b.kind === 'start' || b.kind === 'end') {
           return (
             <g key={b.id} {...common}>
-              <circle cx={cx} cy={cy} r={b.w / 2 - 2} fill="#ffffff" stroke="#0f172a" strokeWidth={1.6} />
+              <circle cx={cx} cy={cy} r={b.w / 2 - 2} fill={hl || selected ? '#e2e8f0' : '#ffffff'} stroke="#0f172a" strokeWidth={hl || selected ? 2.6 : 1.6} />
               <text x={cx} y={cy + 4} textAnchor="middle" fontSize={11} fontWeight={600} fill="#0f172a">{b.label}</text>
             </g>
           );
@@ -123,8 +132,8 @@ export default function FlowFigure({ steps, selectedId = null, onBoxClick, onGra
               <polygon
                 points={`${cx},${b.y} ${b.x + b.w},${cy} ${cx},${b.y + b.h} ${b.x},${cy}`}
                 fill={selected ? '#f0e9db' : '#f7f3ec'}
-                stroke={selected ? '#0f172a' : b.node.unreachable ? '#ef4444' : '#a48149'}
-                strokeWidth={selected ? 2.2 : 1.6}
+                stroke={selected || hl ? '#0f172a' : b.node.unreachable ? '#ef4444' : '#a48149'}
+                strokeWidth={selected ? 3 : hl ? 2.4 : 1.6}
                 strokeDasharray={b.node.unreachable ? '4 3' : undefined}
               />
               {lines.map((l, i) => (
@@ -150,9 +159,9 @@ export default function FlowFigure({ steps, selectedId = null, onBoxClick, onGra
               width={b.w}
               height={b.h}
               rx={8}
-              fill={selected ? '#f1f5f9' : '#ffffff'}
-              stroke={selected ? '#0f172a' : b.node.unreachable ? '#ef4444' : '#94a3b8'}
-              strokeWidth={selected ? 2.2 : 1.4}
+              fill={selected ? '#e2e8f0' : hl ? '#f1f5f9' : '#ffffff'}
+              stroke={selected || hl ? '#0f172a' : b.node.unreachable ? '#ef4444' : '#94a3b8'}
+              strokeWidth={selected ? 3 : hl ? 2.4 : 1.4}
               strokeDasharray={b.node.unreachable ? '4 3' : undefined}
             />
             {lines.map((l, i) => (

@@ -22,6 +22,8 @@ export interface Point { x: number; y: number }
 export interface LayoutLabel { x: number; y: number; w: number; h: number; text: string }
 
 export interface LayoutEdge {
+  from: string;
+  to: string;
   points: Point[];
   label?: LayoutLabel;
   loop: boolean;
@@ -114,7 +116,7 @@ export async function layoutFlow(graph: FlowGraph): Promise<FlowLayout> {
       label = { x: l.x, y: l.y, w: l.width ?? 0, h: l.height ?? 0, text: l.text ?? '' };
       labelRects.push(label);
     }
-    edges.push({ points, label, loop: false });
+    edges.push({ from: e.sources?.[0] ?? '', to: e.targets?.[0] ?? '', points, label, loop: false });
   }
 
   let width = Math.max(Math.ceil(result.width ?? 0), 320);
@@ -196,7 +198,7 @@ function routeLoops(
       const s = boxes[lp.from], t = boxes[lp.to];
       if (!s || !t) return null;
       const text = (lp.label ? lp.label + ' ' : '') + '↩ 戻る';
-      return { s, t, text, lw: text.length * 12 + 10, span: Math.abs(s.y + s.h - t.y) };
+      return { s, t, from: lp.from, to: lp.to, text, lw: text.length * 12 + 10, span: Math.abs(s.y + s.h - t.y) };
     })
     .filter((x): x is NonNullable<typeof x> => !!x)
     .sort((a, b) => a.span - b.span);
@@ -205,7 +207,7 @@ function routeLoops(
   const edges: LayoutEdge[] = [];
   let maxBottom = height, minX = 0, maxX = width;
   for (const it of items) {
-    const { s, t, text, lw } = it;
+    const { s, t, from, to, text, lw } = it;
     const scy = s.y + s.h / 2, tcy = t.y + t.h / 2;
     let best: { c: number; pts: Point[]; label: Rect; side: 'left' | 'right' } | null = null;
     for (const side of ['right', 'left'] as const) {
@@ -235,7 +237,7 @@ function routeLoops(
     }
     if (!best) continue;
     const { pts, label, side } = best;
-    edges.push({ points: pts, label: { ...label, text }, loop: true });
+    edges.push({ from, to, points: pts, label: { ...label, text }, loop: true });
     placed.push({ segs: pts.slice(1).map((p, i) => [pts[i], p] as Seg), label });
     if (side === 'right') { maxX = Math.max(maxX, label.x + lw + 16); lane.right += lw + 26; }
     else { minX = Math.min(minX, label.x - 16); lane.left -= lw + 26; }

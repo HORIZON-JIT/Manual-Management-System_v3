@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import AuthErrorNotice, { driveErrorMessage } from '@/components/AuthErrorNotice';
-import { DriveFileInfo, downloadDriveFile, getTargetFolder, listJsonFilesInFolder } from '@/lib/googleDrive';
+import { DriveFileInfo, downloadDriveFile, getTargetFolder, listJsonFilesInFolder, updateDriveFileMeta } from '@/lib/googleDrive';
+import { buildDriveMeta, buildSearchText } from '@/lib/driveMeta';
 import { getApprovalStatus, getCategoryLabel, WorkInstruction } from '@/types/instruction';
 
 interface DriveJsonFilePickerProps {
@@ -55,34 +56,6 @@ function approvalBadgeLabel(status?: string): string {
   return '未承認';
 }
 
-function buildSearchableText(instruction: WorkInstruction): string {
-  const parts: string[] = [
-    instruction.title,
-    instruction.description,
-    instruction.department,
-    instruction.category,
-    ...(instruction.keywords ?? []),
-  ].filter((value): value is string => !!value);
-
-  for (const step of instruction.steps ?? []) {
-    parts.push(...[
-      step.title,
-      step.description,
-      step.caution,
-      step.detailDescription,
-      ...(step.checkItems ?? []).map((check) => check.label),
-      ...(step.links ?? []).flatMap((link) => [link.label, link.url, link.path]),
-      ...(step.imageCaptions ?? []),
-    ].filter((value): value is string => !!value));
-  }
-
-  for (const condition of instruction.conditions ?? []) {
-    parts.push(condition.label);
-  }
-
-  return parts.filter(Boolean).join('\n').toLowerCase();
-}
-
 export default function DriveJsonFilePicker({ open, onClose, onFileLoaded }: DriveJsonFilePickerProps) {
   const [files, setFiles] = useState<FileListItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -117,7 +90,17 @@ export default function DriveJsonFilePicker({ open, onClose, onFileLoaded }: Dri
 
     listJsonFilesInFolder(folder.id)
       .then((jsonFiles) => {
-        setFiles(jsonFiles);
+        // 保存時に付けた一覧用の情報があるファイルは、ダウンロードせずそのまま表示できる
+        setFiles(jsonFiles.map((file) => (file.meta ? {
+          ...file,
+          createdBy: file.meta.createdBy || file.ownerName || undefined,
+          updatedBy: file.meta.updatedBy || file.lastModifyingUserName || undefined,
+          category: file.meta.category || undefined,
+          department: file.meta.department || undefined,
+          searchableText: file.searchText || undefined,
+          approvalStatus: file.meta.approvalStatus,
+          approvalApprovedAt: file.meta.approvalApprovedAt,
+        } : file)));
         if (jsonFiles.length === 0) {
           setError('このフォルダに JSON ファイルがありません。');
         }
@@ -135,6 +118,7 @@ export default function DriveJsonFilePicker({ open, onClose, onFileLoaded }: Dri
     let cancelled = false;
     const pending = files.filter(
       (file) =>
+        !file.meta &&
         file.createdBy === undefined &&
         file.updatedBy === undefined &&
         file.category === undefined &&
@@ -151,13 +135,15 @@ export default function DriveJsonFilePicker({ open, onClose, onFileLoaded }: Dri
         try {
           const content = await downloadDriveFile(file.id);
           const json = JSON.parse(content) as WorkInstruction;
+          // 旧ファイル: 次回から一覧だけで済むよう、一覧用の情報を後追いで付ける（更新日は据え置き。失敗は無視）
+          updateDriveFileMeta(file.id, { appProperties: buildDriveMeta(json), description: buildSearchText(json), modifiedTime: file.modifiedTime }).catch(() => {});
           return {
             id: file.id,
             createdBy: json.createdBy?.trim() || file.ownerName || '',
             updatedBy: json.updatedBy?.trim() || file.lastModifyingUserName || '',
             category: json.category || '',
             department: json.department || '',
-            searchableText: buildSearchableText(json),
+            searchableText: buildSearchText(json),
             approvalStatus: getApprovalStatus(json),
             approvalApprovedAt: json.approval?.current?.approvedAt,
           };
