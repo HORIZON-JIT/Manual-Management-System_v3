@@ -1,5 +1,6 @@
 import { WorkInstruction } from '@/types/instruction';
 import { ensureAccessToken, throwForResponse, withGoogleAuth } from '@/lib/googleAuth';
+import { DriveInstructionMeta, parseDriveMeta } from '@/lib/driveMeta';
 
 const DEFAULT_FOLDER_NAME = 'WorkInstructions';
 const FILE_NAME = 'work_instructions.json';
@@ -18,10 +19,13 @@ interface DriveFile {
   size?: string;
   owners?: Array<{ displayName?: string }>;
   lastModifyingUser?: { displayName?: string };
+  appProperties?: Record<string, string>;
+  description?: string;
 }
 
 interface DriveFileList {
   files: DriveFile[];
+  nextPageToken?: string;
 }
 
 interface SharedDrive {
@@ -31,6 +35,26 @@ interface SharedDrive {
 
 interface SharedDriveList {
   drives: SharedDrive[];
+  nextPageToken?: string;
+}
+
+const PAGE_SIZE = '1000';
+
+/** Drive の一覧 API を nextPageToken が尽きるまで読み、全件つなげて返す（100 件制限の解消） */
+async function listAllPages<T extends { nextPageToken?: string }, R>(
+  path: string,
+  params: Record<string, string>,
+  pick: (page: T) => R[],
+): Promise<R[]> {
+  const out: R[] = [];
+  let pageToken: string | undefined;
+  for (let guard = 0; guard < 50; guard += 1) {
+    const res = await gapiRequest<T>({ path, params: pageToken ? { ...params, pageToken } : params });
+    out.push(...pick(res.result));
+    pageToken = res.result.nextPageToken || undefined;
+    if (!pageToken) break;
+  }
+  return out;
 }
 
 const childFolderRequests = new Map<string, Promise<DriveFolder>>();
@@ -125,14 +149,12 @@ export type DriveLocation = 'my-drive' | 'shared-drives' | 'shared-with-me';
 // --- Shared drives ---
 
 export async function listSharedDrives(): Promise<DriveFolder[]> {
-  const res = await gapiRequest<SharedDriveList>({
-    path: 'https://www.googleapis.com/drive/v3/drives',
-    params: {
-      pageSize: '100',
-      fields: 'drives(id,name)',
-    },
-  });
-  return (res.result.drives || []).map((d) => ({ id: d.id, name: d.name }));
+  const drives = await listAllPages<SharedDriveList, SharedDrive>(
+    'https://www.googleapis.com/drive/v3/drives',
+    { pageSize: '100', fields: 'nextPageToken,drives(id,name)' },
+    (page) => page.drives || [],
+  );
+  return drives.map((d) => ({ id: d.id, name: d.name }));
 }
 
 // --- Folder browsing ---
@@ -144,9 +166,9 @@ export async function listFolders(parentId?: string, options?: { driveId?: strin
 
   const params: Record<string, string> = {
     q: `${parentQuery} mimeType='application/vnd.google-apps.folder' and trashed=false`,
-    fields: 'files(id,name)',
+    fields: 'nextPageToken,files(id,name)',
     orderBy: 'name',
-    pageSize: '100',
+    pageSize: PAGE_SIZE,
     supportsAllDrives: 'true',
     includeItemsFromAllDrives: 'true',
   };
@@ -156,26 +178,24 @@ export async function listFolders(parentId?: string, options?: { driveId?: strin
     params.driveId = options.driveId;
   }
 
-  const res = await gapiRequest<DriveFileList>({
-    path: 'https://www.googleapis.com/drive/v3/files',
-    params,
-  });
-  return res.result.files.map((f) => ({ id: f.id, name: f.name }));
+  const files = await listAllPages<DriveFileList, DriveFile>('https://www.googleapis.com/drive/v3/files', params, (page) => page.files || []);
+  return files.map((f) => ({ id: f.id, name: f.name }));
 }
 
 export async function listSharedWithMeFolders(): Promise<DriveFolder[]> {
-  const res = await gapiRequest<DriveFileList>({
-    path: 'https://www.googleapis.com/drive/v3/files',
-    params: {
+  const files = await listAllPages<DriveFileList, DriveFile>(
+    'https://www.googleapis.com/drive/v3/files',
+    {
       q: "sharedWithMe=true and mimeType='application/vnd.google-apps.folder' and trashed=false",
-      fields: 'files(id,name)',
+      fields: 'nextPageToken,files(id,name)',
       orderBy: 'name',
-      pageSize: '100',
+      pageSize: PAGE_SIZE,
       supportsAllDrives: 'true',
       includeItemsFromAllDrives: 'true',
     },
-  });
-  return res.result.files.map((f) => ({ id: f.id, name: f.name }));
+    (page) => page.files || [],
+  );
+  return files.map((f) => ({ id: f.id, name: f.name }));
 }
 
 export async function createNewFolder(name: string, parentId?: string): Promise<DriveFolder> {
@@ -309,28 +329,54 @@ export interface DriveFileInfo {
   size?: number;
   ownerName?: string;
   lastModifyingUserName?: string;
+  /** 保存時に付けた一覧用の情報。無ければ旧ファイル（本文をダウンロードして取る） */
+  meta?: DriveInstructionMeta | null;
+  /** 本文検索用のテキスト（description）。meta がある場合のみ */
+  searchText?: string;
 }
 
 export async function listJsonFilesInFolder(folderId: string): Promise<DriveFileInfo[]> {
-  const res = await gapiRequest<DriveFileList>({
-    path: 'https://www.googleapis.com/drive/v3/files',
-    params: {
+  const files = await listAllPages<DriveFileList, DriveFile>(
+    'https://www.googleapis.com/drive/v3/files',
+    {
       q: `'${folderId}' in parents and mimeType='application/json' and trashed=false`,
-      fields: 'files(id,name,modifiedTime,size,owners(displayName),lastModifyingUser(displayName))',
+      fields: 'nextPageToken,files(id,name,modifiedTime,size,owners(displayName),lastModifyingUser(displayName),appProperties,description)',
       orderBy: 'modifiedTime desc',
-      pageSize: '100',
+      pageSize: PAGE_SIZE,
       supportsAllDrives: 'true',
       includeItemsFromAllDrives: 'true',
     },
+    (page) => page.files || [],
+  );
+  return files.map((f) => {
+    const meta = parseDriveMeta(f.appProperties);
+    return {
+      id: f.id,
+      name: f.name,
+      modifiedTime: f.modifiedTime,
+      size: f.size ? Number(f.size) : undefined,
+      ownerName: f.owners?.[0]?.displayName,
+      lastModifyingUserName: f.lastModifyingUser?.displayName,
+      meta,
+      searchText: meta ? (f.description ?? '') : undefined,
+    };
   });
-  return res.result.files.map((f) => ({
-    id: f.id,
-    name: f.name,
-    modifiedTime: f.modifiedTime,
-    size: f.size ? Number(f.size) : undefined,
-    ownerName: f.owners?.[0]?.displayName,
-    lastModifyingUserName: f.lastModifyingUser?.displayName,
-  }));
+}
+
+/** 一覧用の情報だけを書き換える（本文は送らない）。旧ファイルへの後追い付与に使う */
+export async function updateDriveFileMeta(
+  fileId: string,
+  meta: { appProperties: Record<string, string>; description?: string; modifiedTime?: string },
+): Promise<void> {
+  const body: Record<string, unknown> = { appProperties: meta.appProperties };
+  if (meta.description !== undefined) body.description = meta.description;
+  if (meta.modifiedTime) body.modifiedTime = meta.modifiedTime;
+  await gapiRequest<DriveFile>({
+    path: `https://www.googleapis.com/drive/v3/files/${fileId}`,
+    method: 'PATCH',
+    params: { supportsAllDrives: 'true', fields: 'id' },
+    body,
+  });
 }
 
 export async function downloadDriveFile(fileId: string): Promise<string> {
@@ -409,11 +455,38 @@ export async function uploadAsGoogleSheet(
   return file.id;
 }
 
+export interface SaveFileOptions {
+  modifiedTime?: string;
+  /** 一覧用の情報（driveMeta.buildDriveMeta） */
+  appProperties?: Record<string, string>;
+  /** 本文検索用テキスト（driveMeta.buildSearchText） */
+  description?: string;
+}
+
 export async function saveFileToDrive(
   buffer: ArrayBuffer,
   fileName: string,
   mimeType: string,
-  options?: { modifiedTime?: string },
+  options?: SaveFileOptions,
+): Promise<string> {
+  try {
+    return await saveFileToDriveOnce(buffer, fileName, mimeType, options);
+  } catch (e) {
+    // 一覧用の情報が原因で 400 になった場合は、情報なしでもう一度保存する（保存そのものは落とさない）
+    const hasMeta = options?.appProperties || options?.description !== undefined;
+    if (hasMeta && e instanceof Error && /Drive API 400/.test(e.message)) {
+      console.warn('metadata rejected, retrying without appProperties/description', e.message);
+      return saveFileToDriveOnce(buffer, fileName, mimeType, { modifiedTime: options?.modifiedTime });
+    }
+    throw e;
+  }
+}
+
+async function saveFileToDriveOnce(
+  buffer: ArrayBuffer,
+  fileName: string,
+  mimeType: string,
+  options?: SaveFileOptions,
 ): Promise<string> {
   const token = await ensureAccessToken();
 
@@ -437,6 +510,8 @@ export async function saveFileToDrive(
     : { name: fileName, mimeType, parents: [folderId] };
   // 更新日時を据え置きたい場合は明示指定する（指定しないとDriveが現在時刻に更新する）
   if (options?.modifiedTime) metadata.modifiedTime = options.modifiedTime;
+  if (options?.appProperties) metadata.appProperties = options.appProperties;
+  if (options?.description !== undefined) metadata.description = options.description;
 
   // Use resumable upload for reliability with large files
   // For new files, include fields=id so the upload response returns the file ID

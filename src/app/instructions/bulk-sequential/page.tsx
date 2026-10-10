@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import AuthErrorNotice, { AuthChecking, driveErrorMessage } from '@/components/AuthErrorNotice';
+import { buildDriveMeta, buildSearchText } from '@/lib/driveMeta';
 import Link from 'next/link';
 import { WorkInstruction } from '@/types/instruction';
 import { downloadDriveFile, getTargetFolder, listJsonFilesInFolder, saveFileToDrive } from '@/lib/googleDrive';
@@ -56,11 +57,16 @@ function BulkSequentialTool() {
         const loaded = await Promise.all(files.map(async (file) => {
           let title = file.name.replace(/\.json$/i, '');
           let sequential = false;
-          try {
-            const json = JSON.parse(await downloadDriveFile(file.id)) as WorkInstruction;
-            title = json.title?.trim() || title;
-            sequential = !!json.sequential;
-          } catch {}
+          if (file.meta) {
+            title = file.meta.title || title;
+            sequential = file.meta.sequential;
+          } else {
+            try {
+              const json = JSON.parse(await downloadDriveFile(file.id)) as WorkInstruction;
+              title = json.title?.trim() || title;
+              sequential = !!json.sequential;
+            } catch {}
+          }
           return { id: file.id, name: file.name, title, sequential, modifiedTime: file.modifiedTime, selected: false };
         }));
         setRows(loaded);
@@ -94,7 +100,7 @@ function BulkSequentialTool() {
         if (setting === 'on') json.sequential = true;
         else delete json.sequential;
         const buffer = new TextEncoder().encode(JSON.stringify(json, null, 2)).buffer;
-        await saveFileToDrive(buffer, row.name, 'application/json', { modifiedTime: row.modifiedTime });
+        await saveFileToDrive(buffer, row.name, 'application/json', { modifiedTime: row.modifiedTime, appProperties: buildDriveMeta(json), description: buildSearchText(json) });
         ok += 1;
         setRows((prev) => prev.map((item) => item.id === row.id ? { ...item, sequential: setting === 'on', selected: false } : item));
       } catch (err) {

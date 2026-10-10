@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import AuthErrorNotice, { AuthChecking, driveErrorMessage } from '@/components/AuthErrorNotice';
+import { buildDriveMeta, buildSearchText } from '@/lib/driveMeta';
 import Link from 'next/link';
 import { WorkInstruction, DEPARTMENT_OPTIONS } from '@/types/instruction';
 import {
@@ -86,12 +87,17 @@ function BulkDepartmentTool() {
           files.map(async (f) => {
             let title = f.name.replace(/\.json$/i, '');
             let dept = '';
-            try {
-              const json = JSON.parse(await downloadDriveFile(f.id)) as WorkInstruction;
-              title = json.title?.trim() || title;
-              dept = json.department?.trim() || '';
-            } catch {
-              // ignore parse errors; keep filename
+            if (f.meta) {
+              title = f.meta.title || title;
+              dept = f.meta.department;
+            } else {
+              try {
+                const json = JSON.parse(await downloadDriveFile(f.id)) as WorkInstruction;
+                title = json.title?.trim() || title;
+                dept = json.department?.trim() || '';
+              } catch {
+                // ignore parse errors; keep filename
+              }
             }
             return {
               id: f.id,
@@ -149,7 +155,7 @@ function BulkDepartmentTool() {
         json.department = department;
         const buffer = new TextEncoder().encode(JSON.stringify(json)).buffer;
         // 更新日時は据え置く（部署付与だけのため）
-        await saveFileToDrive(buffer, row.name, 'application/json', { modifiedTime: row.modifiedTime });
+        await saveFileToDrive(buffer, row.name, 'application/json', { modifiedTime: row.modifiedTime, appProperties: buildDriveMeta(json), description: buildSearchText(json) });
         ok += 1;
         setRows((prev) =>
           prev.map((r) => (r.id === row.id ? { ...r, department, selected: false } : r)),

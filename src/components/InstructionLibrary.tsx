@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react';
 import AuthErrorNotice, { AuthChecking, driveErrorMessage } from '@/components/AuthErrorNotice';
+import { buildSearchText } from '@/lib/driveMeta';
 import { useRouter } from 'next/navigation';
 import { WorkInstruction, getApprovalStatus, getCategoryLabel } from '@/types/instruction';
 import {
@@ -36,47 +37,6 @@ type SortOrder = 'frequent' | 'updated-desc' | 'name-asc';
 
 const ALL = '__all__';
 const FREQUENT_THRESHOLD = 3;
-const SEARCH_TEXT_LIMIT = 20000;
-
-/** 手順書JSONから検索用テキストを抽出する（画像などのデータは除外）。 */
-function buildSearchText(json: Record<string, unknown>): string {
-  const parts: string[] = [];
-  const push = (v: unknown) => {
-    if (typeof v === 'string' && v.trim()) parts.push(v);
-  };
-  push(json.title);
-  push(json.description);
-  if (Array.isArray(json.keywords)) json.keywords.forEach(push);
-  if (Array.isArray(json.conditions)) {
-    json.conditions.forEach((c) => push((c as { label?: unknown })?.label));
-  }
-  if (Array.isArray(json.steps)) {
-    json.steps.forEach((s) => {
-      const step = s as Record<string, unknown>;
-      push(step.title);
-      push(step.description);
-      push(step.detailDescription);
-      push(step.caution);
-      if (Array.isArray(step.imageCaptions)) step.imageCaptions.forEach(push);
-      if (Array.isArray(step.checkItems)) {
-        step.checkItems.forEach((ci) => push((ci as { label?: unknown })?.label));
-      }
-      if (Array.isArray(step.links)) {
-        step.links.forEach((l) => {
-          const link = l as { label?: unknown; url?: unknown; path?: unknown };
-          push(link.label);
-          push(link.url);
-          push(link.path);
-        });
-      }
-      if (Array.isArray(step.jumps)) {
-        step.jumps.forEach((j) => push((j as { label?: unknown })?.label));
-      }
-    });
-  }
-  return parts.join('\n').slice(0, SEARCH_TEXT_LIMIT).toLowerCase();
-}
-
 /** 曖昧検索用の正規化：小文字化・全角半角統一(NFKC)・カタカナ→ひらがな・空白除去。 */
 function normalizeForSearch(value: string): string {
   return value
@@ -219,9 +179,25 @@ export default function InstructionLibrary() {
     // 更新日時ベースのキャッシュ判定だけではカテゴリ/部署の変更を検知できないことがある）
     const force = forceMetaRef.current;
     forceMetaRef.current = false;
+    // 保存時に付けた一覧用の情報があるファイルは、ダウンロードせず一覧の情報から組み立てる（常に最新）
+    const withMeta: Record<string, CachedMeta> = {};
+    for (const f of files) {
+      if (!f.meta) continue;
+      withMeta[f.id] = {
+        title: f.meta.title || f.name.replace(/\.json$/i, ''),
+        category: f.meta.category,
+        department: f.meta.department,
+        searchText: f.searchText || f.name.toLowerCase(),
+        approvalStatus: f.meta.approvalStatus,
+        approvalApprovedAt: f.meta.approvalApprovedAt,
+        approvalUserName: f.meta.approvalUserName,
+        modifiedTime: f.modifiedTime,
+      };
+    }
+    const legacy = files.filter((f) => !f.meta);
     const stale = force
-      ? files
-      : files.filter(
+      ? legacy
+      : legacy.filter(
           (f) =>
             !cache[f.id] ||
             cache[f.id].modifiedTime !== f.modifiedTime ||
@@ -230,7 +206,11 @@ export default function InstructionLibrary() {
             cache[f.id].approvalStatus === undefined,
         );
     if (stale.length === 0) {
-      queueMicrotask(() => setMeta(cache));
+      const merged = { ...cache, ...withMeta };
+      queueMicrotask(() => {
+        setMeta(merged);
+        saveMetaCache(merged);
+      });
       return;
     }
 
@@ -250,7 +230,7 @@ export default function InstructionLibrary() {
               title: json.title?.trim() || f.name.replace(/\.json$/i, ''),
               category: json.category?.trim() || '',
               department: json.department?.trim() || '',
-              searchText: buildSearchText(json as unknown as Record<string, unknown>),
+              searchText: buildSearchText(json, 20000),
               approvalStatus: getApprovalStatus(json),
               approvalApprovedAt: json.approval?.current?.approvedAt,
               approvalUserName: json.approval?.current?.userName,
@@ -277,7 +257,7 @@ export default function InstructionLibrary() {
     )
       .then((results) => {
         if (cancelled) return;
-        const next = { ...cache };
+        const next = { ...cache, ...withMeta };
         results.forEach((r) => {
           next[r.id] = r.meta;
         });

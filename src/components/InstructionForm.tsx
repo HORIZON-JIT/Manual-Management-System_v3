@@ -41,6 +41,7 @@ import FlowBuilderModal from './FlowBuilderModal';
 import Form63ExportModal from './Form63ExportModal';
 import RoutePlayModal from './RoutePlayModal';
 import { checkRoutes } from '@/lib/routeCheck';
+import { buildDriveMeta, buildSearchText } from '@/lib/driveMeta';
 import { tryConvertConditionsToFlow } from '@/lib/convertConditions';
 
 const LAST_AUTHOR_KEY = 'last_author_name';
@@ -688,6 +689,7 @@ export default function InstructionForm({ initialData, approvalMode = false }: I
         jsonBuffer,
         `${instruction.title}.json`,
         'application/json',
+        { appProperties: buildDriveMeta(instruction), description: buildSearchText(instruction) },
       );
       const targetFolder = getTargetFolder();
       const folderName = targetFolder?.name || 'WorkInstructions';
