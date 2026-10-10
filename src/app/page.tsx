@@ -15,6 +15,7 @@ import { copyAsNewInstruction, TEMPLATE_TEMP_KEY } from '@/lib/templateCopy';
 import QrCodeModal from '@/components/QrCodeModal';
 import { viewerInstructionUrl } from '@/lib/viewerUrl';
 import { FEATURES, VIEWER_ONLY } from '@/lib/appMode';
+import { useTaskMasterAvailable } from '@/lib/taskMasterAccess';
 
 const actions = [
   {
@@ -99,6 +100,7 @@ function EditorHomePage() {
   const [showPreviewPicker, setShowPreviewPicker] = useState(false);
   const [showTemplatePicker, setShowTemplatePicker] = useState(false);
   const [showQrPicker, setShowQrPicker] = useState(false);
+  const taskMasterAvailable = useTaskMasterAvailable();
   const [qrTarget, setQrTarget] = useState<{ url: string; title: string; subtitle?: string } | null>(null);
   const [showExcelPicker, setShowExcelPicker] = useState(false);
   const [showApprovalRequestPicker, setShowApprovalRequestPicker] = useState(false);
@@ -449,7 +451,7 @@ function EditorHomePage() {
           ),
           onClick: handleNotifyClick,
         },
-        ...(FEATURES.taskMasterLink
+        ...(FEATURES.taskMasterLink && taskMasterAvailable
           ? [{
               title: 'タスクの手順書URLを更新',
               description: 'タスク管理アプリのタスクマスタに登録。',

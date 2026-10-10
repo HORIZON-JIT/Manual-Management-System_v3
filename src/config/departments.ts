@@ -24,7 +24,7 @@ export interface DepartmentConfig {
 }
 
 export interface DepartmentFeatures {
-  /** タスク管理アプリ（スプレッドシート）の「タスクマスタ」の手順書URLをアプリから更新する */
+  /** タスク管理アプリ（スプレッドシート）の「タスクマスタ」の手順書URLをアプリから更新する（表示は従業員マスタで判定） */
   taskMasterLink: boolean;
 }
 
@@ -36,9 +36,10 @@ export const DEPARTMENTS = {
     name: '資材課',
     brandLabel: 'MANUAL SYSTEM',
     viewerOnly: false,
-    features: { taskMasterLink: false },
+    // タスクマスタ連携は、タスク管理アプリの従業員マスタに登録された人にだけメニューに出す（taskMasterAccess.ts）
+    features: { taskMasterLink: true },
   },
-  /** 生産管理：タスク管理アプリ（タスクマスタ）との連携を使う。/production/ に配置 */
+  /** 生産管理：いまは資材課と同等（配布 URL は 1 つなので別配置はしない） */
   production: {
     key: 'production',
     name: '生産管理',
