@@ -20,7 +20,7 @@ import {
 import { saveInstruction, getStorageEstimate, formatBytesShort, LOW_STORAGE_BYTES } from '@/lib/storage';
 import { buildExcelBuffer, ExcelNavMode } from '@/lib/exportSpreadsheet';
 import { uploadAsGoogleSheet, saveFileToDrive, getTargetFolder } from '@/lib/googleDrive';
-import { addStepNavLinks, addSheetCheckboxes, addResetScript } from '@/lib/sheetsNavLinks';
+import { addStepNavLinks, addSheetCheckboxes } from '@/lib/sheetsNavLinks';
 import {
   isGoogleConfigured,
   getAuthState,
@@ -673,7 +673,6 @@ export default function InstructionForm({ initialData, approvalMode = false, asN
     setSaveMessage(null);
 
     try {
-      let scriptAttached = false;
       const excelExported = excelNavMode !== 'none';
 
       if (excelExported) {
@@ -688,7 +687,6 @@ export default function InstructionForm({ initialData, approvalMode = false, asN
 
         if (checkboxCells.length > 0) {
           await addSheetCheckboxes(spreadsheetId, checkboxCells);
-          scriptAttached = await addResetScript(spreadsheetId);
         }
       }
 
@@ -712,7 +710,6 @@ export default function InstructionForm({ initialData, approvalMode = false, asN
       } catch {}
 
       setSaveSuccessModal({ folderName, folderUrl, viewUrl, driveFileId, excelExported });
-      void scriptAttached;
     } catch (error) {
       console.error('Drive save error:', error);
       // 失敗しても編集内容を失わないよう、先に端末内の下書きへ残す
