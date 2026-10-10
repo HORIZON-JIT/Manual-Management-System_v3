@@ -16,7 +16,7 @@ import {
   JUMP_END_TARGET,
 } from '@/types/instruction';
 import { getInstruction } from '@/lib/storage';
-import { getViewPageBaseUrl, parseShareData } from '@/lib/shareLink';
+import { parseShareData } from '@/lib/shareLink';
 import { downloadDriveFile } from '@/lib/googleDrive';
 import AuthErrorNotice, { AUTH_EXPIRED_MESSAGE, driveErrorMessage } from '@/components/AuthErrorNotice';
 import {
@@ -32,6 +32,8 @@ import { computeRoute, DEFAULT_JUMP_VALUE } from '@/lib/routeEngine';
 import ViewHistoryModal from '@/components/ViewHistoryModal';
 import FlowchartModal from '@/components/FlowchartModal';
 import Form63ExportModal from '@/components/Form63ExportModal';
+import QrCodeModal from '@/components/QrCodeModal';
+import { viewerInstructionUrl } from '@/lib/viewerUrl';
 import { VIEWER_ONLY } from '@/lib/appMode';
 
 
@@ -60,6 +62,7 @@ function InstructionViewContent() {
   const [showChapters, setShowChapters] = useState(false);
   const [viewingSnapshot, setViewingSnapshot] = useState<InstructionSnapshot | null>(null);
   const [viewUrlCopied, setViewUrlCopied] = useState(false);
+  const [showQr, setShowQr] = useState(false);
   const [expandedStepDetails, setExpandedStepDetails] = useState<Record<string, boolean>>({});
 
   const copyPathToClipboard = async (path: string, linkId: string) => {
@@ -184,9 +187,10 @@ function InstructionViewContent() {
     window.print();
   };
 
+  // 閲覧者向けに渡す URL は閲覧専用ビューアのものにそろえる
   const appViewUrl = (() => {
     const driveFileId = searchParams.get('driveFileId') || instruction?.driveFileId;
-    return driveFileId ? `${getViewPageBaseUrl()}?driveFileId=${driveFileId}` : null;
+    return driveFileId ? viewerInstructionUrl(driveFileId) : null;
   })();
   const editUrl = (() => {
     const driveFileId = searchParams.get('driveFileId') || instruction?.driveFileId;
@@ -409,7 +413,16 @@ function InstructionViewContent() {
             onClick={handleCopyViewUrl}
             className="px-3 py-1.5 bg-slate-50 border border-slate-200 text-slate-600 rounded-lg text-sm hover:bg-slate-100 transition"
           >
-            {viewUrlCopied ? 'URLをコピー済み' : 'アプリ閲覧URL'}
+            {viewUrlCopied ? 'URLをコピー済み' : 'ビューアのURL'}
+          </button>
+        )}
+        {appViewUrl && (
+          <button
+            onClick={() => setShowQr(true)}
+            className="px-3 py-1.5 bg-slate-50 border border-slate-200 text-slate-600 rounded-lg text-sm hover:bg-slate-100 transition"
+            title="スマートフォンで開く QR コードを表示します"
+          >
+            QRコード
           </button>
         )}
         {instruction.updateHistory && instruction.updateHistory.some((entry) => !!entry.snapshot) && (
@@ -905,6 +918,9 @@ function InstructionViewContent() {
 
       {showForm63 && (
         <Form63ExportModal instruction={instruction} onClose={() => setShowForm63(false)} />
+      )}
+      {showQr && appViewUrl && (
+        <QrCodeModal url={appViewUrl} title={instruction.title} subtitle={instruction.department} onClose={() => setShowQr(false)} />
       )}
       {showFlowchart && (
         <FlowchartModal instruction={instruction} onClose={() => setShowFlowchart(false)} />

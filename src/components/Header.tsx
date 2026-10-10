@@ -10,8 +10,7 @@ import ThemeToggle from './ThemeToggle';
 import { DEPARTMENT, VIEWER_ONLY } from '@/lib/appMode';
 import { getTargetFolder, DriveFolder } from '@/lib/googleDrive';
 import { isGoogleConfigured, getAuthState } from '@/lib/googleAuth';
-
-const VIEWER_URL = 'https://horizon-jit.github.io/Manual-Management-System_v3/viewer/';
+import { VIEWER_URL } from '@/lib/viewerUrl';
 
 export default function Header() {
   const pathname = usePathname();

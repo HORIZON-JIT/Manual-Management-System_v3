@@ -12,6 +12,8 @@ import { exportToExcel } from '@/lib/exportSpreadsheet';
 import { getViewPageBaseUrl } from '@/lib/shareLink';
 import { setTempData } from '@/lib/tempStorage';
 import { copyAsNewInstruction, TEMPLATE_TEMP_KEY } from '@/lib/templateCopy';
+import QrCodeModal from '@/components/QrCodeModal';
+import { viewerInstructionUrl } from '@/lib/viewerUrl';
 import { VIEWER_ONLY } from '@/lib/appMode';
 
 const actions = [
@@ -96,6 +98,8 @@ function EditorHomePage() {
   const [showJsonPicker, setShowJsonPicker] = useState(false);
   const [showPreviewPicker, setShowPreviewPicker] = useState(false);
   const [showTemplatePicker, setShowTemplatePicker] = useState(false);
+  const [showQrPicker, setShowQrPicker] = useState(false);
+  const [qrTarget, setQrTarget] = useState<{ url: string; title: string; subtitle?: string } | null>(null);
   const [showExcelPicker, setShowExcelPicker] = useState(false);
   const [showApprovalRequestPicker, setShowApprovalRequestPicker] = useState(false);
   const [showNotifyPicker, setShowNotifyPicker] = useState(false);
@@ -149,6 +153,20 @@ function EditorHomePage() {
     if (ensureDriveReady()) setShowExcelPicker(true);
   };
 
+  const handleQrClick = () => {
+    if (ensureDriveReady()) setShowQrPicker(true);
+  };
+
+  // 選んだ手順書をビューアで開く QR コードを表示する
+  const handleQrFileLoaded = async (content: string, file: DriveFileInfo) => {
+    try {
+      const json = JSON.parse(content) as WorkInstruction;
+      setQrTarget({ url: viewerInstructionUrl(file.id), title: json.title?.trim() || file.name.replace(/\.json$/i, ''), subtitle: json.department || undefined });
+    } catch {
+      setQrTarget({ url: viewerInstructionUrl(file.id), title: file.name.replace(/\.json$/i, '') });
+    }
+  };
+
   const handleApprovalRequestClick = () => {
     if (ensureDriveReady()) setShowApprovalRequestPicker(true);
   };
@@ -158,9 +176,8 @@ function EditorHomePage() {
   };
 
   const buildApprovalRequestMailUrl = (instruction: WorkInstruction, fileId: string) => {
-    const viewBaseUrl = getViewPageBaseUrl();
-    const viewUrl = `${viewBaseUrl}?driveFileId=${encodeURIComponent(fileId)}`;
-    const approvalUrl = `${viewBaseUrl.replace('/instructions/view', '/instructions/edit')}?source=drive&driveFileId=${encodeURIComponent(fileId)}&mode=approval`;
+    const viewUrl = viewerInstructionUrl(fileId);
+    const approvalUrl = `${getViewPageBaseUrl().replace('/instructions/view', '/instructions/edit')}?source=drive&driveFileId=${encodeURIComponent(fileId)}&mode=approval`;
     const requestedAt = new Date().toLocaleDateString('ja-JP');
     const subject = `【承認依頼】${instruction.title}`;
     const body = [
@@ -186,7 +203,7 @@ function EditorHomePage() {
   };
 
   const buildInstructionNotifyMailUrl = (instruction: WorkInstruction, fileId: string) => {
-    const viewUrl = `${getViewPageBaseUrl()}?driveFileId=${encodeURIComponent(fileId)}`;
+    const viewUrl = viewerInstructionUrl(fileId);
     const notifiedAt = new Date().toLocaleDateString('ja-JP');
     const subject = `【手順書通知】${instruction.title}`;
     const body = [
@@ -403,6 +420,19 @@ function EditorHomePage() {
           onClick: handleExcelExportClick,
         },
         {
+          title: 'QRコードを出力',
+          description: '手順書を選び、ビューアで開くQRコードを表示・保存・印刷します。',
+          icon: (
+            <>
+              <rect x="3" y="3" width="7" height="7" rx="1" strokeWidth={2} />
+              <rect x="14" y="3" width="7" height="7" rx="1" strokeWidth={2} />
+              <rect x="3" y="14" width="7" height="7" rx="1" strokeWidth={2} />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 14h3v3h-3zM20 14v1M14 20h1M20 19v2h-2" />
+            </>
+          ),
+          onClick: handleQrClick,
+        },
+        {
           title: '手順書一覧出力',
           description: '作成者・更新者・作成日・更新日・改版などの一覧をExcel形式で出力します。',
           href: '/instructions/list-export',
@@ -521,6 +551,14 @@ function EditorHomePage() {
         onClose={() => setShowTemplatePicker(false)}
         onFileLoaded={handleTemplateFileLoaded}
       />
+      <DriveJsonFilePicker
+        open={showQrPicker}
+        onClose={() => setShowQrPicker(false)}
+        onFileLoaded={handleQrFileLoaded}
+      />
+      {qrTarget && (
+        <QrCodeModal url={qrTarget.url} title={qrTarget.title} subtitle={qrTarget.subtitle} onClose={() => setQrTarget(null)} />
+      )}
       <DriveJsonFilePicker
         open={showExcelPicker}
         onClose={() => setShowExcelPicker(false)}

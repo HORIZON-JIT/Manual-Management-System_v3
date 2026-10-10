@@ -21,7 +21,6 @@ import { saveInstruction, getStorageEstimate, formatBytesShort, LOW_STORAGE_BYTE
 import { buildExcelBuffer, ExcelNavMode } from '@/lib/exportSpreadsheet';
 import { uploadAsGoogleSheet, saveFileToDrive, getTargetFolder } from '@/lib/googleDrive';
 import { addStepNavLinks, addSheetCheckboxes, addResetScript } from '@/lib/sheetsNavLinks';
-import { getViewPageBaseUrl } from '@/lib/shareLink';
 import {
   isGoogleConfigured,
   getAuthState,
@@ -40,6 +39,8 @@ import FlowchartModal from './FlowchartModal';
 import FlowBuilderModal from './FlowBuilderModal';
 import Form63ExportModal from './Form63ExportModal';
 import RoutePlayModal from './RoutePlayModal';
+import QrCodeModal from './QrCodeModal';
+import { viewerInstructionUrl } from '@/lib/viewerUrl';
 import { checkRoutes } from '@/lib/routeCheck';
 import { buildDriveMeta, buildSearchText } from '@/lib/driveMeta';
 import { tryConvertConditionsToFlow } from '@/lib/convertConditions';
@@ -135,6 +136,7 @@ export default function InstructionForm({ initialData, approvalMode = false, asN
   const [showFlowBuilder, setShowFlowBuilder] = useState(false);
   const [showForm63, setShowForm63] = useState(false);
   const [showRoutePlay, setShowRoutePlay] = useState(false);
+  const [showSaveQr, setShowSaveQr] = useState(false);
   const [routeIssueCount, setRouteIssueCount] = useState(0);
   const [storageEstimate, setStorageEstimate] = useState<{ usage: number; quota: number } | null>(null);
   const [showStepIndex, setShowStepIndex] = useState(false);
@@ -699,7 +701,7 @@ export default function InstructionForm({ initialData, approvalMode = false, asN
       const folderUrl = targetFolder?.id
         ? `https://drive.google.com/drive/folders/${targetFolder.id}`
         : undefined;
-      const viewUrl = `${getViewPageBaseUrl()}?driveFileId=${driveFileId}`;
+      const viewUrl = viewerInstructionUrl(driveFileId);
 
       try {
         await saveInstruction({ ...instruction, driveFileId });
@@ -1874,6 +1876,14 @@ export default function InstructionForm({ initialData, approvalMode = false, asN
                   >
                     {viewUrlCopied ? 'コピー済み' : 'コピー'}
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowSaveQr(true)}
+                    className="shrink-0 rounded-lg border border-blue-300 bg-white px-3 py-1.5 text-xs font-semibold text-blue-800 transition hover:bg-blue-100"
+                    title="スマートフォンで開く QR コードを表示します"
+                  >
+                    QRコード
+                  </button>
                 </div>
               </div>
             )}
@@ -1902,6 +1912,10 @@ export default function InstructionForm({ initialData, approvalMode = false, asN
 
       {showRoutePlay && (
         <RoutePlayModal instruction={buildPreviewInstruction()} onClose={() => setShowRoutePlay(false)} onEditStep={scrollToEditStep} />
+      )}
+
+      {showSaveQr && saveSuccessModal?.viewUrl && (
+        <QrCodeModal url={saveSuccessModal.viewUrl} title={title.trim() || '手順書'} subtitle={department || undefined} onClose={() => setShowSaveQr(false)} />
       )}
 
       {showFlowBuilder && (
