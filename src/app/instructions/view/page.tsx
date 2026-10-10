@@ -28,12 +28,12 @@ import {
   initGoogleAuth,
 } from '@/lib/googleAuth';
 import { getTempData } from '@/lib/tempStorage';
+import { computeRoute, DEFAULT_JUMP_VALUE } from '@/lib/routeEngine';
 import ViewHistoryModal from '@/components/ViewHistoryModal';
 import FlowchartModal from '@/components/FlowchartModal';
 import Form63ExportModal from '@/components/Form63ExportModal';
 import { VIEWER_ONLY } from '@/lib/appMode';
 
-const DEFAULT_JUMP_VALUE = '__default__';
 
 function InstructionViewContent() {
   const searchParams = useSearchParams();
@@ -97,21 +97,25 @@ function InstructionViewContent() {
   useEffect(() => {
     // 再フェッチ中（ログイン状態の確定後の再実行など）に「見つかりません」が
     // 一瞬表示されるのを防ぐため、毎回ローディングを立て直す
-    setLoading(true);
-    setCheckStates({});
-    setSelectedConditions({});
-    setSelectedJumpTargets({});
-    setExpandedStepDetails({});
-    setScrollTargetStepId(null);
-    setChapterTargetStepId(null);
-    setRevealedCount(1);
+    queueMicrotask(() => {
+      setLoading(true);
+      setCheckStates({});
+      setSelectedConditions({});
+      setSelectedJumpTargets({});
+      setExpandedStepDetails({});
+      setScrollTargetStepId(null);
+      setChapterTargetStepId(null);
+      setRevealedCount(1);
+    });
 
     if (window.location.hash) {
       const shared = parseShareData(window.location.hash);
       if (shared) {
-        setInstruction(shared);
-        setIsSharedView(true);
-        setLoading(false);
+        queueMicrotask(() => {
+          setInstruction(shared);
+          setIsSharedView(true);
+          setLoading(false);
+        });
         return;
       }
     }
@@ -165,7 +169,7 @@ function InstructionViewContent() {
         .finally(() => setLoading(false));
       return;
     }
-    setLoading(false);
+    queueMicrotask(() => setLoading(false));
   }, [searchParams, auth.isSignedIn, reloadKey]);
 
   useEffect(() => {
@@ -173,7 +177,7 @@ function InstructionViewContent() {
     const target = document.getElementById(`step-${scrollTargetStepId}`);
     if (!target) return;
     target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    setScrollTargetStepId(null);
+    queueMicrotask(() => setScrollTargetStepId(null));
   }, [scrollTargetStepId, revealedCount, selectedJumpTargets]);
 
   const handlePrint = () => {
@@ -273,18 +277,7 @@ function InstructionViewContent() {
     groupConditions.get(groupId)!.push(condition);
   }
 
-  const groupOrder: string[] = [];
-  for (const condition of instruction.conditions ?? []) {
-    const groupId = condition.group || '__default';
-    if (!groupOrder.includes(groupId)) groupOrder.push(groupId);
-  }
-
-  const stepIndex = new Map<string, number>();
-  const stepById = new Map<string, Step>();
-  sortedSteps.forEach((step, index) => {
-    stepIndex.set(step.id, index);
-    stepById.set(step.id, step);
-  });
+  const stepById = new Map<string, Step>(sortedSteps.map((step) => [step.id, step]));
 
   const getStepGroups = (step: Step): string[] => {
     const groups: string[] = [];
@@ -297,153 +290,12 @@ function InstructionViewContent() {
 
   const getPrimaryStepGroup = (step: Step) => getStepGroups(step)[0];
 
-  const groupMetaMap = new Map<string, { parentConditionId?: string }>();
-  for (const group of instruction.conditionGroups ?? []) {
-    groupMetaMap.set(group.id, group);
-  }
-
-  const isGroupVisible = (groupId: string, visited = new Set<string>()): boolean => {
-    if (visited.has(groupId)) return true;
-    visited.add(groupId);
-    const meta = groupMetaMap.get(groupId);
-    if (!meta?.parentConditionId) return true;
-    const parentGroupId = condGroupMap.get(meta.parentConditionId);
-    if (!parentGroupId) return true;
-    if (!isGroupVisible(parentGroupId, visited)) return false;
-    const parentSelection = selectedConditions[parentGroupId];
-    if (parentSelection === null || parentSelection === undefined) {
-      const firstParentCondition = groupConditions.get(parentGroupId)?.[0];
-      return firstParentCondition ? firstParentCondition.id === meta.parentConditionId : true;
-    }
-    return parentSelection === meta.parentConditionId;
-  };
-
-  const stepMatchesSelection = (step: Step): boolean => {
-    const stepConditionIds = getStepConditionIds(step);
-    if (stepConditionIds.length === 0) return true;
-
-    const stepGroups = getStepGroups(step);
-    if (stepGroups.length === 0) return true;
-    if (stepGroups.some((groupId) => !isGroupVisible(groupId))) return false;
-
-    return stepGroups.every((groupId) => {
-      const selectedConditionId = selectedConditions[groupId];
-      const activeConditionId = selectedConditionId ?? groupConditions.get(groupId)?.[0]?.id ?? null;
-      if (!activeConditionId) return true;
-      return stepConditionIds.includes(activeConditionId);
-    });
-  };
-
-  const getBranchFirstStep = (conditionId: string): Step | null => {
-    for (const step of sortedSteps) {
-      if (getStepConditionIds(step).includes(conditionId) && stepMatchesSelection(step)) {
-        return step;
-      }
-    }
-    return null;
-  };
-
-  const branchAnchorByStepId = new Map<string, string[]>();
-  for (const groupId of groupOrder) {
-    const branchStarts = (groupConditions.get(groupId) ?? [])
-      .map((condition) =>
-        sortedSteps.find((step) => getStepConditionIds(step).includes(condition.id)) ?? null,
-      )
-      .filter((step): step is Step => !!step);
-
-    if (branchStarts.length === 0) continue;
-
-    const earliestIndex = Math.min(
-      ...branchStarts.map((step) => stepIndex.get(step.id) ?? Number.MAX_SAFE_INTEGER),
-    );
-
-    const parentConditionId = groupMetaMap.get(groupId)?.parentConditionId;
-    const parentAnchorStep = parentConditionId
-      ? [...sortedSteps]
-          .slice(0, earliestIndex)
-          .reverse()
-          .find((step) => getStepConditionIds(step).includes(parentConditionId))
-      : undefined;
-    const anchorStep = parentAnchorStep ?? (earliestIndex > 0 ? sortedSteps[earliestIndex - 1] : null);
-
-    if (anchorStep) {
-      const current = branchAnchorByStepId.get(anchorStep.id) ?? [];
-      branchAnchorByStepId.set(anchorStep.id, [...current, groupId]);
-    }
-  }
-
-  const resolveBranchNextStep = (step: Step): Step | null => {
-    const branchGroups = branchAnchorByStepId.get(step.id) ?? [];
-    for (const groupId of branchGroups) {
-      if (!isGroupVisible(groupId)) continue;
-      const options = groupConditions.get(groupId) ?? [];
-      const activeConditionId = selectedConditions[groupId] ?? options[0]?.id ?? null;
-      if (!activeConditionId) continue;
-      const branchStep = getBranchFirstStep(activeConditionId);
-      if (branchStep) return branchStep;
-    }
-    return null;
-  };
-
-  const resolveFallbackNextStep = (step: Step): Step | null => {
-    const startIndex = stepIndex.get(step.id);
-    if (startIndex === undefined) return null;
-
-    for (let index = startIndex + 1; index < sortedSteps.length; index += 1) {
-      const candidate = sortedSteps[index];
-      if (!stepMatchesSelection(candidate)) continue;
-
-      const sourceConditions = getStepConditionIds(step);
-      const candidateConditions = getStepConditionIds(candidate);
-
-      if (candidateConditions.length === 0) return candidate;
-      if (sourceConditions.length === 0) return candidate;
-
-      const sourceContainsCandidate = candidateConditions.every((id) => sourceConditions.includes(id));
-      const candidateContainsSource = sourceConditions.every((id) => candidateConditions.includes(id));
-      if (sourceContainsCandidate || candidateContainsSource) return candidate;
-    }
-
-    return null;
-  };
-
-  const visibleSteps: Step[] = [];
-  const firstStep = sortedSteps.find((step) => stepMatchesSelection(step));
-  if (firstStep) {
-    const visited = new Set<string>();
-    let current: Step | null = firstStep;
-
-    while (current && !visited.has(current.id)) {
-      visibleSteps.push(current);
-      visited.add(current.id);
-
-      if (current.endsBranch) break;
-
-      const jumpOptions = current.jumps ?? [];
-      const selectedJumpTarget: string | undefined = selectedJumpTargets[current.id];
-      if (jumpOptions.length > 0 && !selectedJumpTarget) break;
-
-      let nextStep: Step | null = null;
-      if (jumpOptions.length > 0 && selectedJumpTarget !== DEFAULT_JUMP_VALUE) {
-        nextStep = stepById.get(selectedJumpTarget) ?? null;
-        if (!nextStep) break;
-      } else {
-        nextStep = resolveBranchNextStep(current);
-        if (!nextStep && current.nextStepId && current.nextStepId !== current.id) {
-          const explicitTarget = stepById.get(current.nextStepId);
-          if (explicitTarget && stepMatchesSelection(explicitTarget)) {
-            nextStep = explicitTarget;
-          }
-        }
-
-        if (!nextStep) {
-          nextStep = resolveFallbackNextStep(current);
-        }
-      }
-
-      current = nextStep;
-    }
-  }
+  // 表示するステップの決定は routeEngine.computeRoute に一本化（試し読み・条件グループ変換と同じ規則）
+  const visibleSteps: Step[] = computeRoute(
+    { steps: sortedSteps, conditions: instruction.conditions, conditionGroups: instruction.conditionGroups },
+    selectedConditions,
+    selectedJumpTargets,
+  );
 
   const stepNumbers: number[] = [];
   let logicalNumber = 0;

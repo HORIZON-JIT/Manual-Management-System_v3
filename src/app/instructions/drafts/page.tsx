@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { WorkInstruction, getCategoryLabel } from '@/types/instruction';
 import { getAllInstructions, deleteInstruction, estimateInstructionsSize, formatBytes, formatBytesShort, getStorageEstimate, LOW_STORAGE_BYTES } from '@/lib/storage';
 import { setTempData } from '@/lib/tempStorage';
+import { copyAsNewInstruction, TEMPLATE_TEMP_KEY } from '@/lib/templateCopy';
 import EditorOnlyNotice from '@/components/EditorOnlyNotice';
 import { VIEWER_ONLY } from '@/lib/appMode';
 
@@ -47,6 +48,11 @@ function DraftsPageContent() {
     await deleteInstruction(id);
     setDrafts((prev) => prev.filter((d) => d.id !== id));
     refreshEstimate();
+  };
+
+  const handleDuplicate = async (inst: WorkInstruction) => {
+    await setTempData(TEMPLATE_TEMP_KEY, JSON.stringify(copyAsNewInstruction(inst)));
+    router.push('/instructions/new?source=template');
   };
 
   const handleDeleteAll = async () => {
@@ -155,6 +161,9 @@ function DraftsPageContent() {
                   <Link href={`/instructions/edit?id=${inst.id}`} className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800">
                     編集を再開
                   </Link>
+                  <button onClick={() => handleDuplicate(inst)} title="この下書きをひな形にして新しい手順書を作ります" className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50">
+                    複製
+                  </button>
                   <button onClick={() => handleDelete(inst.id, inst.title)} className="rounded-lg px-3 py-2 text-sm font-medium text-slate-500 transition hover:bg-red-50 hover:text-red-600">
                     削除
                   </button>

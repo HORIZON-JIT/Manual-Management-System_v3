@@ -11,6 +11,7 @@ import XmbMenu, { XmbCategory, XmbItem } from '@/components/XmbMenu';
 import { exportToExcel } from '@/lib/exportSpreadsheet';
 import { getViewPageBaseUrl } from '@/lib/shareLink';
 import { setTempData } from '@/lib/tempStorage';
+import { copyAsNewInstruction, TEMPLATE_TEMP_KEY } from '@/lib/templateCopy';
 import { VIEWER_ONLY } from '@/lib/appMode';
 
 const actions = [
@@ -94,6 +95,7 @@ function EditorHomePage() {
   const [showAuthPrompt, setShowAuthPrompt] = useState(false);
   const [showJsonPicker, setShowJsonPicker] = useState(false);
   const [showPreviewPicker, setShowPreviewPicker] = useState(false);
+  const [showTemplatePicker, setShowTemplatePicker] = useState(false);
   const [showExcelPicker, setShowExcelPicker] = useState(false);
   const [showApprovalRequestPicker, setShowApprovalRequestPicker] = useState(false);
   const [showNotifyPicker, setShowNotifyPicker] = useState(false);
@@ -123,6 +125,24 @@ function EditorHomePage() {
 
   const handlePreviewClick = () => {
     if (ensureDriveReady()) setShowPreviewPicker(true);
+  };
+
+  const handleTemplateClick = () => {
+    if (ensureDriveReady()) setShowTemplatePicker(true);
+  };
+
+  // 既存の手順書をひな形にして新規作成する
+  const handleTemplateFileLoaded = async (content: string, file: DriveFileInfo) => {
+    try {
+      const json = JSON.parse(content);
+      if (!json.id || !json.title || !json.steps || !Array.isArray(json.steps)) {
+        throw new Error('有効な手順書データではありません。');
+      }
+      await setTempData(TEMPLATE_TEMP_KEY, JSON.stringify(copyAsNewInstruction(json as WorkInstruction)));
+      router.push('/instructions/new?source=template');
+    } catch (err) {
+      setImportError(err instanceof Error ? err.message : `${file.name} の読み込みに失敗しました。`);
+    }
   };
 
   const handleExcelExportClick = () => {
@@ -293,6 +313,12 @@ function EditorHomePage() {
       ),
       items: [
         { ...find('/instructions/new'), description: '空のテンプレートから手順書を作成します。' },
+        {
+          title: '既存の手順書から作成',
+          description: 'Drive上の手順書をひな形にして、新しい手順書を作ります。',
+          icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />,
+          onClick: handleTemplateClick,
+        },
         { ...find('/instructions/drafts'), description: '保存済みの下書きを開いて編集します。' },
       ],
     },
@@ -486,6 +512,11 @@ function EditorHomePage() {
         open={showPreviewPicker}
         onClose={() => setShowPreviewPicker(false)}
         onFileLoaded={handlePreviewFileLoaded}
+      />
+      <DriveJsonFilePicker
+        open={showTemplatePicker}
+        onClose={() => setShowTemplatePicker(false)}
+        onFileLoaded={handleTemplateFileLoaded}
       />
       <DriveJsonFilePicker
         open={showExcelPicker}
