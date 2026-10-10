@@ -60,7 +60,7 @@ const actions = [
   },
   {
     href: '/instructions/bulk-sequential',
-    title: '読み飛ばし防止を一括変更',
+    title: '読み飛ばし防止を変更',
     icon: (
       <path
         strokeLinecap="round"
@@ -438,7 +438,7 @@ function EditorHomePage() {
           onClick: handleApprovalRequestClick,
         },
         {
-          title: '手順書作成/改版を通知',
+          title: '作成/改版を通知',
           description: 'Gmail で閲覧案内メールを作ります。',
           icon: (
             <>
@@ -453,7 +453,8 @@ function EditorHomePage() {
     },
   ];
   return (
-    <div className="mx-auto flex min-h-[calc(100vh-76px)] max-w-7xl flex-col px-6 py-8 lg:py-10">
+    <div className="mx-auto flex min-h-[calc(100vh-76px)] w-full max-w-[1500px] flex-col px-6 py-8 lg:py-10">
+      <div className="my-auto">
       <div className="mb-5 flex items-end justify-between gap-4">
         <div>
           <p className="brand-text text-xs font-semibold tracking-[0.28em]">HORIZON JIT</p>
@@ -507,6 +508,7 @@ function EditorHomePage() {
           {importError}
         </div>
       )}
+      </div>
 
       <footer className="mt-auto flex flex-wrap items-center justify-between gap-3 pt-5 text-xs text-neutral-400">
         <p>Developed by Yuma Tani</p>
