@@ -10,6 +10,11 @@ import {
   createNewFolder,
   getTargetFolder,
   setTargetFolder,
+  RecentFolder,
+  getRecentFolders,
+  rememberFolder,
+  removeRecentFolder,
+  toggleFolderPin,
 } from '@/lib/googleDrive';
 
 interface DriveFolderPickerProps {
@@ -41,6 +46,10 @@ export default function DriveFolderPicker({ open, onClose, onSelect }: DriveFold
   // Track if we're at the shared drives list level (not yet inside one)
   const [isSharedDrivesList, setIsSharedDrivesList] = useState(false);
   const currentParentId = breadcrumbs[breadcrumbs.length - 1].id;
+  const [recent, setRecent] = useState<RecentFolder[]>([]);
+  useEffect(() => {
+    if (open) setRecent(getRecentFolders());
+  }, [open]);
 
   const loadFolderList = useCallback(async (parentId?: string, driveId?: string) => {
     setLoading(true);
@@ -160,9 +169,19 @@ export default function DriveFolderPicker({ open, onClose, onSelect }: DriveFold
       onSelect(null);
     } else {
       const folder: DriveFolder = { id: current.id, name: current.name };
+      const path = [LOCATION_LABELS[location], ...breadcrumbs.slice(1, -1).map((b) => b.name)].join(' / ');
       setTargetFolder(folder);
+      rememberFolder(folder, path);
       onSelect(folder);
     }
+    onClose();
+  };
+
+  const handleSelectRecent = (folder: RecentFolder) => {
+    const target: DriveFolder = { id: folder.id, name: folder.name };
+    setTargetFolder(target);
+    rememberFolder(target, folder.path);
+    onSelect(target);
     onClose();
   };
 
@@ -211,6 +230,48 @@ export default function DriveFolderPicker({ open, onClose, onSelect }: DriveFold
             </p>
           )}
         </div>
+
+        {/* Recent / pinned folders */}
+        {recent.length > 0 && (
+          <div className="px-4 py-2 border-b border-gray-200 bg-gray-50/70">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-400">よく使うフォルダ</p>
+            <ul className="mt-1.5 space-y-0.5">
+              {recent.map((f) => (
+                <li key={f.id} className="group flex items-center gap-1 rounded-lg hover:bg-white">
+                  <button
+                    type="button"
+                    onClick={() => setRecent(toggleFolderPin(f.id))}
+                    title={f.pinned ? 'ピン留めを外す' : 'ピン留めして常に上に表示'}
+                    aria-label={f.pinned ? 'ピン留めを外す' : 'ピン留め'}
+                    className={`shrink-0 rounded px-1.5 py-1 text-sm transition ${f.pinned ? 'text-yellow-500' : 'text-gray-300 hover:text-yellow-500'}`}
+                  >
+                    {f.pinned ? '★' : '☆'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleSelectRecent(f)}
+                    className="flex min-w-0 flex-1 items-center gap-2 px-1 py-1.5 text-left text-sm transition"
+                  >
+                    <span className="text-yellow-500">📁</span>
+                    <span className="min-w-0 flex-1">
+                      <span className={`block truncate ${currentTarget?.id === f.id ? 'font-semibold text-yellow-700' : 'text-gray-700'}`}>{f.name}</span>
+                      {f.path && <span className="block truncate text-[11px] text-gray-400">{f.path}</span>}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRecent(removeRecentFolder(f.id))}
+                    title="一覧から外す"
+                    aria-label={`${f.name} を一覧から外す`}
+                    className="shrink-0 rounded px-1.5 py-1 text-xs text-gray-300 transition hover:text-red-500"
+                  >
+                    ✕
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         {/* Location tabs */}
         <div className="px-2 sm:px-4 py-2 border-b border-gray-200 flex gap-1">
