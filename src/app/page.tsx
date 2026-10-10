@@ -14,7 +14,7 @@ import { setTempData } from '@/lib/tempStorage';
 import { copyAsNewInstruction, TEMPLATE_TEMP_KEY } from '@/lib/templateCopy';
 import QrCodeModal from '@/components/QrCodeModal';
 import { viewerInstructionUrl } from '@/lib/viewerUrl';
-import { VIEWER_ONLY } from '@/lib/appMode';
+import { FEATURES, VIEWER_ONLY } from '@/lib/appMode';
 
 const actions = [
   {
@@ -449,6 +449,14 @@ function EditorHomePage() {
           ),
           onClick: handleNotifyClick,
         },
+        ...(FEATURES.taskMasterLink
+          ? [{
+              title: 'タスクの手順書URLを更新',
+              description: 'タスク管理アプリのタスクマスタに登録。',
+              icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 0 0-5.656 0l-4 4a4 4 0 1 0 5.656 5.656l1.102-1.101m-.758-4.899a4 4 0 0 0 5.656 0l4-4a4 4 0 0 0-5.656-5.656l-1.1 1.1" />,
+              href: '/instructions/task-links',
+            }]
+          : []),
       ],
     },
   ];

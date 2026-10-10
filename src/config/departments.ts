@@ -19,6 +19,13 @@ export interface DepartmentConfig {
   brandLabel: string;
   /** 閲覧専用エディションか（true で作成・編集・下書きを無効化し、ホームを手順書一覧にする） */
   viewerOnly: boolean;
+  /** 課ごとに有効にする機能 */
+  features: DepartmentFeatures;
+}
+
+export interface DepartmentFeatures {
+  /** タスク管理アプリ（スプレッドシート）の「タスクマスタ」の手順書URLをアプリから更新する */
+  taskMasterLink: boolean;
 }
 
 /** 課別設定のレジストリ。課を増やすときはここに追記する。 */
@@ -29,13 +36,15 @@ export const DEPARTMENTS = {
     name: '資材課',
     brandLabel: 'MANUAL SYSTEM',
     viewerOnly: false,
+    features: { taskMasterLink: false },
   },
-  /** 生産管理：いまは資材課と同等。差分は今後ここで定義する */
+  /** 生産管理：タスク管理アプリ（タスクマスタ）との連携を使う。/production/ に配置 */
   production: {
     key: 'production',
     name: '生産管理',
     brandLabel: 'MANUAL SYSTEM',
     viewerOnly: false,
+    features: { taskMasterLink: true },
   },
   /** 現場閲覧：閲覧専用エディション */
   viewer: {
@@ -43,6 +52,7 @@ export const DEPARTMENTS = {
     name: '現場閲覧',
     brandLabel: 'MANUAL VIEWER',
     viewerOnly: true,
+    features: { taskMasterLink: false },
   },
 } satisfies Record<string, DepartmentConfig>;
 

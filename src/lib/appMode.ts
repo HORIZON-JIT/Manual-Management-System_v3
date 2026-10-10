@@ -11,3 +11,6 @@ export { DEPARTMENT };
 
 /** 閲覧専用エディションか（作成・編集・下書きを無効化し、ホームを手順書一覧にする）。 */
 export const VIEWER_ONLY = DEPARTMENT.viewerOnly;
+
+/** 現在の課で有効な機能 */
+export const FEATURES = DEPARTMENT.features;
