@@ -52,6 +52,8 @@ const labelClass = 'mb-1.5 block text-sm font-semibold text-slate-700';
 interface InstructionFormProps {
   initialData?: WorkInstruction;
   approvalMode?: boolean;
+  /** initialData をひな形として「新規作成」として扱う（複製・テンプレート） */
+  asNew?: boolean;
 }
 
 function createEmptyStep(orderIndex: number): Step {
@@ -88,9 +90,9 @@ function formatDate(value?: string): string {
 
 const AUTO_SAVE_DELAY_MS = 3000;
 
-export default function InstructionForm({ initialData, approvalMode = false }: InstructionFormProps) {
+export default function InstructionForm({ initialData, approvalMode = false, asNew = false }: InstructionFormProps) {
   const router = useRouter();
-  const isEdit = !!initialData;
+  const isEdit = !!initialData && !asNew;
   // 下書き・自動保存・完成保存で同じ id を使う（新規作成でも保存のたびに増えない）
   const instructionIdRef = useRef<string>(initialData?.id ?? uuidv4());
   const buildPreviewRef = useRef<() => WorkInstruction>(() => ({} as WorkInstruction));
@@ -612,7 +614,8 @@ export default function InstructionForm({ initialData, approvalMode = false }: I
   useEffect(() => {
     if (!autoSaveMountedRef.current) {
       autoSaveMountedRef.current = true;
-      return;
+      // ひな形からの新規作成は、開いた時点で下書きに残す
+      if (!asNew) return;
     }
     autoSaveDirtyRef.current = true;
     if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
