@@ -77,14 +77,14 @@ export default function XmbMenu({
   }, [categories.length, items.length, item, cat]);
 
   return (
-    <div className={`grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4 ${className}`}>
+    <div className={`grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 ${className}`}>
       {categories.map((c, ci) => {
         const activeCat = ci === cat;
         return (
           <section
             key={c.key}
             onMouseEnter={() => { if (!activeCat) selectCat(ci); }}
-            className={`xmb-card flex flex-col rounded-xl border bg-white p-4 transition ${
+            className={`xmb-card flex flex-col rounded-xl border bg-white p-3.5 transition ${
               activeCat ? 'xmb-card-active' : 'border-neutral-200'
             }`}
           >
@@ -118,7 +118,7 @@ export default function XmbMenu({
                     onMouseEnter={() => { setCat(ci); setItem(ii); }}
                     onFocus={() => { setCat(ci); setItem(ii); }}
                     onClick={() => { setCat(ci); setItem(ii); activate(it); }}
-                    className={`group flex w-full items-start gap-3 rounded-lg border px-2.5 py-2.5 text-left transition ${
+                    className={`group flex w-full items-start gap-2.5 rounded-lg border px-2 py-2 text-left transition ${
                       activeItem ? 'xmb-item-active' : 'border-transparent hover:bg-neutral-50'
                     }`}
                   >
