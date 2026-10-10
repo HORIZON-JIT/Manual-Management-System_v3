@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, Suspense, Fragment } from 'react';
+import { useEffect, useRef, useState, Suspense, Fragment } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -333,6 +333,7 @@ function InstructionViewContent() {
     !selectedJumpTargets[visibleSteps[visibleSteps.length - 1].id]
       ? visibleSteps[visibleSteps.length - 1].id
       : null;
+  const isComplete = visibleSteps.length > 0 && (!isSequential || revealedCount >= visibleSteps.length) && !pendingJumpStepId;
 
   const handleJumpSelect = (stepId: string, targetStepId: string, visibleIndex: number) => {
     setChapterTargetStepId(null);
@@ -838,10 +839,18 @@ function InstructionViewContent() {
         })}
       </div>
 
-      {(!isSequential || revealedCount >= visibleSteps.length) && !pendingJumpStepId && (
-        <div className="text-center py-6">
-          <p className="text-sm font-medium text-emerald-600">全ステップ完了</p>
-        </div>
+      {isComplete && (
+        <CompletionCard
+          stepCount={visibleSteps.length}
+          title={displayTitle}
+          onRestart={() => {
+            setSelectedConditions({});
+            setSelectedJumpTargets({});
+            setRevealedCount(1);
+            setCheckStates({});
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+        />
       )}
 
       {showHistory && instruction.updateHistory && (
@@ -1077,6 +1086,38 @@ function InstructionViewContent() {
           </button>
         )}
       </aside>
+    </div>
+  );
+}
+
+/** 最後まで読んだことを知らせるカード。表示されたときに画面内へスクロールし、読み直しとトップへの導線を出す */
+function CompletionCard({ stepCount, title, onRestart }: { stepCount: number; title: string; onRestart: () => void }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const timer = window.setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'center' }), 150);
+    return () => window.clearTimeout(timer);
+  }, []);
+  return (
+    <div ref={ref} className="no-print mms-complete relative mt-6 overflow-hidden rounded-2xl border border-emerald-200 bg-white px-6 py-8 text-center shadow-[0_18px_44px_rgba(16,185,129,0.12)]">
+      <div className="pointer-events-none absolute inset-0" aria-hidden="true">
+        {Array.from({ length: 14 }).map((_, i) => (
+          <span key={i} className="mms-confetti" style={{ left: `${6 + i * 6.5}%`, animationDelay: `${(i % 7) * 0.12}s`, backgroundColor: ['#10b981', '#a48149', '#2563eb', '#f59e0b'][i % 4] }} />
+        ))}
+      </div>
+      <div className="relative">
+        <svg className="mms-complete-mark mx-auto h-20 w-20" viewBox="0 0 80 80" aria-hidden="true">
+          <circle cx="40" cy="40" r="34" fill="#ecfdf5" stroke="#10b981" strokeWidth="4" />
+          <path d="M24 41 L36 53 L57 29" fill="none" stroke="#10b981" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+        <p className="mt-4 text-xl font-bold text-emerald-700">お疲れさまでした</p>
+        <p className="mt-1 text-sm text-slate-600">「{title}」はここまでです。全 {stepCount} ステップを確認しました。</p>
+        <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
+          <Link href="/" className="rounded-lg bg-slate-950 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800">トップへ戻る</Link>
+          <button type="button" onClick={onRestart} className="rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-900 transition hover:bg-slate-50">最初から読み直す</button>
+        </div>
+      </div>
     </div>
   );
 }
