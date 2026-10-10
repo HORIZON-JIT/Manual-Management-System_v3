@@ -34,8 +34,15 @@ export type ImageAnnotation =
   | { type: 'circle'; cx: number; cy: number; radiusX: number; radiusY: number; color: string }
   | { type: 'rectangle'; x: number; y: number; width: number; height: number; color: string }
   | { type: 'arrow'; x1: number; y1: number; x2: number; y2: number; scale: number; color: string }
+  | { type: 'line'; x1: number; y1: number; x2: number; y2: number; scale: number; color: string }
+  /** 半透明の塗り（強調） */
+  | { type: 'highlight'; x: number; y: number; width: number; height: number; color: string }
+  /** モザイク（個人情報などを隠す。下地の画像をぼかして描く） */
+  | { type: 'mosaic'; x: number; y: number; width: number; height: number }
+  /** 塗りつぶし（個人情報などを隠す） */
+  | { type: 'fill'; x: number; y: number; width: number; height: number; color: string }
   | { type: 'number'; x: number; y: number; value: number; scale: number; color: string; mode?: 'auto' | 'manual' }
-  | { type: 'text'; x: number; y: number; value: string; scale: number; color: string };
+  | { type: 'text'; x: number; y: number; value: string; scale: number; color: string; background?: boolean };
 
 /** 画像の表示サイズ（ビューア）。等倍 / 大きく（列幅いっぱい） / 小さく（中央に小さめ）。 */
 export type ImageDisplaySize = 'natural' | 'large' | 'small';

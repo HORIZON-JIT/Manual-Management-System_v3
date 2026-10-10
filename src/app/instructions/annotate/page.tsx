@@ -61,6 +61,7 @@ function AnnotatePageContent() {
     action: 'save' | 'restore' | 'cancel',
     url?: string,
     annotations?: ImageAnnotation[],
+    base?: string,
   ) => {
     if (!token) {
       window.close();
@@ -69,7 +70,7 @@ function AnnotatePageContent() {
     try {
       await setTempData(
         'annotate_res_' + token,
-        JSON.stringify(url ? { action, url, annotations } : { action }),
+        JSON.stringify(url ? { action, url, annotations, base } : { action }),
       );
       resultWritten.current = true;
     } catch {
@@ -109,7 +110,7 @@ function AnnotatePageContent() {
       imageDataUrl={src.imageDataUrl}
       originalImageDataUrl={src.originalImageDataUrl}
       initialAnnotations={src.initialAnnotations}
-      onSave={(url, annotations) => finishAnnotation('save', url, annotations)}
+      onSave={(url, annotations, base) => finishAnnotation('save', url, annotations, base)}
       onRestore={() => finishAnnotation('restore')}
       onClose={() => finishAnnotation('cancel')}
     />
