@@ -22,6 +22,7 @@ import {
   upgradeToViewerUrl,
   writeManualUrls,
 } from '@/lib/taskMaster';
+import { TaskMasterVisibility, clearTaskMasterMemberCache, getTaskMasterVisibility, setTaskMasterVisibility } from '@/lib/taskMasterAccess';
 
 interface ManualOption {
   id: string;
@@ -56,11 +57,13 @@ function TaskLinksContent() {
   const [onlyActive, setOnlyActive] = useState(true);
   const [onlyEmpty, setOnlyEmpty] = useState(false);
   const [query, setQuery] = useState('');
+  const [visibility, setVisibility] = useState<TaskMasterVisibility>('auto');
 
   const configured = isGoogleConfigured();
 
   useEffect(() => {
     setSheetInput(getTaskMasterSpreadsheetId());
+    setVisibility(getTaskMasterVisibility());
     if (!configured) return;
     initGoogleAuth().catch(() => {});
     return addAuthListener(setAuth);
@@ -76,6 +79,7 @@ function TaskLinksContent() {
     try {
       setTaskMasterSpreadsheetId(id);
       setSheetInput(id);
+      clearTaskMasterMemberCache();
       const [m, files] = await Promise.all([
         readTaskMaster(id),
         (async () => {
@@ -226,6 +230,20 @@ function TaskLinksContent() {
           {folderName && ` ／ 手順書の候補: ${folderName} の ${manuals.length} 件`}
           {!folderName && master && ' ／ 手順書を当てるには右上のフォルダボタンで保存先フォルダを選んでください。'}
         </p>
+        <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-slate-100 pt-3 text-xs text-slate-600">
+          <span className="font-semibold text-slate-500">トップのメニューに表示:</span>
+          {([
+            ['auto', '自動（従業員マスタに登録された人）'],
+            ['on', '常に表示'],
+            ['off', '表示しない'],
+          ] as [TaskMasterVisibility, string][]).map(([v, label]) => (
+            <label key={v} className="flex cursor-pointer items-center gap-1.5">
+              <input type="radio" name="tm-visibility" checked={visibility === v} onChange={() => { setVisibility(v); setTaskMasterVisibility(v); }} className="accent-slate-900" />
+              {label}
+            </label>
+          ))}
+          <span className="text-slate-400">（この端末だけの設定）</span>
+        </div>
       </div>
 
       {preset && (
@@ -323,7 +341,7 @@ export default function TaskLinksPage() {
       <div className="mx-auto max-w-6xl px-4 py-8">
         <BackLink />
         <div className="mt-6 rounded-lg border border-slate-200 bg-white p-6 text-sm text-slate-700">
-          この機能は生産管理版（/production/）でのみ使えます。
+          この機能はこの版では使えません。
         </div>
       </div>
     );

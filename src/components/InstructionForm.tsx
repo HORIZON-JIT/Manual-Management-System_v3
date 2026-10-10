@@ -42,6 +42,7 @@ import RoutePlayModal from './RoutePlayModal';
 import QrCodeModal from './QrCodeModal';
 import { viewerInstructionUrl } from '@/lib/viewerUrl';
 import { FEATURES } from '@/lib/appMode';
+import { useTaskMasterAvailable } from '@/lib/taskMasterAccess';
 import { checkRoutes } from '@/lib/routeCheck';
 import { buildDriveMeta, buildSearchText } from '@/lib/driveMeta';
 import { tryConvertConditionsToFlow } from '@/lib/convertConditions';
@@ -138,6 +139,7 @@ export default function InstructionForm({ initialData, approvalMode = false, asN
   const [showForm63, setShowForm63] = useState(false);
   const [showRoutePlay, setShowRoutePlay] = useState(false);
   const [showSaveQr, setShowSaveQr] = useState(false);
+  const taskMasterAvailable = useTaskMasterAvailable();
   const [routeIssueCount, setRouteIssueCount] = useState(0);
   const [storageEstimate, setStorageEstimate] = useState<{ usage: number; quota: number } | null>(null);
   const [showStepIndex, setShowStepIndex] = useState(false);
@@ -1887,7 +1889,7 @@ export default function InstructionForm({ initialData, approvalMode = false, asN
                     QRコード
                   </button>
                 </div>
-                {FEATURES.taskMasterLink && saveSuccessModal.driveFileId && (
+                {FEATURES.taskMasterLink && taskMasterAvailable && saveSuccessModal.driveFileId && (
                   <button
                     type="button"
                     onClick={() => router.push(`/instructions/task-links?driveFileId=${encodeURIComponent(saveSuccessModal.driveFileId!)}`)}

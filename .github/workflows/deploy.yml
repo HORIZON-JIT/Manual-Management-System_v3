@@ -56,19 +56,6 @@ jobs:
           mkdir -p site/viewer
           cp -a out/. site/viewer/
 
-      # 生産管理版（タスク管理アプリ連携つき）を /production/ サブパスにビルド
-      - name: Build production-control edition (/production)
-        run: npm run build:production
-        env:
-          NEXT_PUBLIC_REPO_NAME: ${{ github.event.repository.name }}
-          NEXT_PUBLIC_BASE_SUBPATH: production
-          NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${{ vars.NEXT_PUBLIC_GOOGLE_CLIENT_ID }}
-
-      - name: Stage production-control output
-        run: |
-          mkdir -p site/production
-          cp -a out/. site/production/
-
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
