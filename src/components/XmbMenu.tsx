@@ -77,80 +77,74 @@ export default function XmbMenu({
   }, [categories.length, items.length, item, cat]);
 
   return (
-    <div
-      className={`xmb-bg flex flex-col items-center justify-start rounded-2xl border border-neutral-200 px-4 py-8 sm:py-12 ${className}`}
-    >
-      {/* 横軸：カテゴリ */}
-      <div className="flex w-full max-w-3xl items-end justify-start gap-6 overflow-x-auto px-1 pb-2 pt-3 sm:justify-center sm:gap-12">
-        {categories.map((c, i) => {
-          const active = i === cat;
-          return (
+    <div className={`grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4 ${className}`}>
+      {categories.map((c, ci) => {
+        const activeCat = ci === cat;
+        return (
+          <section
+            key={c.key}
+            onMouseEnter={() => { if (!activeCat) selectCat(ci); }}
+            className={`xmb-card flex flex-col rounded-xl border bg-white p-4 transition ${
+              activeCat ? 'xmb-card-active' : 'border-neutral-200'
+            }`}
+          >
+            {/* カテゴリの見出し */}
             <button
-              key={c.key}
               type="button"
-              onClick={() => selectCat(i)}
-              aria-pressed={active}
-              className="flex shrink-0 flex-col items-center gap-2 outline-none"
+              onClick={() => selectCat(ci)}
+              aria-pressed={activeCat}
+              className="flex flex-col items-center gap-2 border-b border-neutral-100 pb-4 outline-none"
             >
               <span
-                className={`flex h-14 w-14 items-center justify-center rounded-2xl border bg-white transition-all duration-200 ${
-                  active
-                    ? 'brand-border brand-text scale-110 shadow-[0_0_0_4px_rgba(164,129,73,0.18)]'
-                    : 'border-neutral-200 text-neutral-400 hover:text-neutral-700'
+                className={`flex h-14 w-14 items-center justify-center rounded-2xl border transition ${
+                  activeCat ? 'xmb-cat-icon-active' : 'brand-border-soft brand-panel brand-text'
                 }`}
               >
-                <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   {c.icon}
                 </svg>
               </span>
-              <span
-                className={`whitespace-nowrap text-xs font-semibold tracking-wide transition ${
-                  active ? 'brand-text' : 'text-neutral-400'
-                }`}
-              >
-                {c.label}
-              </span>
+              <span className="text-sm font-semibold text-neutral-950">{c.label}</span>
             </button>
-          );
-        })}
-      </div>
 
-      <div className="my-6 h-px w-full max-w-md bg-neutral-200" />
-
-      {/* 最大3項目分の高さを確保し、カテゴリ切替時にパネル全体が上下しないようにする。 */}
-      <div className="flex w-full max-w-md flex-col gap-2 sm:min-h-72">
-        {items.map((it, i) => {
-          const active = i === item;
-          return (
-            <button
-              key={it.title}
-              type="button"
-              onMouseEnter={() => setItem(i)}
-              onFocus={() => setItem(i)}
-              onClick={() => activate(it)}
-              className={`group flex min-h-14 w-full items-center gap-4 rounded-xl border border-transparent px-3 py-3 text-left transition sm:px-4 ${
-                active ? 'xmb-item-active' : 'xmb-item-idle'
-              }`}
-            >
-              <span
-                className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-neutral-200 bg-white text-neutral-500 transition ${
-                  active ? 'xmb-item-icon-active' : ''
-                }`}
-              >
-                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  {it.icon}
-                </svg>
-              </span>
-              <span className="min-w-0">
-                <span className="block text-[15px] font-semibold leading-6 text-neutral-950">{it.title}</span>
-                {it.description && (
-                  <span className="hidden text-[13px] leading-5 text-neutral-500 sm:block">{it.description}</span>
-                )}
-              </span>
-            </button>
-          );
-        })}
-      </div>
+            {/* 項目（すべて表示） */}
+            <div className="mt-2 flex flex-col gap-1">
+              {c.items.map((it, ii) => {
+                const activeItem = activeCat && ii === item;
+                return (
+                  <button
+                    key={it.title}
+                    type="button"
+                    onMouseEnter={() => { setCat(ci); setItem(ii); }}
+                    onFocus={() => { setCat(ci); setItem(ii); }}
+                    onClick={() => { setCat(ci); setItem(ii); activate(it); }}
+                    className={`group flex w-full items-start gap-3 rounded-lg border px-2.5 py-2.5 text-left transition ${
+                      activeItem ? 'xmb-item-active' : 'border-transparent hover:bg-neutral-50'
+                    }`}
+                  >
+                    <span
+                      className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-white text-neutral-500 transition ${
+                        activeItem ? 'xmb-item-icon-active' : ''
+                      }`}
+                    >
+                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        {it.icon}
+                      </svg>
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block text-[14px] font-semibold leading-5 text-neutral-950">{it.title}</span>
+                      {it.description && (
+                        <span className="mt-0.5 block text-[12px] leading-5 text-neutral-500">{it.description}</span>
+                      )}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+        );
+      })}
+      <p className="col-span-full hidden text-center text-[11px] text-neutral-400 sm:block">← → でカテゴリ、↑ ↓ で項目、Enter で開く</p>
     </div>
   );
 }
