@@ -444,8 +444,11 @@ function EditorHomePage() {
 
   return (
     <div className="mx-auto flex min-h-[calc(100vh-76px)] max-w-7xl flex-col px-6 py-8 lg:py-10">
-      <div className="mb-4 flex items-baseline justify-between">
-        <p className="brand-text text-xs font-semibold tracking-[0.28em]">HORIZON JIT</p>
+      <div className="mb-5 flex items-end justify-between gap-4">
+        <div>
+          <p className="brand-text text-xs font-semibold tracking-[0.28em]">HORIZON JIT</p>
+          <h1 className="mt-1.5 text-2xl font-bold tracking-tight text-neutral-950">手順書作成システム</h1>
+        </div>
         <p className="text-sm font-semibold text-neutral-500">Manual Management</p>
       </div>
 

@@ -46,39 +46,43 @@ select {
   background: rgba(164, 129, 73, 0.18);
 }
 
-/* XMBメニューの没入グラデ背景（ライト/ダーク） */
-.xmb-bg {
-  background: radial-gradient(130% 90% at 18% 22%, #ffffff 0, #f6f3ec 55%, #efe9dc 100%);
+/* トップのカテゴリカード */
+.xmb-card-active {
+  border-color: #a48149;
+  box-shadow: 0 12px 30px rgba(164, 129, 73, 0.12);
+}
+.dark .xmb-card-active {
+  border-color: rgba(215, 183, 124, 0.6);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
+}
+.xmb-cat-icon-active {
+  background-color: #0a0a0a;
+  border-color: #0a0a0a;
+  color: #e7d3a8;
+}
+.dark .xmb-cat-icon-active {
+  background-color: #d7b77c;
+  border-color: #d7b77c;
+  color: #161922;
+}
+.xmb-item-active {
+  background-color: #fcfbf8;
+  border-color: #d7c29b;
+}
+.dark .xmb-item-active {
+  background-color: #1c2230;
+  border-color: rgba(164, 129, 73, 0.5);
+}
+.xmb-item-icon-active {
+  border-color: rgba(164, 129, 73, 0.6);
+  color: #8a6a37;
+  box-shadow: 0 0 0 3px rgba(164, 129, 73, 0.18);
+}
+.dark .xmb-item-icon-active {
+  border-color: rgba(215, 183, 124, 0.55);
+  color: #d7b77c;
 }
 
-/* XMBの項目カード（PCのみ枠付き。ダークはダークサーフェスにして文字が読めるように） */
-@media (min-width: 640px) {
-  .xmb-item-active {
-    background-color: #ffffff;
-    border-color: #d7c29b;
-    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.06);
-  }
-  .dark .xmb-item-active {
-    background-color: #1c2230;
-    border-color: rgba(164, 129, 73, 0.5);
-    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.45);
-  }
-  .xmb-item-icon-active {
-    border-color: rgba(164, 129, 73, 0.6);
-    color: #8a6a37;
-    box-shadow: 0 0 0 3px rgba(164, 129, 73, 0.18);
-  }
-  .dark .xmb-item-icon-active {
-    border-color: rgba(215, 183, 124, 0.55);
-    color: #d7b77c;
-  }
-  .xmb-item-idle {
-    opacity: 0.6;
-  }
-  .xmb-item-idle:hover {
-    opacity: 1;
-  }
-}
 
 /* ヘッダーのロゴバッジ：ライトは黒地白字、ダークは白地黒字 */
 .app-logo {
@@ -115,9 +119,6 @@ html.dark {
   background: rgba(96, 165, 250, 0.32);
 }
 
-.dark .xmb-bg {
-  background: radial-gradient(130% 90% at 18% 22%, #1a1e27 0, #12151b 55%, #0c0e12 100%);
-}
 
 .dark .app-logo {
   background-color: #ffffff;
