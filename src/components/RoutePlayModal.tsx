@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { WorkInstruction, Step, JUMP_END_TARGET } from '@/types/instruction';
 import { computeRoute, groupConditionsOf, selectableGroupIds, DEFAULT_JUMP_VALUE, ConditionSelection, JumpSelection } from '@/lib/routeEngine';
 import { checkRoutes, RouteIssue } from '@/lib/routeCheck';
+import { tryConvertConditionsToFlow } from '@/lib/convertConditions';
 import { sortSteps, isQuestionOnlyStep, questionNodeId, START_NODE, END_NODE, hasBranch } from '@/lib/flowModel';
 import FlowFigure, { FlowLegend } from './FlowFigure';
 
@@ -16,6 +17,8 @@ interface Props {
   onClose: () => void;
   /** 問題のあるステップの編集欄へ移動する */
   onEditStep?: (stepId: string) => void;
+  /** 条件グループ方式の手順書を「図で分岐を組み立てる」へ送って変換する */
+  onConvertRequest?: () => void;
 }
 
 const ISSUE_LABEL: Record<RouteIssue['kind'], string> = {
@@ -26,7 +29,7 @@ const ISSUE_LABEL: Record<RouteIssue['kind'], string> = {
   'too-many': '確認省略',
 };
 
-export default function RoutePlayModal({ instruction, onClose, onEditStep }: Props) {
+export default function RoutePlayModal({ instruction, onClose, onEditStep, onConvertRequest }: Props) {
   const [selectedConditions, setSelectedConditions] = useState<ConditionSelection>({});
   const [selectedJumpTargets, setSelectedJumpTargets] = useState<JumpSelection>({});
 
@@ -41,6 +44,7 @@ export default function RoutePlayModal({ instruction, onClose, onEditStep }: Pro
   const issues = useMemo(() => checkRoutes(instruction), [instruction]);
   const route = useMemo(() => computeRoute(instruction, selectedConditions, selectedJumpTargets), [instruction, selectedConditions, selectedJumpTargets]);
   const usesConditions = (instruction.conditions?.length ?? 0) > 0;
+  const conversion = useMemo(() => (usesConditions ? tryConvertConditionsToFlow(instruction) : null), [instruction, usesConditions]);
   const conditionGroups = useMemo(() => {
     if (!usesConditions) return [];
     const selectable = selectableGroupIds(instruction);
@@ -86,7 +90,7 @@ export default function RoutePlayModal({ instruction, onClose, onEditStep }: Pro
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-2 sm:p-4" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="flex h-[calc(100vh-16px)] w-full max-w-6xl flex-col rounded-2xl bg-white shadow-xl sm:h-[calc(100vh-32px)]">
+      <div className="flex h-[calc(100vh-16px)] w-full max-w-[1600px] flex-col rounded-2xl bg-white shadow-xl sm:h-[calc(100vh-32px)]">
         <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3 sm:px-6">
           <div className="min-w-0">
             <h2 className="text-lg font-bold text-slate-950">試し読み</h2>
@@ -207,7 +211,22 @@ export default function RoutePlayModal({ instruction, onClose, onEditStep }: Pro
           {/* 右: 流れ図 */}
           <div className="min-h-0 overflow-auto bg-[#fcfbf8] px-4 py-4 sm:px-6">
             {usesConditions ? (
-              <p className="py-8 text-center text-sm text-slate-500">条件グループ方式の手順書は、図の強調表示に対応していません。左の一覧で確認してください。</p>
+              <div className="mx-auto max-w-md py-8 text-center">
+                <p className="text-sm text-slate-600">この手順書は「条件グループ」方式で分岐を設定しているため、流れ図は表示できません。左の一覧で確認してください。</p>
+                {conversion?.ok ? (
+                  <>
+                    <p className="mt-4 text-sm font-semibold text-slate-900">「図で分岐を組み立てる」方式に変換すると、流れ図で確認・編集できるようになります。</p>
+                    <p className="mt-1 text-xs text-slate-500">条件の選び方 {conversion.combinations} 通りすべてで、変換前後の手順の流れが一致することを確認済みです。変換はこの編集画面の中だけで行われ、保存するまで手順書は変わりません。</p>
+                    {onConvertRequest && (
+                      <button type="button" onClick={onConvertRequest} className="mt-4 rounded-lg bg-slate-950 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800">
+                        図で組み立てる方式に変換する
+                      </button>
+                    )}
+                  </>
+                ) : conversion ? (
+                  <p className="mt-4 text-xs leading-5 text-amber-700">図の方式には自動変換できません: {conversion.reason}</p>
+                ) : null}
+              </div>
             ) : (
               <>
                 <FlowFigure steps={steps} selectedId={currentId} highlightIds={highlightIds} highlightEdges={highlightEdges} />

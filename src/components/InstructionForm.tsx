@@ -1921,7 +1921,12 @@ export default function InstructionForm({ initialData, approvalMode = false, asN
       )}
 
       {showRoutePlay && (
-        <RoutePlayModal instruction={buildPreviewInstruction()} onClose={() => setShowRoutePlay(false)} onEditStep={scrollToEditStep} />
+        <RoutePlayModal
+          instruction={buildPreviewInstruction()}
+          onClose={() => setShowRoutePlay(false)}
+          onEditStep={scrollToEditStep}
+          onConvertRequest={conditions.length > 0 ? () => { setShowRoutePlay(false); setShowFlowBuilder(true); } : undefined}
+        />
       )}
 
       {showSaveQr && saveSuccessModal?.viewUrl && (
