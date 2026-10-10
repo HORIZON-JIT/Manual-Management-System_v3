@@ -331,3 +331,14 @@ html.dark {
 .dark .border-emerald-200,
 .dark .border-emerald-100 { border-color: rgba(52, 211, 153, 0.35); }
 .dark .border-indigo-200 { border-color: rgba(129, 140, 248, 0.35); }
+
+/* 手順書を最後まで読んだときの完了カード */
+.mms-complete { animation: mms-pop 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.mms-complete-mark circle { transform-origin: 40px 40px; animation: mms-pop 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.mms-complete-mark path { stroke-dasharray: 60; stroke-dashoffset: 60; animation: mms-draw 0.5s ease-out 0.35s forwards; }
+.mms-confetti { position: absolute; top: -12px; width: 8px; height: 14px; border-radius: 2px; opacity: 0; animation: mms-confetti 1.8s ease-in 0.2s forwards; }
+@keyframes mms-pop { 0% { opacity: 0; transform: scale(0.85); } 100% { opacity: 1; transform: scale(1); } }
+@keyframes mms-draw { to { stroke-dashoffset: 0; } }
+@keyframes mms-confetti { 0% { opacity: 0; transform: translateY(0) rotate(0deg); } 10% { opacity: 1; } 100% { opacity: 0; transform: translateY(260px) rotate(540deg); } }
+@media (prefers-reduced-motion: reduce) { .mms-complete, .mms-complete-mark circle, .mms-complete-mark path, .mms-confetti { animation: none; } .mms-complete-mark path { stroke-dashoffset: 0; } .mms-confetti { display: none; } }
+.dark .mms-complete { background-color: #161922; border-color: rgba(16, 185, 129, 0.4); }
