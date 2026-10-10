@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import AuthErrorNotice, { driveErrorMessage } from '@/components/AuthErrorNotice';
 import { DriveFileInfo, downloadDriveFile, getTargetFolder, listJsonFilesInFolder } from '@/lib/googleDrive';
 import { getApprovalStatus, getCategoryLabel, WorkInstruction } from '@/types/instruction';
 
@@ -98,6 +99,7 @@ export default function DriveJsonFilePicker({ open, onClose, onFileLoaded }: Dri
   const [includeContentSearch, setIncludeContentSearch] = useState(false);
   const [metadataLoading, setMetadataLoading] = useState(false);
 
+  const [reloadKey, setReloadKey] = useState(0);
   useEffect(() => {
     if (!open) return;
 
@@ -122,10 +124,10 @@ export default function DriveJsonFilePicker({ open, onClose, onFileLoaded }: Dri
       })
       .catch((err) => {
         console.error('Failed to list files:', err);
-        setError('JSON ファイル一覧の取得に失敗しました。');
+        setError(driveErrorMessage(err, 'JSON ファイル一覧の取得に失敗しました。'));
       })
       .finally(() => setLoading(false));
-  }, [open]);
+  }, [open, reloadKey]);
 
   useEffect(() => {
     if (!open || files.length === 0) return;
@@ -484,8 +486,8 @@ export default function DriveJsonFilePicker({ open, onClose, onFileLoaded }: Dri
         </div>
 
         {error && (
-          <div className="border-t border-red-100 bg-red-50 px-6 py-3 text-sm text-red-700">
-            {error}
+          <div className="border-t border-red-100 px-6 py-3">
+            <AuthErrorNotice error={error} tone="red" onRetry={() => setReloadKey((k) => k + 1)} />
           </div>
         )}
 

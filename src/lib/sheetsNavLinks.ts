@@ -1,5 +1,6 @@
 import { WorkInstruction } from '@/types/instruction';
 import { CheckboxCell } from '@/lib/exportSpreadsheet';
+import { ensureAccessToken, throwForResponse } from '@/lib/googleAuth';
 
 interface SheetProperties {
   sheetId: number;
@@ -16,10 +17,7 @@ async function getSheetList(spreadsheetId: string, token: string): Promise<Sheet
     `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}?fields=sheets.properties`,
     { headers: { Authorization: `Bearer ${token}` } },
   );
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`Sheets API ${res.status}: ${err}`);
-  }
+  if (!res.ok) await throwForResponse(res, 'Sheets API');
   const data = await res.json() as SheetsGetResponse;
   return data.sheets.map((s) => s.properties);
 }
@@ -92,8 +90,7 @@ export async function addStepNavLinks(
   stepNavRows: number[],
   indexNavRows: number[],
 ): Promise<void> {
-  const token = gapi.client.getToken()?.access_token;
-  if (!token) throw new Error('Google認証が必要です');
+  const token = await ensureAccessToken();
 
   // 1. Get all sheets with their gids
   const sheetList = await getSheetList(spreadsheetId, token);
@@ -156,10 +153,7 @@ export async function addStepNavLinks(
     },
   );
 
-  if (!updateRes.ok) {
-    const err = await updateRes.text();
-    throw new Error(`Sheets API batchUpdate ${updateRes.status}: ${err}`);
-  }
+  if (!updateRes.ok) await throwForResponse(updateRes, 'Sheets API batchUpdate');
 }
 
 /**
@@ -171,8 +165,7 @@ export async function addSheetCheckboxes(
 ): Promise<void> {
   if (checkboxCells.length === 0) return;
 
-  const token = gapi.client.getToken()?.access_token;
-  if (!token) throw new Error('Google認証が必要です');
+  const token = await ensureAccessToken();
 
   const sheetList = await getSheetList(spreadsheetId, token);
 
@@ -220,10 +213,7 @@ export async function addSheetCheckboxes(
     },
   );
 
-  if (!updateRes.ok) {
-    const err = await updateRes.text();
-    throw new Error(`Sheets API batchUpdate ${updateRes.status}: ${err}`);
-  }
+  if (!updateRes.ok) await throwForResponse(updateRes, 'Sheets API batchUpdate');
 }
 
 const SCRIPT_ID_KEY = 'sheets_reset_script_ids';
@@ -297,7 +287,7 @@ const APPSSCRIPT_MANIFEST = JSON.stringify({
  * (e.g. Apps Script API not enabled in Cloud Console).
  */
 export async function addResetScript(spreadsheetId: string): Promise<boolean> {
-  const token = gapi.client.getToken()?.access_token;
+  const token = await ensureAccessToken().catch(() => null);
   if (!token) return false;
 
   const existingScriptId = getStoredScriptId(spreadsheetId);

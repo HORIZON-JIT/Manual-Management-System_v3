@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import AuthErrorNotice, { AuthChecking, driveErrorMessage } from '@/components/AuthErrorNotice';
 import Link from 'next/link';
 import {
   copyDriveFile,
@@ -75,7 +76,7 @@ function BackupTool() {
         })));
         if (files.length === 0) setError('このフォルダに手順書がありません。');
       })
-      .catch(() => setError('一覧の取得に失敗しました。'))
+      .catch((err) => setError(driveErrorMessage(err, '一覧の取得に失敗しました。')))
       .finally(() => setLoading(false));
   }, []);
 
@@ -127,13 +128,16 @@ function BackupTool() {
       setResult({ ok, ng, path: `${folderName}/バックアップ/${dateFolderName}` });
     } catch (err) {
       console.error('Failed to prepare backup folder', err);
-      setError('バックアップ先フォルダを作成できませんでした。Drive の権限を確認してください。');
+      setError(driveErrorMessage(err, 'バックアップ先フォルダを作成できませんでした。Drive の権限を確認してください。'));
     } finally {
       applyingRef.current = false;
       setApplying(false);
     }
   };
 
+  if (configured && !auth.isInitialized) {
+    return <div className="mx-auto max-w-5xl px-4 py-8"><BackLink /><AuthChecking /></div>;
+  }
   if (configured && !auth.isSignedIn) {
     return <SignInNotice />;
   }
@@ -164,7 +168,7 @@ function BackupTool() {
           バックアップを作成しました。成功 {result.ok} 件{result.ng > 0 && `／失敗 ${result.ng} 件`}。保存先: {result.path}
         </div>
       )}
-      {error && <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">{error}</div>}
+      <AuthErrorNotice error={error} onRetry={load} className="mt-4" />
 
       <div className="mt-4 overflow-hidden rounded-lg border border-slate-200 bg-white">
         <div className="flex items-center justify-between border-b border-slate-200 px-4 py-2.5 text-xs text-slate-500">

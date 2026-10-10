@@ -1,11 +1,12 @@
 // Google Identity Services (GIS) Token Model
 declare namespace google.accounts.oauth2 {
   interface TokenClient {
-    requestAccessToken(config?: { prompt?: string }): void;
+    requestAccessToken(config?: { prompt?: string; hint?: string }): void;
   }
   interface TokenClientConfig {
     client_id: string;
     scope: string;
+    hint?: string;
     callback: (response: TokenResponse) => void;
     error_callback?: (error: { type: string; message: string }) => void;
   }

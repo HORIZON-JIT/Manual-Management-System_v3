@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import AuthErrorNotice, { AuthChecking, driveErrorMessage } from '@/components/AuthErrorNotice';
 import Link from 'next/link';
 import { WorkInstruction, DEPARTMENT_OPTIONS } from '@/types/instruction';
 import {
@@ -105,7 +106,7 @@ function BulkDepartmentTool() {
         setRows(loaded);
         if (loaded.length === 0) setError('このフォルダに手順書がありません。');
       })
-      .catch(() => setError('一覧の取得に失敗しました。'))
+      .catch((err) => setError(driveErrorMessage(err, '一覧の取得に失敗しました。')))
       .finally(() => setLoading(false));
   }, []);
 
@@ -165,6 +166,7 @@ function BulkDepartmentTool() {
   };
 
   const needsSignIn = configured && !auth.isSignedIn;
+  const authChecking = configured && !auth.isInitialized;
 
   const fieldClass =
     'rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-blue-400';
@@ -180,7 +182,9 @@ function BulkDepartmentTool() {
         既存の手順書に部署をまとめて割り当てます。{folderName && `（フォルダ: ${folderName}）`}
       </p>
 
-      {needsSignIn ? (
+      {authChecking ? (
+        <AuthChecking />
+      ) : needsSignIn ? (
         <div className="mt-8 rounded-lg border border-slate-200 bg-white p-6">
           <p className="text-sm font-semibold text-slate-900">Google Drive にログインしてください</p>
           <button
@@ -251,9 +255,7 @@ function BulkDepartmentTool() {
               完了しました。成功 {result.ok} 件{result.ng > 0 && `／失敗 ${result.ng} 件`}。
             </div>
           )}
-          {error && (
-            <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">{error}</div>
-          )}
+          <AuthErrorNotice error={error} onRetry={load} className="mt-4" />
 
           <div className="mt-4 overflow-hidden rounded-lg border border-slate-200 bg-white">
             <div className="flex items-center justify-between border-b border-slate-200 px-4 py-2.5 text-xs text-slate-500">

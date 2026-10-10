@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import AuthErrorNotice, { AuthChecking, driveErrorMessage } from '@/components/AuthErrorNotice';
 import Link from 'next/link';
 import { WorkInstruction } from '@/types/instruction';
 import { downloadDriveFile, getTargetFolder, listJsonFilesInFolder, saveFileToDrive } from '@/lib/googleDrive';
@@ -65,7 +66,7 @@ function BulkSequentialTool() {
         setRows(loaded);
         if (loaded.length === 0) setError('このフォルダに手順書がありません。');
       })
-      .catch(() => setError('一覧の取得に失敗しました。'))
+      .catch((err) => setError(driveErrorMessage(err, '一覧の取得に失敗しました。')))
       .finally(() => setLoading(false));
   }, []);
 
@@ -106,6 +107,9 @@ function BulkSequentialTool() {
     setResult({ ok, ng });
   };
 
+  if (configured && !auth.isInitialized) {
+    return <div className="mx-auto max-w-5xl px-4 py-8"><BackLink /><AuthChecking /></div>;
+  }
   if (configured && !auth.isSignedIn) {
     return <div className="mx-auto max-w-5xl px-4 py-8"><BackLink /><div className="mt-6 rounded-lg border border-slate-200 bg-white p-6"><p className="text-sm font-semibold text-slate-900">Google Drive にログインしてください</p><button onClick={signIn} className="mt-4 rounded-lg bg-slate-950 px-5 py-3 text-sm font-semibold text-white">Googleでログイン</button></div></div>;
   }
@@ -121,7 +125,7 @@ function BulkSequentialTool() {
         <button onClick={apply} disabled={applying || selectedRows.length === 0} className="ml-auto rounded-lg bg-slate-950 px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50">{applying ? `変更中... (${progress.done}/${progress.total})` : `選択した ${selectedRows.length} 件を変更`}</button>
       </div>
       {result && <div className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">完了しました。成功 {result.ok} 件{result.ng > 0 && `／失敗 ${result.ng} 件`}。</div>}
-      {error && <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">{error}</div>}
+      <AuthErrorNotice error={error} onRetry={load} className="mt-4" />
       <div className="mt-4 overflow-hidden rounded-lg border border-slate-200 bg-white"><div className="flex items-center justify-between border-b border-slate-200 px-4 py-2.5 text-xs text-slate-500"><span>{loading ? '読み込み中...' : `${rows.length} 件（選択 ${selectedRows.length} 件）`}</span><button onClick={load} disabled={loading || applying}>再読み込み</button></div><ul className="divide-y divide-slate-100">{rows.map((row) => <li key={row.id}><label className="flex cursor-pointer items-center gap-3 px-4 py-3 hover:bg-slate-50"><input type="checkbox" checked={row.selected} onChange={() => toggle(row.id)} disabled={applying} /><span className="min-w-0 flex-1 truncate text-sm text-slate-900">{row.title}</span><span className={`rounded-full border px-2.5 py-0.5 text-xs ${row.sequential ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-slate-50 text-slate-600'}`}>読み飛ばし防止 {row.sequential ? 'ON' : 'OFF'}</span></label></li>)}</ul></div>
     </div>
   );
