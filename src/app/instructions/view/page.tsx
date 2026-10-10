@@ -63,6 +63,9 @@ function InstructionViewContent() {
   const [viewingSnapshot, setViewingSnapshot] = useState<InstructionSnapshot | null>(null);
   const [viewUrlCopied, setViewUrlCopied] = useState(false);
   const [showQr, setShowQr] = useState(false);
+  // 完了カードへの自動スクロールは、閲覧者が答えや「次へ」を操作して終わりに到達したときだけ行う
+  // （開いた直後に分岐のない手順書で一番下へ飛ばないように）
+  const [interacted, setInteracted] = useState(false);
   const [expandedStepDetails, setExpandedStepDetails] = useState<Record<string, boolean>>({});
 
   const copyPathToClipboard = async (path: string, linkId: string) => {
@@ -109,6 +112,7 @@ function InstructionViewContent() {
       setScrollTargetStepId(null);
       setChapterTargetStepId(null);
       setRevealedCount(1);
+      setInteracted(false);
     });
 
     if (window.location.hash) {
@@ -318,6 +322,7 @@ function InstructionViewContent() {
   }
 
   const handleConditionSelect = (groupId: string, conditionId: string, visibleIndex: number) => {
+    setInteracted(true);
     const activeConditionId = selectedConditions[groupId] ?? groupConditions.get(groupId)?.[0]?.id;
     const branchChanged = activeConditionId !== conditionId;
 
@@ -336,6 +341,7 @@ function InstructionViewContent() {
   const isComplete = visibleSteps.length > 0 && (!isSequential || revealedCount >= visibleSteps.length) && !pendingJumpStepId;
 
   const handleJumpSelect = (stepId: string, targetStepId: string, visibleIndex: number) => {
+    setInteracted(true);
     setChapterTargetStepId(null);
     // 前に表示したステップへ戻る選択（やり直し）: 戻り先以降の選択を取り消して、そこからやり直す
     const backIndex = visibleSteps.findIndex((step, index) => index < visibleIndex && step.id === targetStepId);
@@ -822,7 +828,7 @@ function InstructionViewContent() {
                     </span>
                   ) : revealedCount < visibleSteps.length ? (
                     <button
-                      onClick={() => setRevealedCount((count) => count + 1)}
+                      onClick={() => { setInteracted(true); setRevealedCount((count) => count + 1); }}
                       className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow transition"
                     >
                       次へ
@@ -841,6 +847,7 @@ function InstructionViewContent() {
 
       {isComplete && (
         <CompletionCard
+          autoScroll={interacted}
           stepCount={visibleSteps.length}
           title={displayTitle}
           onRestart={() => {
@@ -1091,14 +1098,14 @@ function InstructionViewContent() {
 }
 
 /** 最後まで読んだことを知らせるカード。表示されたときに画面内へスクロールし、読み直しとトップへの導線を出す */
-function CompletionCard({ stepCount, title, onRestart }: { stepCount: number; title: string; onRestart: () => void }) {
+function CompletionCard({ stepCount, title, onRestart, autoScroll }: { stepCount: number; title: string; onRestart: () => void; autoScroll: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const el = ref.current;
-    if (!el) return;
+    if (!el || !autoScroll) return;
     const timer = window.setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'center' }), 150);
     return () => window.clearTimeout(timer);
-  }, []);
+  }, [autoScroll]);
   return (
     <div ref={ref} className="no-print mms-complete relative mt-6 overflow-hidden rounded-2xl border border-emerald-200 bg-white px-6 py-8 text-center shadow-[0_18px_44px_rgba(16,185,129,0.12)]">
       <div className="pointer-events-none absolute inset-0" aria-hidden="true">
