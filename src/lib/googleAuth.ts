@@ -1,6 +1,6 @@
 const CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '';
 const SCOPES =
-  'openid email profile https://www.googleapis.com/auth/drive https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/script.projects';
+  'openid email profile https://www.googleapis.com/auth/drive https://www.googleapis.com/auth/spreadsheets';
 
 const STORAGE_TOKEN_KEY = 'google_auth_token';
 const STORAGE_EXPIRY_KEY = 'google_auth_expiry';
