@@ -8,7 +8,7 @@ import EditorOnlyNotice from '@/components/EditorOnlyNotice';
 import { FEATURES, VIEWER_ONLY } from '@/lib/appMode';
 import { addAuthListener, getAuthState, GoogleAuthState, initGoogleAuth, isGoogleConfigured, signIn } from '@/lib/googleAuth';
 import { DriveFileInfo, getTargetFolder, listJsonFilesInFolder } from '@/lib/googleDrive';
-import { viewerInstructionUrl } from '@/lib/viewerUrl';
+import { editorInstructionUrl } from '@/lib/viewerUrl';
 import {
   TaskMaster,
   classifyUrl,
@@ -32,7 +32,7 @@ interface ManualOption {
 const KIND_LABEL: Record<string, string> = { K: '計画管理', T: '手配', J: '受注管理', B: 'BOMメンテナンス', S: '打合せ・問い合わせ', Z: '改善', O: 'その他', α: 'アフター管理' };
 
 function urlBadge(kind: ReturnType<typeof classifyUrl>) {
-  if (kind === 'v3') return <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">v3 ビューア</span>;
+  if (kind === 'v3') return <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">v3（編集可）</span>;
   if (kind === 'v2') return <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700">旧 URL</span>;
   if (kind === 'other') return <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-semibold text-slate-600">外部</span>;
   return <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-semibold text-slate-400">未設定</span>;
@@ -139,7 +139,7 @@ function TaskLinksContent() {
       const next = { ...prev };
       if (fileId === '__keep__') delete next[rowNumber];
       else if (fileId === '__clear__') next[rowNumber] = '';
-      else next[rowNumber] = viewerInstructionUrl(fileId);
+      else next[rowNumber] = editorInstructionUrl(fileId);
       return next;
     });
   };
@@ -155,7 +155,7 @@ function TaskLinksContent() {
       if (up) { next[r.rowNumber] = up; sug.add(r.rowNumber); upgraded += 1; continue; }
       if (classifyUrl(r.manualUrl) === 'empty' && r.active) {
         const id = matchTitle(r.name, manuals);
-        if (id) { next[r.rowNumber] = viewerInstructionUrl(id); sug.add(r.rowNumber); matched += 1; }
+        if (id) { next[r.rowNumber] = editorInstructionUrl(id); sug.add(r.rowNumber); matched += 1; }
       }
     }
     setPending(next);
@@ -207,7 +207,7 @@ function TaskLinksContent() {
       <BackLink />
       <h1 className="text-3xl font-bold tracking-tight text-slate-950">タスクの手順書URLを更新</h1>
       <p className="mt-2 text-sm text-slate-500">
-        タスク管理アプリの「タスクマスタ」シートにある手順書URL を、このアプリのビューアの URL に更新します。書き換えるのは手順書URL の列だけです。
+        タスク管理アプリの「タスクマスタ」シートにある手順書URL を、この手順書作成システムの URL（開くと編集もできる）に更新します。書き換えるのは手順書URL の列だけです。
       </p>
 
       <div className="mt-6 rounded-lg border border-slate-200 bg-white p-4">

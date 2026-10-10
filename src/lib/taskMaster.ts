@@ -1,9 +1,9 @@
 import { ensureAccessToken, throwForResponse } from '@/lib/googleAuth';
-import { viewerInstructionUrl } from '@/lib/viewerUrl';
+import { editorInstructionUrl } from '@/lib/viewerUrl';
 
 /**
  * タスク管理アプリ（Google スプレッドシート）の「タスクマスタ」シートとの連携。
- * 手順書URL 列を、手順書アプリの v3 ビューア URL で更新する。
+ * 手順書URL 列を、手順書作成システム（編集できる側）の v3 閲覧 URL で更新する。
  * 列は見出し名で探すので、列の順番が変わっても動く。
  */
 
@@ -70,13 +70,13 @@ export function spreadsheetUrl(id: string): string {
 
 export type UrlKind = 'empty' | 'v3' | 'v2' | 'other';
 
-/** 手順書URL の種類。v3 はこのアプリのビューア、v2 は旧アプリ */
+/** 手順書URL の種類。v3 は作成システム（編集できる側）の URL、v2 は旧アプリやビューアの URL（置き換え対象） */
 export function classifyUrl(url: string): UrlKind {
   const u = url.trim();
   if (!u) return 'empty';
-  if (/Manual-Management-System_v3\/viewer\/instructions\/view\?/.test(u)) return 'v3';
+  if (/Manual-Management-System_v3\/viewer\/instructions\/view\?/.test(u)) return 'v2'; // ビューア URL は編集できないので置き換える
+  if (/Manual-Management-System_v3\/instructions\/view\?/.test(u)) return 'v3';
   if (/Manual-Management-System(_v2)?\/instructions\/view\?/.test(u)) return 'v2';
-  if (/Manual-Management-System_v3\/instructions\/view\?/.test(u)) return 'v2'; // v3 の作成アプリ側 URL もビューアに揃える
   return 'other';
 }
 
@@ -86,12 +86,12 @@ export function driveFileIdOf(url: string): string | null {
   return m ? decodeURIComponent(m[1]) : null;
 }
 
-/** 旧 URL を v3 ビューアの URL に直せるなら返す */
+/** 旧 URL（v2・ビューア）を作成システムの v3 URL に直せるなら返す */
 export function upgradeToViewerUrl(url: string): string | null {
   const kind = classifyUrl(url);
   if (kind !== 'v2') return null;
   const id = driveFileIdOf(url);
-  return id ? viewerInstructionUrl(id) : null;
+  return id ? editorInstructionUrl(id) : null;
 }
 
 function columnLetter(index0: number): string {
