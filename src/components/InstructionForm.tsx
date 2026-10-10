@@ -39,6 +39,8 @@ import VersionHistoryModal from './VersionHistoryModal';
 import FlowchartModal from './FlowchartModal';
 import FlowBuilderModal from './FlowBuilderModal';
 import Form63ExportModal from './Form63ExportModal';
+import RoutePlayModal from './RoutePlayModal';
+import { checkRoutes } from '@/lib/routeCheck';
 import { tryConvertConditionsToFlow } from '@/lib/convertConditions';
 
 const LAST_AUTHOR_KEY = 'last_author_name';
@@ -129,6 +131,8 @@ export default function InstructionForm({ initialData, approvalMode = false }: I
   const [showFlowchart, setShowFlowchart] = useState(false);
   const [showFlowBuilder, setShowFlowBuilder] = useState(false);
   const [showForm63, setShowForm63] = useState(false);
+  const [showRoutePlay, setShowRoutePlay] = useState(false);
+  const [routeIssueCount, setRouteIssueCount] = useState(0);
   const [storageEstimate, setStorageEstimate] = useState<{ usage: number; quota: number } | null>(null);
   const [showStepIndex, setShowStepIndex] = useState(false);
   const [showDescriptionGuide, setShowDescriptionGuide] = useState(false);
@@ -555,6 +559,21 @@ export default function InstructionForm({ initialData, approvalMode = false }: I
   useEffect(() => {
     refreshStorageEstimate();
   }, [refreshStorageEstimate]);
+
+  // 分岐の問題（表示されないステップ・未設定の答えなど）の件数を、入力が落ち着いてから数える
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      try {
+        const groups = Object.entries(groupParents)
+          .filter((entry): entry is [string, string] => !!entry[1])
+          .map(([id, parentConditionId]) => ({ id, parentConditionId }));
+        setRouteIssueCount(checkRoutes({ steps, conditions, conditionGroups: groups }).filter((i) => i.kind !== 'too-many').length);
+      } catch {
+        setRouteIssueCount(0);
+      }
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [steps, conditions, groupParents]);
 
   /* ---- 自動下書き保存 ----
    * 入力が止まって 3 秒後に端末内（IndexedDB）へ保存する。タブを閉じる・ブラウザが落ちても編集内容が残る。
@@ -1502,6 +1521,21 @@ export default function InstructionForm({ initialData, approvalMode = false }: I
                   </svg>
                   作成中のフローチャートを表示
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setShowRoutePlay(true)}
+                  className="flex w-full items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-slate-500 transition hover:bg-slate-50 hover:text-slate-900"
+                >
+                  <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24" aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 4.5v15l12-7.5-12-7.5Z" />
+                  </svg>
+                  試し読み（分岐を確認）
+                  {routeIssueCount > 0 && (
+                    <span className="ml-1 inline-flex min-w-5 items-center justify-center rounded-full bg-amber-100 px-1.5 text-[11px] font-bold text-amber-800" title="確認が必要な箇所">
+                      {routeIssueCount}
+                    </span>
+                  )}
+                </button>
               </div>
 
               <div className="my-5 border-t border-slate-100" />
@@ -1859,6 +1893,10 @@ export default function InstructionForm({ initialData, approvalMode = false }: I
 
       {showForm63 && (
         <Form63ExportModal instruction={buildPreviewInstruction()} onClose={() => setShowForm63(false)} />
+      )}
+
+      {showRoutePlay && (
+        <RoutePlayModal instruction={buildPreviewInstruction()} onClose={() => setShowRoutePlay(false)} onEditStep={scrollToEditStep} />
       )}
 
       {showFlowBuilder && (
