@@ -7,6 +7,7 @@
     "dev:viewer": "cross-env NEXT_PUBLIC_DEPARTMENT=viewer next dev",
     "build": "next build",
     "build:viewer": "cross-env NEXT_PUBLIC_DEPARTMENT=viewer next build",
+    "build:production": "cross-env NEXT_PUBLIC_DEPARTMENT=production next build",
     "start": "next start",
     "start:viewer": "cross-env NEXT_PUBLIC_DEPARTMENT=viewer next start",
     "lint": "eslint"

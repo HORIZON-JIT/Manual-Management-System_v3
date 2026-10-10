@@ -41,6 +41,7 @@ import Form63ExportModal from './Form63ExportModal';
 import RoutePlayModal from './RoutePlayModal';
 import QrCodeModal from './QrCodeModal';
 import { viewerInstructionUrl } from '@/lib/viewerUrl';
+import { FEATURES } from '@/lib/appMode';
 import { checkRoutes } from '@/lib/routeCheck';
 import { buildDriveMeta, buildSearchText } from '@/lib/driveMeta';
 import { tryConvertConditionsToFlow } from '@/lib/convertConditions';
@@ -165,6 +166,7 @@ export default function InstructionForm({ initialData, approvalMode = false, asN
     folderName: string;
     folderUrl?: string;
     viewUrl?: string;
+    driveFileId?: string;
     excelExported: boolean;
   } | null>(null);
   const [viewUrlCopied, setViewUrlCopied] = useState(false);
@@ -707,7 +709,7 @@ export default function InstructionForm({ initialData, approvalMode = false, asN
         await saveInstruction({ ...instruction, driveFileId });
       } catch {}
 
-      setSaveSuccessModal({ folderName, folderUrl, viewUrl, excelExported });
+      setSaveSuccessModal({ folderName, folderUrl, viewUrl, driveFileId, excelExported });
       void scriptAttached;
     } catch (error) {
       console.error('Drive save error:', error);
@@ -1885,6 +1887,15 @@ export default function InstructionForm({ initialData, approvalMode = false, asN
                     QRコード
                   </button>
                 </div>
+                {FEATURES.taskMasterLink && saveSuccessModal.driveFileId && (
+                  <button
+                    type="button"
+                    onClick={() => router.push(`/instructions/task-links?driveFileId=${encodeURIComponent(saveSuccessModal.driveFileId!)}`)}
+                    className="mt-2 text-xs font-semibold text-blue-800 underline decoration-blue-300 underline-offset-2 hover:text-blue-900"
+                  >
+                    タスク管理アプリのタスクマスタにこの手順書を登録する →
+                  </button>
+                )}
               </div>
             )}
 
