@@ -9,8 +9,7 @@ import { VIEWER_ONLY } from '@/lib/appMode';
 import { setTempData } from '@/lib/tempStorage';
 import { TEMPLATE_TEMP_KEY } from '@/lib/templateCopy';
 import { WorkInstruction, Step } from '@/types/instruction';
-import { AiSettings, DEFAULT_GEMINI_MODEL, loadAiSettings, maskApiKey, saveAiSettings } from '@/lib/aiSettings';
-import { analyzeVideo, AnalyzeStage, parseStepsJson, normalizeSteps, VideoStep, INLINE_LIMIT_BYTES } from '@/lib/geminiVideo';
+import { buildPrompt, GEMINI_WEB_URL, loadGlossary, normalizeSteps, parseStepsJson, saveGlossary, VideoStep } from '@/lib/videoSteps';
 import { captureFrameAt, formatTime, loadVideo, ScreenRecorder, startScreenRecording, VideoInfo } from '@/lib/videoFrames';
 
 const MAX_DURATION_WARN_SEC = 15 * 60;
@@ -25,7 +24,6 @@ type Phase =
   | { kind: 'idle' }
   | { kind: 'recording'; startedAt: number }
   | { kind: 'loading' }
-  | { kind: 'analyzing'; stage: AnalyzeStage; detail?: string }
   | { kind: 'capturing'; done: number; total: number }
   | { kind: 'error'; message: string };
 
@@ -34,13 +32,6 @@ function formatBytes(n: number): string {
   if (n >= 1024) return `${Math.round(n / 1024)} KB`;
   return `${n} B`;
 }
-
-const STAGE_LABEL: Record<AnalyzeStage, string> = {
-  upload: '動画を送信中',
-  processing: 'Gemini 側で動画を処理中',
-  analyze: '手順を解析中',
-  done: '完了',
-};
 
 export default function FromVideoPage() {
   if (VIEWER_ONLY) return <EditorOnlyNotice />;
@@ -55,10 +46,9 @@ function FromVideoContent() {
   const [videoName, setVideoName] = useState('');
   const [videoInfo, setVideoInfo] = useState<VideoInfo | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [settings, setSettings] = useState<AiSettings>({ apiKey: '', model: DEFAULT_GEMINI_MODEL, glossary: '' });
-  const [keyInput, setKeyInput] = useState('');
-  const [showSettings, setShowSettings] = useState(false);
-  const [showJsonPaste, setShowJsonPaste] = useState(false);
+  const [glossary, setGlossary] = useState('');
+  const [showPrompt, setShowPrompt] = useState(false);
+  const [geminiMessage, setGeminiMessage] = useState<string | null>(null);
   const [jsonText, setJsonText] = useState('');
   const [steps, setSteps] = useState<FrameStep[]>([]);
   const [previewTime, setPreviewTime] = useState(0);
@@ -73,11 +63,8 @@ function FromVideoContent() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const s = loadAiSettings();
-    queueMicrotask(() => {
-      setSettings(s);
-      setShowSettings(!s.apiKey);
-    });
+    const g = loadGlossary();
+    queueMicrotask(() => setGlossary(g));
   }, []);
 
   // 録画中の経過時間
@@ -163,20 +150,43 @@ function FromVideoContent() {
     await acceptVideo(blob, name);
   };
 
-  const persistSettings = (next: AiSettings) => {
-    setSettings(next);
-    saveAiSettings(next);
+  const prompt = useMemo(() => buildPrompt(glossary, videoInfo?.durationSec), [glossary, videoInfo?.durationSec]);
+
+  const copyPrompt = async (): Promise<boolean> => {
+    try {
+      await navigator.clipboard.writeText(prompt);
+      return true;
+    } catch {
+      setShowPrompt(true);
+      return false;
+    }
   };
 
-  const handleSaveKey = () => {
-    const key = keyInput.trim();
-    if (!key) return;
-    persistSettings({ ...settings, apiKey: key });
-    setKeyInput('');
+  /** 指示文をコピーして Gemini（ウェブ版）を新しいタブで開く。様式6-3号の「Gemini で文章を書き直す」と同じ流れ。 */
+  const handleOpenGemini = async () => {
+    const win = window.open(GEMINI_WEB_URL, '_blank', 'noopener');
+    const ok = await copyPrompt();
+    if (ok) setGeminiMessage('Gemini を開きました。入力欄の「＋」で動画を添付し、指示文を貼り付け（Ctrl+V）て送信してください。返ってきた JSON を下の欄に貼り付けます。');
+    else setGeminiMessage('クリップボードが使えないため、下に出した指示文を手でコピーして Gemini に貼り付けてください。');
+    if (!win) setGeminiMessage('Gemini のタブを開けませんでした（ポップアップがブロックされた可能性）。指示文はコピー済みなので、Gemini を自分で開いて貼り付けてください。');
   };
 
-  const handleClearKey = () => {
-    persistSettings({ ...settings, apiKey: '' });
+  const handleCopyPromptOnly = async () => {
+    const ok = await copyPrompt();
+    setGeminiMessage(ok ? '指示文をコピーしました。' : 'クリップボードが使えないため、下の指示文を手でコピーしてください。');
+  };
+
+  /** 録画した動画を端末に保存する（Gemini に添付するため） */
+  const handleDownloadVideo = () => {
+    if (!videoBlob) return;
+    const url = URL.createObjectURL(videoBlob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = videoName || 'recording.webm';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
   /** 手順一覧を受け取り、各時刻のフレームを切り出して一覧に入れる */
@@ -208,43 +218,10 @@ function FromVideoContent() {
     }
   }, [videoInfo?.durationSec]);
 
-  const handleAnalyze = async () => {
-    if (!videoBlob) return;
-    if (!settings.apiKey) {
-      setShowSettings(true);
-      setPhase({ kind: 'error', message: 'API キーを設定してください。' });
-      return;
-    }
-    if (steps.length > 0 && !confirm('いまの手順一覧を捨てて、AI の解析結果で置き換えます。よろしいですか？')) return;
-    const controller = new AbortController();
-    abortRef.current = controller;
-    setPhase({ kind: 'analyzing', stage: 'upload' });
-    try {
-      const result = await analyzeVideo(videoBlob, {
-        apiKey: settings.apiKey,
-        model: settings.model,
-        glossary: settings.glossary,
-        durationSec: videoInfo?.durationSec,
-        signal: controller.signal,
-        onProgress: (stage, detail) => setPhase({ kind: 'analyzing', stage, detail }),
-      });
-      abortRef.current = null;
-      await applySteps(result);
-    } catch (err) {
-      abortRef.current = null;
-      if ((err as { name?: string })?.name === 'AbortError') {
-        setPhase({ kind: 'idle' });
-        return;
-      }
-      setPhase({ kind: 'error', message: err instanceof Error ? err.message : '解析に失敗しました。' });
-    }
-  };
-
   const handleApplyJson = async () => {
     try {
       const list = parseStepsJson(jsonText);
       if (steps.length > 0 && !confirm('いまの手順一覧を捨てて、貼り付けた JSON で置き換えます。よろしいですか？')) return;
-      setShowJsonPaste(false);
       await applySteps(list);
     } catch (err) {
       setPhase({ kind: 'error', message: err instanceof Error ? err.message : 'JSON を読めませんでした。' });
@@ -347,7 +324,7 @@ function FromVideoContent() {
     }
   };
 
-  const busy = phase.kind === 'loading' || phase.kind === 'analyzing' || phase.kind === 'capturing';
+  const busy = phase.kind === 'loading' || phase.kind === 'capturing';
   const readyCount = useMemo(() => steps.filter((s) => s.image).length, [steps]);
   const sizeWarn = videoBlob && videoBlob.size > MAX_SIZE_WARN_BYTES;
   const durationWarn = videoInfo && videoInfo.durationSec > MAX_DURATION_WARN_SEC;
@@ -363,8 +340,8 @@ function FromVideoContent() {
         </Link>
         <h1 className="text-3xl font-bold tracking-tight text-slate-950">動画から作成</h1>
         <p className="mt-2 text-sm leading-6 text-slate-500">
-          パソコン操作の録画を AI（Gemini）に読ませ、手順の区切りと説明文の下書きを作ります。
-          結果の各時刻で動画から画像を切り出し、いつもの新規作成画面に渡します。
+          パソコン操作の録画を Gemini（ウェブ版）に渡して、手順の区切りと説明文の JSON を作ってもらいます。
+          その JSON を貼り付けると、各時刻の画像を動画から切り出し、いつもの新規作成画面に渡します。動画や画像をこのアプリが外部に送ることはありません。
         </p>
       </div>
 
@@ -425,12 +402,12 @@ function FromVideoContent() {
               <ul className="mt-2 space-y-1 text-xs text-slate-500">
                 <li>長さ: {formatTime(videoInfo.durationSec)}</li>
                 <li>解像度: {videoInfo.width} × {videoInfo.height}</li>
-                <li>サイズ: {formatBytes(videoBlob.size)}{videoBlob.size > INLINE_LIMIT_BYTES && '（20MB 超のため Files API 経由で送信）'}</li>
+                <li>サイズ: {formatBytes(videoBlob.size)}</li>
               </ul>
               {(sizeWarn || durationWarn) && (
                 <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                  {durationWarn && '15 分を超える動画は解析に時間がかかり、手順が粗くなります。'}
-                  {sizeWarn && ' 200MB を超えるとアップロードに失敗することがあります。'}
+                  {durationWarn && '15 分を超える動画は Gemini の手順が粗くなりがちです。'}
+                  {sizeWarn && ' 200MB を超えると Gemini に添付できないことがあります。'}
                   短く分けて録画することをおすすめします。
                 </p>
               )}
@@ -448,122 +425,82 @@ function FromVideoContent() {
         )}
       </section>
 
-      {/* 2. AI で解析 */}
+      {/* 2. Gemini で JSON を作る */}
       <section className="mt-5 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="flex items-center gap-2 text-base font-semibold text-slate-900">
-            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-900 text-xs font-bold text-white">2</span>
-            AI で手順を作る
-          </h2>
-          <div className="flex items-center gap-2 text-xs">
-            <button type="button" onClick={() => setShowSettings((v) => !v)} className="rounded-md border border-slate-200 bg-white px-3 py-1.5 font-medium text-slate-600 transition hover:bg-slate-50">
-              AI 設定 {settings.apiKey ? `（キー ${maskApiKey(settings.apiKey)}）` : '（キー未設定）'}
-            </button>
-            <button type="button" onClick={() => setShowJsonPaste((v) => !v)} className="rounded-md border border-slate-200 bg-white px-3 py-1.5 font-medium text-slate-600 transition hover:bg-slate-50">
-              JSON を貼り付ける
-            </button>
-          </div>
-        </div>
+        <h2 className="flex items-center gap-2 text-base font-semibold text-slate-900">
+          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-900 text-xs font-bold text-white">2</span>
+          Gemini で手順の JSON を作る
+        </h2>
+        <p className="mt-1 text-xs text-slate-500">動画は自分で Gemini に添付します。取引先名・単価・個人情報が映る動画は、社内ルールに従って扱ってください。</p>
 
-        <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-900">
-          <p className="font-semibold">送信先と送る内容</p>
-          <p>「解析する」を押すと、この動画と下の用語集が Google の Gemini API（generativelanguage.googleapis.com）へ送られます。送信前に黒塗りはできません。取引先名・単価・個人情報が映る動画は、社内ルールに従って扱ってください。動画は解析後に Gemini 側から削除します（20MB 超の場合）。手順書の画像は、保存前に注釈画面の「モザイク」「塗りつぶし」で隠せます。</p>
-        </div>
-
-        {showSettings && (
-          <div className="mt-4 grid gap-4 rounded-lg border border-slate-200 bg-slate-50 p-4 md:grid-cols-2">
-            <div className="md:col-span-2">
-              <label className="block text-xs font-semibold text-slate-700">Gemini API キー</label>
-              <p className="mt-0.5 text-[11px] text-slate-500">Google AI Studio で発行した自分のキーを入れてください。この端末のブラウザにだけ保存され、コードや Drive、手順書には入りません。共有パソコンでは使い終わったら削除してください。</p>
-              {settings.apiKey ? (
-                <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
-                  <span className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-1.5 font-mono text-emerald-800">{maskApiKey(settings.apiKey)}</span>
-                  <span className="text-xs text-emerald-700">保存済み</span>
-                  <button type="button" onClick={handleClearKey} className="rounded-md px-3 py-1.5 text-xs font-medium text-red-600 transition hover:bg-red-50">キーを削除</button>
-                </div>
-              ) : (
-                <div className="mt-2 flex flex-wrap gap-2">
-                  <input
-                    type="password"
-                    value={keyInput}
-                    onChange={(e) => setKeyInput(e.target.value)}
-                    placeholder="AIza..."
-                    autoComplete="off"
-                    className="min-w-0 flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm font-mono focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
-                  />
-                  <button type="button" onClick={handleSaveKey} disabled={!keyInput.trim()} className="rounded-md bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-40">この端末に保存</button>
-                </div>
+        <ol className="mt-4 space-y-4">
+          <li className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+            <p className="text-sm font-semibold text-slate-800">① 指示文をコピーして Gemini を開く</p>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <button type="button" onClick={handleOpenGemini} className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700">
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                指示文をコピーして Gemini を開く
+              </button>
+              <button type="button" onClick={handleCopyPromptOnly} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50">指示文だけコピー</button>
+              <button type="button" onClick={() => setShowPrompt((v) => !v)} className="rounded-lg px-3 py-2 text-sm font-medium text-slate-500 transition hover:bg-slate-100">{showPrompt ? '指示文を隠す' : '指示文を見る'}</button>
+              {videoBlob && (
+                <button type="button" onClick={handleDownloadVideo} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50" title="Gemini に添付するために動画を端末へ保存します">
+                  動画を保存
+                </button>
               )}
             </div>
-            <div>
-              <label className="block text-xs font-semibold text-slate-700">モデル</label>
-              <input
-                type="text"
-                value={settings.model}
-                onChange={(e) => setSettings({ ...settings, model: e.target.value })}
-                onBlur={() => persistSettings({ ...settings, model: settings.model.trim() || DEFAULT_GEMINI_MODEL })}
-                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
-              />
-              <p className="mt-1 text-[11px] text-slate-500">既定は {DEFAULT_GEMINI_MODEL}。精度を上げたいときは pro 系に変えられます（費用が上がります）。</p>
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-slate-700">社内用語集（任意）</label>
+            {geminiMessage && <p className="mt-2 rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-900">{geminiMessage}</p>}
+            {showPrompt && (
+              <textarea readOnly value={prompt} rows={10} onFocus={(e) => e.target.select()} className="mt-2 w-full rounded-md border border-slate-300 bg-white px-3 py-2 font-mono text-xs text-slate-700" />
+            )}
+            <div className="mt-3">
+              <label className="block text-xs font-semibold text-slate-700">社内用語集（任意・指示文に入ります）</label>
               <textarea
-                value={settings.glossary}
-                onChange={(e) => setSettings({ ...settings, glossary: e.target.value })}
-                onBlur={() => persistSettings(settings)}
-                rows={4}
+                value={glossary}
+                onChange={(e) => setGlossary(e.target.value)}
+                onBlur={() => saveGlossary(glossary)}
+                rows={3}
                 placeholder={'例:\n受注一覧 = 業務システムの「受注照会」画面\nPO = 発注書'}
                 className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
               />
-              <p className="mt-1 text-[11px] text-slate-500">画面名や略語の正しい表記を書いておくと、説明文に反映されます。動画と一緒に送られます。</p>
+              <p className="mt-1 text-[11px] text-slate-500">画面名や略語の正しい表記を書いておくと、説明文に反映されます。この端末に記憶されます。</p>
             </div>
-          </div>
-        )}
-
-        {showJsonPaste && (
-          <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
-            <p className="text-xs font-semibold text-slate-700">時刻つき JSON を貼り付ける（API キーなしでも使えます）</p>
-            <p className="mt-0.5 text-[11px] text-slate-500">
-              Gemini のウェブ版などで作った <code className="rounded bg-white px-1">[{'{'}&quot;time&quot;: 12.5, &quot;title&quot;: &quot;…&quot;, &quot;text&quot;: &quot;…&quot;{'}'}, …]</code> の形の JSON を貼ると、各時刻の画像を切り出します。time は秒または「1:23」の形。
+          </li>
+          <li className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+            <p className="font-semibold text-slate-800">② Gemini で動画を添付して送信する</p>
+            <p className="mt-1 text-xs leading-5 text-slate-600">
+              Gemini の入力欄の「＋」から動画ファイル（録画したものは上の「動画を保存」で端末に保存）を添付し、コピーした指示文を貼り付けて送信します。
+              返ってきた JSON（<code className="rounded bg-white px-1">[ {'{'} &quot;time&quot;: …, &quot;title&quot;: …, &quot;text&quot;: … {'}'}, … ]</code>）をコピーしてください。
             </p>
+          </li>
+          <li className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+            <p className="text-sm font-semibold text-slate-800">③ 返ってきた JSON を貼り付ける</p>
+            <p className="mt-1 text-[11px] text-slate-500">```json の囲みや前後の文章が混ざっていても読み取ります。time は秒または「1:23」の形。</p>
             <textarea
               value={jsonText}
               onChange={(e) => setJsonText(e.target.value)}
               rows={6}
-              className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 font-mono text-xs focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+              placeholder='[ { "time": 12.5, "title": "受注一覧を開く", "text": "メニューから受注一覧を開く。" }, … ]'
+              className="mt-2 w-full rounded-md border border-slate-300 bg-white px-3 py-2 font-mono text-xs focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
             />
-            <div className="mt-2 flex gap-2">
-              <button type="button" onClick={handleApplyJson} disabled={!videoBlob || !jsonText.trim() || busy} className="rounded-md bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-40">この JSON で画像を切り出す</button>
-              {!videoBlob && <span className="self-center text-xs text-slate-500">先に動画を用意してください。</span>}
+            <div className="mt-2 flex flex-wrap items-center gap-3">
+              {phase.kind === 'capturing' ? (
+                <>
+                  <span className="inline-flex items-center gap-2 text-sm text-slate-700">
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-slate-900" />
+                    画像を切り出し中 {phase.done} / {phase.total}
+                  </span>
+                  <button type="button" onClick={handleCancel} className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-50">中断</button>
+                </>
+              ) : (
+                <button type="button" onClick={handleApplyJson} disabled={!videoBlob || !jsonText.trim() || busy} className="rounded-lg bg-slate-950 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 disabled:opacity-40">
+                  この JSON で画像を切り出す
+                </button>
+              )}
+              {!videoBlob && phase.kind !== 'capturing' && <span className="text-xs text-slate-500">先に動画を用意してください。</span>}
             </div>
-          </div>
-        )}
-
-        <div className="mt-4 flex flex-wrap items-center gap-3">
-          {phase.kind === 'analyzing' || phase.kind === 'capturing' ? (
-            <>
-              <span className="inline-flex items-center gap-2 text-sm text-slate-700">
-                <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-slate-900" />
-                {phase.kind === 'analyzing'
-                  ? `${STAGE_LABEL[phase.stage]}${phase.detail ? `（${phase.detail}）` : ''}...`
-                  : `画像を切り出し中 ${phase.done} / ${phase.total}`}
-              </span>
-              <button type="button" onClick={handleCancel} className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-50">中断</button>
-            </>
-          ) : (
-            <button
-              type="button"
-              onClick={handleAnalyze}
-              disabled={!videoBlob || busy}
-              className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:opacity-40"
-            >
-              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456z" /></svg>
-              Gemini に送って解析する
-            </button>
-          )}
-          {!videoBlob && phase.kind === 'idle' && <span className="text-xs text-slate-500">先に動画を用意してください。</span>}
-        </div>
+          </li>
+        </ol>
 
         {phase.kind === 'error' && (
           <div className="mt-3 flex items-start justify-between gap-3 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -585,7 +522,7 @@ function FromVideoContent() {
             <p className="text-xs text-slate-500">赤枠・矢印・黒塗りは、手順書にしたあと各ステップの「注釈」で付けられます。</p>
           </div>
 
-          <ol className="mt-4 space-y-3">
+          <ol data-steps className="mt-4 space-y-3">
             {steps.map((s, i) => (
               <li key={s.id} className="grid gap-3 rounded-lg border border-slate-200 p-3 md:grid-cols-[220px_minmax(0,1fr)_auto]">
                 <div>
