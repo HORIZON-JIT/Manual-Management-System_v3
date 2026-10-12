@@ -52,6 +52,9 @@ export default function XmbMenu({
   // キーボードは補助。クリック/タップだけでも全操作できる。
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // 入力欄やモーダルの中で打っているキーは横取りしない
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable || t.closest('[role="dialog"]'))) return;
       if (e.key === 'ArrowRight') {
         e.preventDefault();
         setItem(0);

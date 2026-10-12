@@ -16,6 +16,8 @@ import QrCodeModal from '@/components/QrCodeModal';
 import { viewerInstructionUrl } from '@/lib/viewerUrl';
 import { FEATURES, VIEWER_ONLY } from '@/lib/appMode';
 import { useTaskMasterAvailable } from '@/lib/taskMasterAccess';
+import PasswordGateModal from '@/components/PasswordGateModal';
+import { isFromVideoUnlocked } from '@/lib/videoGate';
 
 const actions = [
   {
@@ -100,6 +102,7 @@ function EditorHomePage() {
   const [showPreviewPicker, setShowPreviewPicker] = useState(false);
   const [showTemplatePicker, setShowTemplatePicker] = useState(false);
   const [showQrPicker, setShowQrPicker] = useState(false);
+  const [showVideoGate, setShowVideoGate] = useState(false);
   const taskMasterAvailable = useTaskMasterAvailable();
   const [qrTarget, setQrTarget] = useState<{ url: string; title: string; subtitle?: string } | null>(null);
   const [showExcelPicker, setShowExcelPicker] = useState(false);
@@ -153,6 +156,12 @@ function EditorHomePage() {
 
   const handleExcelExportClick = () => {
     if (ensureDriveReady()) setShowExcelPicker(true);
+  };
+
+  // 「動画から作成」は検証中: 解除済みでなければパスワードを求める
+  const handleFromVideoClick = () => {
+    if (isFromVideoUnlocked()) router.push('/instructions/from-video');
+    else setShowVideoGate(true);
   };
 
   const handleQrClick = () => {
@@ -332,17 +341,17 @@ function EditorHomePage() {
       ),
       items: [
         { ...find('/instructions/new'), description: '空の手順書から作ります。' },
+        { ...find('/instructions/drafts'), description: '端末内の下書きを開きます。' },
         {
           title: '既存の手順書から作成',
           description: 'Drive の手順書をひな形に複製します。',
           icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />,
           onClick: handleTemplateClick,
         },
-        { ...find('/instructions/drafts'), description: '端末内の下書きを開きます。' },
         {
           title: '動画から作成',
-          description: '画面録画を AI が手順に分けます。',
-          href: '/instructions/from-video',
+          description: '画面録画を AI が手順に分けます（検証中）。',
+          onClick: handleFromVideoClick,
           icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />,
         },
       ],
@@ -554,6 +563,15 @@ function EditorHomePage() {
         onClose={() => setShowQrPicker(false)}
         onFileLoaded={handleQrFileLoaded}
       />
+      {showVideoGate && (
+        <PasswordGateModal
+          onUnlock={() => {
+            setShowVideoGate(false);
+            router.push('/instructions/from-video');
+          }}
+          onCancel={() => setShowVideoGate(false)}
+        />
+      )}
       {qrTarget && (
         <QrCodeModal url={qrTarget.url} title={qrTarget.title} subtitle={qrTarget.subtitle} onClose={() => setQrTarget(null)} />
       )}

@@ -6,6 +6,8 @@ import Link from 'next/link';
 import { v4 as uuidv4 } from 'uuid';
 import EditorOnlyNotice from '@/components/EditorOnlyNotice';
 import { VIEWER_ONLY } from '@/lib/appMode';
+import PasswordGateModal from '@/components/PasswordGateModal';
+import { isFromVideoUnlocked } from '@/lib/videoGate';
 import { setTempData } from '@/lib/tempStorage';
 import { TEMPLATE_TEMP_KEY } from '@/lib/templateCopy';
 import { WorkInstruction, Step } from '@/types/instruction';
@@ -35,6 +37,25 @@ function formatBytes(n: number): string {
 
 export default function FromVideoPage() {
   if (VIEWER_ONLY) return <EditorOnlyNotice />;
+  return <GatedFromVideo />;
+}
+
+/** 検証中のため、URL を直接開いた場合もパスワードを求める */
+function GatedFromVideo() {
+  const router = useRouter();
+  const [unlocked, setUnlocked] = useState<boolean | null>(null);
+  useEffect(() => {
+    const u = isFromVideoUnlocked();
+    queueMicrotask(() => setUnlocked(u));
+  }, []);
+  if (unlocked === null) return <div className="flex min-h-[50vh] items-center justify-center"><p className="text-slate-500">読み込み中...</p></div>;
+  if (!unlocked) {
+    return (
+      <div className="min-h-[60vh]">
+        <PasswordGateModal onUnlock={() => setUnlocked(true)} onCancel={() => router.push('/')} />
+      </div>
+    );
+  }
   return <FromVideoContent />;
 }
 
