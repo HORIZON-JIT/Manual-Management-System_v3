@@ -9,15 +9,24 @@
   box-sizing: border-box;
 }
 
+/* 背景: 象牙色の地に、左上からシャンパンゴールド、右上に淡い藤色、足元に金の照り返し。
+   html に置いて画面に固定し（スクロールしても動かない）、白いカードが浮いて見えるようにする。 */
 html {
-  background: var(--background);
+  min-height: 100%;
+  background-color: var(--background);
+  background-image:
+    radial-gradient(1100px 640px at 6% -8%, rgba(222, 196, 145, 0.62), rgba(222, 196, 145, 0) 62%),
+    radial-gradient(900px 560px at 100% 0%, rgba(206, 194, 224, 0.42), rgba(206, 194, 224, 0) 60%),
+    radial-gradient(1000px 720px at 50% 112%, rgba(214, 189, 142, 0.34), rgba(214, 189, 142, 0) 62%),
+    linear-gradient(180deg, #fcfbf8 0%, #f5f2eb 52%, #efe8db 100%);
+  background-attachment: fixed;
+  background-repeat: no-repeat;
+  background-size: cover;
 }
 
 body {
   color: var(--foreground);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.92) 0, rgba(247, 246, 243, 0.96) 26rem),
-    var(--background);
+  background: transparent;
   font-family: 'Inter', 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', 'Yu Gothic', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -109,10 +118,16 @@ html.dark {
   color-scheme: dark;
 }
 
+html.dark {
+  background-image:
+    radial-gradient(1100px 640px at 6% -8%, rgba(215, 183, 124, 0.26), rgba(215, 183, 124, 0) 62%),
+    radial-gradient(900px 560px at 100% 0%, rgba(110, 118, 160, 0.34), rgba(110, 118, 160, 0) 60%),
+    radial-gradient(1000px 720px at 50% 112%, rgba(215, 183, 124, 0.16), rgba(215, 183, 124, 0) 62%),
+    linear-gradient(180deg, #1a1d26 0%, #0f1115 55%, #0b0d12 100%);
+}
+
 .dark body {
-  background:
-    linear-gradient(180deg, rgba(28, 32, 41, 0.96) 0, rgba(15, 17, 21, 0.98) 26rem),
-    var(--background);
+  background: transparent;
 }
 
 .dark ::selection {
