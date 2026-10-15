@@ -40,6 +40,11 @@ import FlowBuilderModal from './FlowBuilderModal';
 import Form63ExportModal from './Form63ExportModal';
 import RoutePlayModal from './RoutePlayModal';
 import QrCodeModal from './QrCodeModal';
+import DriveJsonFilePicker from './DriveJsonFilePicker';
+import StepCopyModal from './StepCopyModal';
+import GoogleLoginButton from './GoogleLoginButton';
+import { DriveFileInfo } from '@/lib/googleDrive';
+import { insertSteps } from '@/lib/copySteps';
 import { viewerInstructionUrl } from '@/lib/viewerUrl';
 import { FEATURES } from '@/lib/appMode';
 import { useTaskMasterAvailable } from '@/lib/taskMasterAccess';
@@ -139,6 +144,9 @@ export default function InstructionForm({ initialData, approvalMode = false, asN
   const [showForm63, setShowForm63] = useState(false);
   const [showRoutePlay, setShowRoutePlay] = useState(false);
   const [showSaveQr, setShowSaveQr] = useState(false);
+  const [showCopyPicker, setShowCopyPicker] = useState(false);
+  const [copyLoginPrompt, setCopyLoginPrompt] = useState(false);
+  const [copySource, setCopySource] = useState<{ instruction: WorkInstruction; name: string } | null>(null);
   const taskMasterAvailable = useTaskMasterAvailable();
   const [routeIssueCount, setRouteIssueCount] = useState(0);
   const [storageEstimate, setStorageEstimate] = useState<{ usage: number; quota: number } | null>(null);
@@ -278,6 +286,35 @@ export default function InstructionForm({ initialData, approvalMode = false, asN
     const newSteps = [...steps];
     newSteps.splice(afterIndex + 1, 0, createEmptyStep(afterIndex + 1));
     setSteps(newSteps.map((step, index) => ({ ...step, orderIndex: index })));
+  };
+
+  // 他の手順書（Drive）からステップをコピーする
+  const handleCopyStepsClick = () => {
+    if (!isGoogleConfigured() || !auth.isSignedIn) {
+      setCopyLoginPrompt(true);
+      return;
+    }
+    setCopyLoginPrompt(false);
+    setShowCopyPicker(true);
+  };
+
+  const handleCopySourceLoaded = (content: string, file: DriveFileInfo) => {
+    try {
+      const json = JSON.parse(content) as WorkInstruction;
+      if (!json || !Array.isArray(json.steps)) throw new Error('有効な手順書データではありません。');
+      setShowCopyPicker(false);
+      setCopySource({ instruction: json, name: file.name.replace(/\.json$/i, '') });
+    } catch (err) {
+      alert(err instanceof Error ? err.message : `${file.name} の読み込みに失敗しました。`);
+    }
+  };
+
+  const handleCopySteps = (incoming: Step[], insertAfterIndex: number | null) => {
+    if (incoming.length === 0) return;
+    setSteps((prev) => insertSteps(prev, incoming, insertAfterIndex));
+    setCopySource(null);
+    const firstId = incoming[0].id;
+    setTimeout(() => scrollToEditStep(firstId), 150);
   };
 
   const handleStepChange = (index: number, updatedStep: Step) => {
@@ -1450,6 +1487,27 @@ export default function InstructionForm({ initialData, approvalMode = false, asN
               >
                 + ステップを追加
               </button>
+              <button
+                type="button"
+                onClick={handleCopyStepsClick}
+                className="w-full rounded-lg border border-dashed border-slate-300 bg-white py-2.5 text-sm font-medium text-slate-600 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700"
+                data-copy-steps
+              >
+                他の手順書からステップをコピー
+              </button>
+              {copyLoginPrompt && (
+                <div className="flex flex-col gap-3 rounded-lg border border-neutral-200 bg-white px-4 py-4 text-sm sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="font-semibold text-neutral-950">Google Drive にログインしてください</p>
+                    <p className="mt-1 text-xs leading-5 text-neutral-500">Drive 上の手順書からステップをコピーするには、先に Google アカウントの認証が必要です。</p>
+                  </div>
+                  <GoogleLoginButton
+                    align="end"
+                    onSignedIn={() => { setCopyLoginPrompt(false); setShowCopyPicker(true); }}
+                    className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-neutral-950 px-4 text-sm font-semibold text-white transition hover:bg-neutral-800"
+                  />
+                </div>
+              )}
             </section>
           </div>
 
@@ -1931,6 +1989,17 @@ export default function InstructionForm({ initialData, approvalMode = false, asN
 
       {showSaveQr && saveSuccessModal?.viewUrl && (
         <QrCodeModal url={saveSuccessModal.viewUrl} title={title.trim() || '手順書'} subtitle={department || undefined} onClose={() => setShowSaveQr(false)} />
+      )}
+
+      <DriveJsonFilePicker open={showCopyPicker} onClose={() => setShowCopyPicker(false)} onFileLoaded={handleCopySourceLoaded} />
+      {copySource && (
+        <StepCopyModal
+          source={copySource.instruction}
+          sourceName={copySource.name}
+          currentSteps={steps}
+          onCopy={handleCopySteps}
+          onClose={() => setCopySource(null)}
+        />
       )}
 
       {showFlowBuilder && (
