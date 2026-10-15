@@ -63,9 +63,9 @@ function InstructionViewContent() {
   const [viewingSnapshot, setViewingSnapshot] = useState<InstructionSnapshot | null>(null);
   const [viewUrlCopied, setViewUrlCopied] = useState(false);
   const [showQr, setShowQr] = useState(false);
-  // 完了カードへの自動スクロールは、閲覧者が答えや「次へ」を操作して終わりに到達したときだけ行う
-  // （開いた直後に分岐のない手順書で一番下へ飛ばないように）
-  const [interacted, setInteracted] = useState(false);
+  // 完了カードへの自動スクロールは、読み飛ばし防止モードで最後の「次へ」を押して終わりに着いたときだけ行う。
+  // 開いた直後や、分岐・条件を選んで完了になったとき（選んだ先のステップへのスクロールを優先）は飛ばない。
+  const [scrollToCompletion, setScrollToCompletion] = useState(false);
   const [expandedStepDetails, setExpandedStepDetails] = useState<Record<string, boolean>>({});
 
   const copyPathToClipboard = async (path: string, linkId: string) => {
@@ -112,7 +112,7 @@ function InstructionViewContent() {
       setScrollTargetStepId(null);
       setChapterTargetStepId(null);
       setRevealedCount(1);
-      setInteracted(false);
+      setScrollToCompletion(false);
     });
 
     if (window.location.hash) {
@@ -321,7 +321,7 @@ function InstructionViewContent() {
   }
 
   const handleConditionSelect = (groupId: string, conditionId: string, visibleIndex: number) => {
-    setInteracted(true);
+    setScrollToCompletion(false);
     const activeConditionId = selectedConditions[groupId] ?? groupConditions.get(groupId)?.[0]?.id;
     const branchChanged = activeConditionId !== conditionId;
 
@@ -340,7 +340,7 @@ function InstructionViewContent() {
   const isComplete = visibleSteps.length > 0 && (!isSequential || revealedCount >= visibleSteps.length) && !pendingJumpStepId;
 
   const handleJumpSelect = (stepId: string, targetStepId: string, visibleIndex: number) => {
-    setInteracted(true);
+    setScrollToCompletion(false);
     setChapterTargetStepId(null);
     // 前に表示したステップへ戻る選択（やり直し）: 戻り先以降の選択を取り消して、そこからやり直す
     const backIndex = visibleSteps.findIndex((step, index) => index < visibleIndex && step.id === targetStepId);
@@ -827,7 +827,7 @@ function InstructionViewContent() {
                     </span>
                   ) : revealedCount < visibleSteps.length ? (
                     <button
-                      onClick={() => { setInteracted(true); setRevealedCount((count) => count + 1); }}
+                      onClick={() => { setScrollToCompletion(true); setRevealedCount((count) => count + 1); }}
                       className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow transition"
                     >
                       次へ
@@ -846,7 +846,7 @@ function InstructionViewContent() {
 
       {isComplete && (
         <CompletionCard
-          autoScroll={interacted}
+          autoScroll={scrollToCompletion}
           stepCount={visibleSteps.length}
           title={displayTitle}
           onRestart={() => {
@@ -854,6 +854,7 @@ function InstructionViewContent() {
             setSelectedJumpTargets({});
             setRevealedCount(1);
             setCheckStates({});
+            setScrollToCompletion(false);
             window.scrollTo({ top: 0, behavior: 'smooth' });
           }}
         />
