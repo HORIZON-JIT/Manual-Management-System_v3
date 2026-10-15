@@ -6,7 +6,8 @@ import { buildDriveMeta, buildSearchText } from '@/lib/driveMeta';
 import Link from 'next/link';
 import { DEFAULT_CATEGORIES, WorkInstruction, getCategoryLabel } from '@/types/instruction';
 import { downloadDriveFile, getTargetFolder, listJsonFilesInFolder, saveFileToDrive } from '@/lib/googleDrive';
-import { addAuthListener, getAuthState, GoogleAuthState, initGoogleAuth, isGoogleConfigured, signIn } from '@/lib/googleAuth';
+import { addAuthListener, getAuthState, GoogleAuthState, initGoogleAuth, isGoogleConfigured } from '@/lib/googleAuth';
+import GoogleLoginButton from '@/components/GoogleLoginButton';
 import { VIEWER_ONLY } from '@/lib/appMode';
 import EditorOnlyNotice from '@/components/EditorOnlyNotice';
 
@@ -164,7 +165,7 @@ function BackLink() {
 }
 
 function SignInNotice() {
-  return <div className="mx-auto max-w-5xl px-4 py-8"><BackLink /><div className="mt-6 rounded-lg border border-slate-200 bg-white p-6"><p className="text-sm font-semibold text-slate-900">Google Drive にログインしてください</p><button onClick={signIn} className="mt-4 rounded-lg bg-slate-950 px-5 py-3 text-sm font-semibold text-white">Googleでログイン</button></div></div>;
+  return <div className="mx-auto max-w-5xl px-4 py-8"><BackLink /><div className="mt-6 rounded-lg border border-slate-200 bg-white p-6"><p className="text-sm font-semibold text-slate-900">Google Drive にログインしてください</p><div className="mt-4"><GoogleLoginButton showIcon={false} className="rounded-lg bg-slate-950 px-5 py-3 text-sm font-semibold text-white" /></div></div></div>;
 }
 
 function ToolButton({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {

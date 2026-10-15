@@ -12,6 +12,7 @@ const MIN_REFRESH_DELAY_MS = 20 * 1000; // 次回更新までの最短間隔
 const SILENT_RETRY_MS = 60 * 1000; // サイレント更新に失敗したときの再試行間隔
 const SILENT_TIMEOUT_MS = 8 * 1000; // サイレント更新の応答を待つ上限
 const INIT_SILENT_WAIT_MS = 4 * 1000; // 起動時にサイレント再ログインの結果を待つ上限
+const STALE_POPUP_CLOSED_MS = 1500; // 出し直し直後に届いた古いポップアップの「閉じた」通知を無視する時間
 
 export interface GoogleAuthState {
   isInitialized: boolean;
@@ -78,6 +79,7 @@ interface PendingTokenRequest {
   reject: (error: Error) => void;
   silent: boolean;
   timer: ReturnType<typeof setTimeout> | null;
+  startedAt: number;
 }
 let pending: PendingTokenRequest | null = null;
 let pendingPromise: Promise<google.accounts.oauth2.TokenResponse> | null = null;
@@ -271,7 +273,7 @@ function requestToken(options: { silent: boolean; prompt?: string }): Promise<go
   if (pendingPromise) return pendingPromise;
   const client = tokenClient;
   pendingPromise = new Promise((resolve, reject) => {
-    pending = { resolve, reject, silent: options.silent, timer: null };
+    pending = { resolve, reject, silent: options.silent, timer: null, startedAt: Date.now() };
     if (options.silent) {
       pending.timer = setTimeout(() => settlePending(null, new Error('silent token request timed out')), SILENT_TIMEOUT_MS);
     }
@@ -284,6 +286,17 @@ function requestToken(options: { silent: boolean; prompt?: string }): Promise<go
     }
   });
   return pendingPromise;
+}
+
+/**
+ * 対話ログイン（ポップアップ）を要求する。
+ * 前の要求（閉じられずに残ったポップアップ、起動時のサイレント更新など）が残っていると
+ * 新しい要求がそれに相乗りして何も起きないので、打ち切ってから出し直す。
+ * ポップアップはクリック直後でないとブロックされるため、この関数の前で長く待たないこと。
+ */
+function requestInteractiveToken(): Promise<google.accounts.oauth2.TokenResponse> {
+  if (pending) settlePending(null, new Error('superseded'));
+  return requestToken({ silent: false, prompt: authState.userEmail ? '' : 'select_account' });
 }
 
 async function applyToken(response: google.accounts.oauth2.TokenResponse, silent: boolean) {
@@ -346,7 +359,7 @@ export async function ensureAccessToken(options: { interactive?: boolean; force?
   }
   if (!options.interactive) throw new AuthRequiredError();
 
-  const response = await requestToken({ silent: false, prompt: authState.userEmail ? '' : 'select_account' }).catch(() => {
+  const response = await requestInteractiveToken().catch(() => {
     throw new AuthRequiredError('Google ログインがキャンセルされました。');
   });
   await applyToken(response, false);
@@ -388,7 +401,11 @@ export function initGoogleAuth(): Promise<void> {
       client_id: CLIENT_ID,
       scope: SCOPES,
       callback: (response) => settlePending(response),
-      error_callback: (error) => settlePending(null, new Error(error?.message || error?.type || 'token request failed')),
+      error_callback: (error) => {
+        // 打ち切った前の要求のポップアップが閉じた通知が、出し直した直後の要求に届くことがあるので無視する
+        if (error?.type === 'popup_closed' && pending && !pending.silent && Date.now() - pending.startedAt < STALE_POPUP_CLOSED_MS) return;
+        settlePending(null, new Error(error?.type || error?.message || 'token request failed'));
+      },
     });
 
     const { tokenValid } = restoreSession();
@@ -424,11 +441,49 @@ export function initGoogleAuth(): Promise<void> {
 }
 
 /** ヘッダーの「Google Drive」「再ログイン」ボタン。ユーザー操作から呼ぶ */
+let lastSignInError: string | null = null;
+
+/** 直前の signIn が失敗した理由（画面に出す文言）。成功・未実行なら null */
+export function getLastSignInError(): string | null {
+  return lastSignInError;
+}
+
+function signInErrorMessage(e: unknown): string {
+  const m = e instanceof Error ? e.message : String(e);
+  if (/popup_failed_to_open/i.test(m)) return 'ログイン画面を開けませんでした（ポップアップがブロックされた可能性）。もう一度押すか、ブラウザでこのサイトのポップアップを許可してください。';
+  if (/popup_closed|access_denied|cancel/i.test(m)) return 'ログインが完了しませんでした。もう一度押してください。';
+  return `ログインできませんでした（${m}）。もう一度押してください。`;
+}
+
+/**
+ * ログインボタンから呼ぶ。サイレント更新は挟まず、すぐにポップアップを出す
+ * （先にサイレント更新を試すとクリックの権限を使い切り、ポップアップがブロックされるため）。
+ */
 export async function signIn(): Promise<boolean> {
+  lastSignInError = null;
+  if (!isGoogleConfigured()) {
+    lastSignInError = 'Google 連携が設定されていません。管理者に連絡してください。';
+    return false;
+  }
+  if (!tokenClient) {
+    try {
+      await initGoogleAuth();
+    } catch {
+      lastSignInError = 'Google の読み込みに失敗しました。通信環境を確認して、もう一度押してください。';
+      return false;
+    }
+    // 起動処理の中でログイン状態が復元できた
+    if (authState.isSignedIn && hasValidToken(REFRESH_LEAD_MS)) return true;
+  }
   try {
-    await ensureAccessToken({ interactive: true, force: true });
+    const response = await requestInteractiveToken();
+    await applyToken(response, false);
     return true;
-  } catch {
+  } catch (e) {
+    // もう一度押されて出し直した場合は、新しい方の結果に任せる
+    if (e instanceof Error && e.message === 'superseded') return false;
+    lastSignInError = signInErrorMessage(e);
+    notifyListeners();
     return false;
   }
 }
