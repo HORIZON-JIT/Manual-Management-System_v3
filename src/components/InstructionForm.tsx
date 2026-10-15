@@ -1994,13 +1994,38 @@ export default function InstructionForm({ initialData, approvalMode = false, asN
               </div>
             )}
 
-            <button
-              type="button"
-              onClick={() => router.push('/')}
-              className="w-full rounded-lg bg-slate-950 py-3 font-bold text-white transition hover:bg-slate-800"
-            >
-              OK
-            </button>
+            {saveSuccessModal.driveFileId ? (
+              <div className="space-y-2">
+                <button
+                  type="button"
+                  onClick={() => router.push(`/instructions/view?driveFileId=${encodeURIComponent(saveSuccessModal.driveFileId!)}`)}
+                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-slate-950 py-3 font-bold text-white transition hover:bg-slate-800"
+                  data-open-saved
+                >
+                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                  </svg>
+                  保存した手順書を表示する
+                </button>
+                <p className="text-center text-xs text-slate-500">読む人と同じ画面で、完成した手順書を試し読みできます。</p>
+                <button
+                  type="button"
+                  onClick={() => router.push('/')}
+                  className="w-full rounded-lg border border-slate-200 bg-white py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                >
+                  トップへ戻る
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => router.push('/')}
+                className="w-full rounded-lg bg-slate-950 py-3 font-bold text-white transition hover:bg-slate-800"
+              >
+                OK
+              </button>
+            )}
           </div>
         </div>
       )}
