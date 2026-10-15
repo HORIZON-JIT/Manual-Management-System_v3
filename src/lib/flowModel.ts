@@ -227,6 +227,47 @@ export function addStepBefore(steps: Step[], beforeId: string): { steps: Step[];
   return { steps: renumber(next), newId: created.id };
 }
 
+/**
+ * 複数のステップ（別の手順書からのコピーなど）をステップの直後に挿入する。
+ * 元の進み先（終了／明示の次）は最後の挿入ステップへ引き継ぎ、挿入した並びは順に流れる。
+ */
+export function insertStepsAfterInFlow(steps: Step[], afterId: string, incoming: Step[]): Step[] {
+  if (incoming.length === 0) return sortSteps(steps);
+  const sorted = sortSteps(steps);
+  const index = sorted.findIndex((step) => step.id === afterId);
+  if (index < 0) return renumber([...pinLastStep(sorted), ...incoming]);
+  const source = sorted[index];
+  const last: Step = { ...incoming[incoming.length - 1] };
+  if (!hasBranch(last)) {
+    if (source.endsBranch) last.endsBranch = true;
+    if (source.nextStepId && source.nextStepId !== source.id) last.nextStepId = source.nextStepId;
+  }
+  const updatedSource: Step = { ...source };
+  if (!hasBranch(source)) {
+    delete updatedSource.endsBranch;
+    delete updatedSource.nextStepId;
+  }
+  const next = [...sorted];
+  next[index] = updatedSource;
+  next.splice(index + 1, 0, ...incoming.slice(0, -1), last);
+  return renumber(next);
+}
+
+/** 複数のステップを答えの先につなぐ。末尾に追加し、最後のステップはいったん「終了」で止める。 */
+export function attachStepsToAnswer(steps: Step[], stepId: string, jumpIndex: number, incoming: Step[]): Step[] {
+  if (incoming.length === 0) return sortSteps(steps);
+  const sorted = pinLastStep(sortSteps(steps));
+  const first = incoming[0];
+  const last: Step = { ...incoming[incoming.length - 1] };
+  if (!hasBranch(last) && !(last.nextStepId && incoming.some((s) => s.id === last.nextStepId))) last.endsBranch = true;
+  const next = sorted.map((step) => {
+    if (step.id !== stepId) return step;
+    const jumps = (step.jumps ?? []).map((jump, index) => (index === jumpIndex ? { ...jump, targetStepId: first.id } : jump));
+    return { ...step, jumps };
+  });
+  return renumber([...next, ...incoming.slice(0, -1), last]);
+}
+
 /** 末尾のステップが「並び順で次」に頼って終了していた場合、末尾に追加しても進み先が変わらないよう明示の終了にする */
 function pinLastStep(sorted: Step[]): Step[] {
   if (sorted.length === 0) return sorted;
