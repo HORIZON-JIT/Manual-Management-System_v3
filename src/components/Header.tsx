@@ -39,9 +39,26 @@ export default function Header() {
       <header className="sticky top-0 z-40 border-b border-neutral-200/80 bg-white/90 text-neutral-950 backdrop-blur-xl">
         <div className="mx-auto flex max-w-[92rem] items-center justify-between gap-4 px-6 py-3">
           <Link href="/" className="flex min-w-0 items-center gap-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-            <span className="app-logo flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-sm font-semibold tracking-wide shadow-[0_10px_24px_rgba(0,0,0,0.16)]">
-              H
-            </span>
+            {/* ファビコン（app/icon.svg）と同じ「JIT」マーク。外部ファイルに頼らずインラインで描く */}
+            <svg
+              viewBox="0 0 64 64"
+              className="h-9 w-9 shrink-0 rounded-md shadow-[0_10px_24px_rgba(0,0,0,0.16)]"
+              role="img"
+              aria-label="JIT"
+            >
+              <defs>
+                <linearGradient id="jit-logo-gold" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="64" y2="64">
+                  <stop offset="0" stopColor="#f0d9a6" />
+                  <stop offset="1" stopColor="#a48149" />
+                </linearGradient>
+              </defs>
+              <rect width="64" height="64" rx="14" fill="#14171f" />
+              <g fill="none" stroke="url(#jit-logo-gold)" strokeWidth="7.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M22 18 V37.5 a7.5 7.5 0 0 1 -15 0" />
+                <path d="M33 18 V46" />
+                <path d="M40 18 H58 M49 18 V46" />
+              </g>
+            </svg>
             <span className="truncate text-[15px] font-semibold tracking-[0.08em]">{DEPARTMENT.brandLabel}</span>
             <span className="shrink-0 rounded-md border border-neutral-300 px-1.5 py-0.5 text-[11px] font-semibold leading-none tracking-wide text-neutral-500">
               v3

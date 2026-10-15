@@ -94,11 +94,6 @@ select {
 
 
 /* ヘッダーのロゴバッジ：ライトは黒地白字、ダークは白地黒字 */
-.app-logo {
-  background-color: #0a0a0a;
-  color: #ffffff;
-}
-
 @media print {
   header,
   .no-print {
@@ -134,11 +129,6 @@ html.dark {
   background: rgba(96, 165, 250, 0.32);
 }
 
-
-.dark .app-logo {
-  background-color: #ffffff;
-  color: #0a0a0a;
-}
 
 /* ---- ブランドカラー ---- */
 .brand-panel { background-color: #fcfbf8; }
