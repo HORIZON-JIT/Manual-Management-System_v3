@@ -276,14 +276,15 @@ export function isQuestionOnlyStep(step: Step): boolean {
   return hasBranch(step) && !step.description.trim() && step.title === (step.branchQuestion ?? '');
 }
 
-/** ステップを質問にする。答え1は元の進み先へ、答え2は未設定。 */
+/** ステップを質問にする。答え1は元の進み先が別のステップならそれを引き継ぎ、答え2は未設定。 */
 export function addBranch(steps: Step[], stepId: string): Step[] {
   const sorted = sortSteps(steps);
   const step = sorted.find((s) => s.id === stepId);
   if (!step || hasBranch(step)) return sorted;
-  // 答え1は元の進み先を引き継ぐ。最後のステップ（並び順で終了していただけ）なら未設定にして「＋ 次を追加」を出す。
+  // 答え1は元の進み先が別のステップならそれを引き継ぐ（流れを切らない）。
+  // 終了していた場合（endsBranch や並び順の最後）は「終了」を勝手に入れず、未設定にして「＋ 次を追加」を出す。
   const succ = successorOf(sorted, step);
-  const inherited = step.endsBranch ? JUMP_END_TARGET : succ.kind === 'step' ? succ.id : '';
+  const inherited = succ.kind === 'step' ? succ.id : '';
   const jumps: StepJump[] = [
     { id: uuidv4(), label: 'はい', targetStepId: inherited },
     { id: uuidv4(), label: 'いいえ', targetStepId: '' },
