@@ -13,8 +13,14 @@ interface FlowFigureProps {
   steps: Step[];
   /** 強調表示する箱（ステップID または質問ノードID） */
   selectedId?: string | null;
-  /** 箱を押したとき。未指定なら閲覧専用（押せない） */
-  onBoxClick?: (box: LayoutBox) => void;
+  /** 箱を押したとき（押した箱の画面上の位置も渡す）。未指定なら閲覧専用（押せない） */
+  onBoxClick?: (box: LayoutBox, anchor: DOMRect) => void;
+  /** 「終了」の丸も押せるようにする（進み先を図で選ぶモード） */
+  endClickable?: boolean;
+  /** 表示倍率（SVG の幅・高さに掛ける。viewBox はそのまま） */
+  zoom?: number;
+  /** 図の自然な大きさ（倍率 1 のときの幅・高さ）が決まったとき */
+  onLayoutSize?: (width: number, height: number) => void;
   /** 図の計算が終わったときに呼ばれる（グラフと寸法を渡す） */
   onGraph?: (graph: FlowGraph) => void;
   /** 通った経路として強調する箱（ノードID） */
@@ -45,14 +51,18 @@ export function FlowLegend() {
   );
 }
 
-export default function FlowFigure({ steps, selectedId = null, onBoxClick, onGraph, highlightIds, highlightEdges }: FlowFigureProps) {
+export default function FlowFigure({ steps, selectedId = null, onBoxClick, onGraph, highlightIds, highlightEdges, endClickable = false, zoom = 1, onLayoutSize }: FlowFigureProps) {
   const [layout, setLayout] = useState<FlowLayout | null>(null);
   const [error, setError] = useState<string | null>(null);
   const seqRef = useRef(0);
   const interactive = !!onBoxClick;
+  const onLayoutSizeRef = useRef(onLayoutSize);
+  useEffect(() => {
+    onLayoutSizeRef.current = onLayoutSize;
+  }, [onLayoutSize]);
 
   const sorted = useMemo(() => sortSteps(steps), [steps]);
-  const graph = useMemo(() => buildFlowGraph(sorted), [sorted]);
+  const graph = useMemo(() => buildFlowGraph(sorted, { includeEnd: endClickable }), [sorted, endClickable]);
 
   useEffect(() => {
     onGraph?.(graph);
@@ -65,6 +75,7 @@ export default function FlowFigure({ steps, selectedId = null, onBoxClick, onGra
         if (seq !== seqRef.current) return;
         setLayout(result);
         setError(null);
+        onLayoutSizeRef.current?.(result.width, result.height);
       })
       .catch((e) => {
         if (seq !== seqRef.current) return;
@@ -79,8 +90,8 @@ export default function FlowFigure({ steps, selectedId = null, onBoxClick, onGra
   return (
     <svg
       viewBox={`${minX} 0 ${width} ${height}`}
-      width={width}
-      height={height}
+      width={Math.round(width * zoom)}
+      height={Math.round(height * zoom)}
       className="mx-auto block max-w-none select-none"
       role="img"
       aria-label="手順の流れ図"
@@ -115,8 +126,12 @@ export default function FlowFigure({ steps, selectedId = null, onBoxClick, onGra
         const cx = b.x + b.w / 2, cy = b.y + b.h / 2;
         const selected = b.id === selectedId;
         const hl = !selected && !!highlightIds?.has(b.id);
-        const clickable = interactive && b.kind !== 'start' && b.kind !== 'end';
-        const common = { onClick: clickable ? () => onBoxClick?.(b) : undefined, className: clickable ? 'cursor-pointer' : undefined };
+        const clickable = interactive && b.kind !== 'start' && (b.kind !== 'end' || endClickable);
+        const common = {
+          onClick: clickable ? (e: React.MouseEvent<SVGGElement>) => onBoxClick?.(b, e.currentTarget.getBoundingClientRect()) : undefined,
+          className: clickable ? 'cursor-pointer' : undefined,
+          'data-flow-box': b.id,
+        };
         if (b.kind === 'start' || b.kind === 'end') {
           return (
             <g key={b.id} {...common}>

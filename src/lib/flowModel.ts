@@ -88,8 +88,11 @@ export function createFlowStep(orderIndex: number): Step {
   return { id: uuidv4(), orderIndex, title: '', description: '' };
 }
 
-/** ステップ配列から図（箱と線）を作る。開始から深さ優先でたどり、答えの順番を保つ。 */
-export function buildFlowGraph(input: Step[]): FlowGraph {
+/**
+ * ステップ配列から図（箱と線）を作る。開始から深さ優先でたどり、答えの順番を保つ。
+ * includeEnd: どの線も終了に届いていなくても「終了」の丸を描く（進み先を図で選ぶときに押せるように）。
+ */
+export function buildFlowGraph(input: Step[], options: { includeEnd?: boolean } = {}): FlowGraph {
   const steps = sortSteps(input);
   const byId = new Map(steps.map((step) => [step.id, step]));
   const nodes: FlowNode[] = [];
@@ -173,6 +176,7 @@ export function buildFlowGraph(input: Step[]): FlowGraph {
     ensureStep(step, true);
     visit(step);
   }
+  if (options.includeEnd) ensureEnd();
   return { nodes, edges };
 }
 
@@ -198,6 +202,28 @@ export function addStepAfter(steps: Step[], afterId: string): { steps: Step[]; n
   const next = [...sorted];
   next[index] = updatedSource;
   next.splice(index + 1, 0, inherited);
+  return { steps: renumber(next), newId: created.id };
+}
+
+/**
+ * ステップの直前に新しいステップを挿入する。
+ * 対象を指していた線（答えの進み先・明示の次・並び順の流れ）はすべて新しいステップを通ってから対象へ進む。
+ */
+export function addStepBefore(steps: Step[], beforeId: string): { steps: Step[]; newId: string } {
+  const sorted = sortSteps(steps);
+  const index = sorted.findIndex((step) => step.id === beforeId);
+  const created = createFlowStep(0);
+  if (index < 0) return { steps: renumber([created, ...sorted]), newId: created.id };
+  const redirected = sorted.map((s) => {
+    let updated = s;
+    if (s.jumps?.some((jump) => jump.targetStepId === beforeId)) {
+      updated = { ...updated, jumps: s.jumps.map((jump) => (jump.targetStepId === beforeId ? { ...jump, targetStepId: created.id } : jump)) };
+    }
+    if (s.nextStepId === beforeId) updated = { ...updated, nextStepId: created.id };
+    return updated;
+  });
+  const next = [...redirected];
+  next.splice(index, 0, created);
   return { steps: renumber(next), newId: created.id };
 }
 
@@ -311,12 +337,84 @@ export function addAnswer(steps: Step[], stepId: string): Step[] {
   return steps.map((step) => (step.id === stepId ? { ...step, jumps: [...(step.jumps ?? []), { id: uuidv4(), label: '', targetStepId: '' }] } : step));
 }
 
+/** 質問の答えの下限。これより少なくはできない（質問をやめるときは removeBranch を使う） */
+export const MIN_ANSWERS = 2;
+
 export function removeAnswer(steps: Step[], stepId: string, jumpIndex: number): Step[] {
   const step = steps.find((s) => s.id === stepId);
   if (!step) return steps;
-  const jumps = (step.jumps ?? []).filter((_, index) => index !== jumpIndex);
-  if (jumps.length === 0) return removeBranch(steps, stepId);
+  const current = step.jumps ?? [];
+  if (current.length <= MIN_ANSWERS || jumpIndex < 0 || jumpIndex >= current.length) return steps;
+  const jumps = current.filter((_, index) => index !== jumpIndex);
   return steps.map((s) => (s.id === stepId ? { ...s, jumps } : s));
+}
+
+/** 開始からたどり着けるステップの ID（buildFlowGraph の到達判定と同じ規則） */
+export function reachableStepIds(steps: Step[]): Set<string> {
+  const sorted = sortSteps(steps);
+  const byId = new Map(sorted.map((s) => [s.id, s]));
+  const seen = new Set<string>();
+  const stack: Step[] = sorted.length ? [sorted[0]] : [];
+  while (stack.length) {
+    const step = stack.pop()!;
+    if (seen.has(step.id)) continue;
+    seen.add(step.id);
+    const targets: string[] = [];
+    if (hasBranch(step)) {
+      for (const jump of step.jumps ?? []) targets.push(jump.targetStepId);
+      if (step.jumpDefaultLabel) {
+        const succ = successorOf(sorted, step);
+        if (succ.kind === 'step') targets.push(succ.id);
+      }
+    } else {
+      const succ = successorOf(sorted, step);
+      if (succ.kind === 'step') targets.push(succ.id);
+    }
+    for (const t of targets) {
+      const next = byId.get(t);
+      if (next && !seen.has(next.id)) stack.push(next);
+    }
+  }
+  return seen;
+}
+
+/** 答えを消したときに、どこからもたどり着けなくなるステップ（並び順） */
+export function orphanedByRemovingAnswer(steps: Step[], stepId: string, jumpIndex: number): Step[] {
+  const step = steps.find((s) => s.id === stepId);
+  const current = step?.jumps ?? [];
+  if (!step || jumpIndex < 0 || jumpIndex >= current.length) return [];
+  const before = reachableStepIds(steps);
+  // 下限に関係なく「その答えを外したら」で判定する
+  const without = steps.map((s) => (s.id === stepId ? { ...s, jumps: current.filter((_, i) => i !== jumpIndex) } : s));
+  const after = reachableStepIds(without);
+  return sortSteps(steps).filter((s) => before.has(s.id) && !after.has(s.id));
+}
+
+/** 複数のステップをまとめて削除する。消えたステップを指す線は「終了」／未設定に直す。 */
+export function removeSteps(steps: Step[], ids: Iterable<string>): Step[] {
+  const gone = new Set(ids);
+  if (gone.size === 0) return sortSteps(steps);
+  const remaining = sortSteps(steps).filter((s) => !gone.has(s.id));
+  const fixed = remaining.map((s) => {
+    let updated = s;
+    if (s.jumps?.some((jump) => gone.has(jump.targetStepId))) {
+      updated = { ...updated, jumps: s.jumps.map((jump) => (gone.has(jump.targetStepId) ? { ...jump, targetStepId: '' } : jump)) };
+    }
+    if (s.nextStepId && gone.has(s.nextStepId)) {
+      updated = { ...updated, endsBranch: true };
+      delete updated.nextStepId;
+    }
+    return updated;
+  });
+  return renumber(fixed);
+}
+
+/** 答えを消し、その先で孤立するステップも一緒に削除する */
+export function removeAnswerWithBranch(steps: Step[], stepId: string, jumpIndex: number): Step[] {
+  const orphans = orphanedByRemovingAnswer(steps, stepId, jumpIndex);
+  const next = removeAnswer(steps, stepId, jumpIndex);
+  if (next === steps) return steps;
+  return removeSteps(next, orphans.map((s) => s.id));
 }
 
 /** 通常ルートの進み先を設定する。target は JUMP_END_TARGET（終了）かステップID。 */
