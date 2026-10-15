@@ -43,7 +43,12 @@ interface FlowBuilderModalProps {
   conversion?: ConvertResult | null;
   /** 変換を実行する（変換後のステップを渡す） */
   onConvert?: (steps: Step[]) => void;
+  /** 他の手順書からステップをコピーして、指定の場所に入れる（呼び出し側が Drive の選択と取り込みを行う） */
+  onCopyFromOther?: (target: CopyTarget) => void;
 }
+
+/** 他の手順書からコピーしたステップを入れる場所 */
+export type CopyTarget = { kind: 'after'; stepId: string } | { kind: 'answer'; stepId: string; jumpIndex: number };
 
 const inputClass =
   'w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-slate-400 focus:ring-4 focus:ring-slate-100';
@@ -67,13 +72,13 @@ const ZOOM_STEP = 0.1;
 const POPOVER_WIDTH = 236;
 
 type Linking = { kind: 'next'; stepId: string } | { kind: 'answer'; stepId: string; jumpIndex: number };
-interface Popover { box: LayoutBox; rect: DOMRect }
+interface Popover { box: LayoutBox; rect: DOMRect; title: string; items: PopoverItem[] }
 interface PopoverItem { label: string; onClick: () => void; accent?: boolean }
 interface PendingRemoval { stepId: string; jumpIndex: number; orphans: Step[] }
 
 const clampZoom = (z: number) => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.round(z * 100) / 100));
 
-export default function FlowBuilderModal({ steps, onChange, onClose, onEditStep, disabledReason, conversion, onConvert }: FlowBuilderModalProps) {
+export default function FlowBuilderModal({ steps, onChange, onClose, onEditStep, disabledReason, conversion, onConvert, onCopyFromOther }: FlowBuilderModalProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [popover, setPopover] = useState<Popover | null>(null);
   const [linking, setLinking] = useState<Linking | null>(null);
@@ -87,12 +92,21 @@ export default function FlowBuilderModal({ steps, onChange, onClose, onEditStep,
   const figureRef = useRef<HTMLDivElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
   const stepsRef = useRef(steps);
-  useEffect(() => {
-    stepsRef.current = steps;
-  }, [steps]);
+  const internalChangeRef = useRef(false);
   const undoRef = useRef<Step[][]>([]);
   const redoRef = useRef<Step[][]>([]);
   const lastTextKeyRef = useRef<{ key: string; at: number } | null>(null);
+  useEffect(() => {
+    // 自分の操作以外で steps が変わったとき（他の手順書からのコピーなど）も「元に戻す」で戻せるように積む
+    if (!internalChangeRef.current && stepsRef.current !== steps && stepsRef.current.length > 0) {
+      undoRef.current.push(stepsRef.current);
+      if (undoRef.current.length > HISTORY_LIMIT) undoRef.current.shift();
+      redoRef.current.length = 0;
+      setHistory({ undo: undoRef.current.length, redo: redoRef.current.length });
+    }
+    internalChangeRef.current = false;
+    stepsRef.current = steps;
+  }, [steps]);
 
   /* ---- 変更はすべてここを通す（元に戻す／やり直すのため） ---- */
   const apply = useCallback((next: Step[], textKey?: string) => {
@@ -101,12 +115,13 @@ export default function FlowBuilderModal({ steps, onChange, onClose, onEditStep,
     if (!merge) {
       undoRef.current.push(stepsRef.current);
       if (undoRef.current.length > HISTORY_LIMIT) undoRef.current.shift();
-      redoRef.current = [];
+      redoRef.current.length = 0;
     }
     lastTextKeyRef.current = textKey ? { key: textKey, at: now } : null;
     setPopover(null);
     setPendingRemoval(null);
     setHistory({ undo: undoRef.current.length, redo: redoRef.current.length });
+    internalChangeRef.current = true;
     onChange(next);
   }, [onChange]);
 
@@ -119,6 +134,7 @@ export default function FlowBuilderModal({ steps, onChange, onClose, onEditStep,
     setPendingRemoval(null);
     setLinking(null);
     setHistory({ undo: undoRef.current.length, redo: redoRef.current.length });
+    internalChangeRef.current = true;
     onChange(prev);
   }, [onChange]);
 
@@ -131,6 +147,7 @@ export default function FlowBuilderModal({ steps, onChange, onClose, onEditStep,
     setPendingRemoval(null);
     setLinking(null);
     setHistory({ undo: undoRef.current.length, redo: redoRef.current.length });
+    internalChangeRef.current = true;
     onChange(next);
   }, [onChange]);
 
@@ -225,6 +242,33 @@ export default function FlowBuilderModal({ steps, onChange, onClose, onEditStep,
   const selectedNode = selectedId ? graph.nodes.find((n) => n.id === selectedId) ?? null : null;
   const selectedStep = selectedNode?.stepId ? sorted.find((s) => s.id === selectedNode.stepId) ?? null : null;
 
+  /* ---- 箱の直下に出す小さなメニュー（項目はここで組み立て、描画は FlowPopover） ---- */
+  const buildPopover = (box: LayoutBox, rect: DOMRect): Popover | null => {
+    const step = box.node.stepId ? sorted.find((s) => s.id === box.node.stepId) : null;
+    if (!step) return null;
+    const jumpIndex = box.node.jumpIndex ?? 0;
+    const items: PopoverItem[] =
+      box.kind === 'placeholder'
+        ? [
+            { label: '＋ ステップを追加', onClick: () => selectStepAfterCreate(addAnswerStep(sorted, step.id, jumpIndex)) },
+            { label: '？ 質問を追加（続けて分岐）', onClick: () => selectStepAfterCreate(addAnswerQuestion(sorted, step.id, jumpIndex), true), accent: true },
+            ...(onCopyFromOther ? [{ label: '他の手順書からコピー', onClick: () => { setPopover(null); onCopyFromOther({ kind: 'answer', stepId: step.id, jumpIndex }); } }] : []),
+          ]
+        : [
+            ...(hasBranch(step)
+              ? []
+              : [
+                  { label: '＋ 次にステップを追加', onClick: () => selectStepAfterCreate(addStepAfter(sorted, step.id)) },
+                  { label: '？ ここで分岐', onClick: () => { apply(addBranch(sorted, step.id)); setSelectedId(questionNodeId(step.id)); }, accent: true },
+                ]),
+            { label: '＋ この前にステップを挿入', onClick: () => selectStepAfterCreate(addStepBefore(sorted, step.id)) },
+            ...(onCopyFromOther && !hasBranch(step) ? [{ label: '他の手順書からコピーして次に', onClick: () => { setPopover(null); onCopyFromOther({ kind: 'after', stepId: step.id }); } }] : []),
+          ];
+    const title = box.kind === 'placeholder' ? `「${step.jumps?.[box.node.jumpIndex ?? 0]?.label || `答え${(box.node.jumpIndex ?? 0) + 1}`}」の先に` : stepLabel(sorted, step);
+    return { box, rect, title, items };
+  };
+
+
   /* ---- 図の箱を押したとき ---- */
   const handleBoxClick = (box: LayoutBox, anchor: DOMRect) => {
     const node = box.node;
@@ -241,7 +285,7 @@ export default function FlowBuilderModal({ steps, onChange, onClose, onEditStep,
     if (node.kind === 'start' || node.kind === 'end') { setSelectedId(null); setPopover(null); return; }
     setSelectedId(node.id);
     setPendingRemoval(null);
-    if (node.kind === 'placeholder' || node.kind === 'step') setPopover({ box, rect: anchor });
+    if (node.kind === 'placeholder' || node.kind === 'step') setPopover(buildPopover(box, anchor));
     else setPopover(null);
   };
 
@@ -277,6 +321,11 @@ export default function FlowBuilderModal({ steps, onChange, onClose, onEditStep,
           <button type="button" onClick={() => selectStepAfterCreate(addAnswerQuestion(sorted, step.id, jumpIndex), true)} className={accentBtn}>
             ？ 質問を追加（続けて分岐する）
           </button>
+          {onCopyFromOther && (
+            <button type="button" onClick={() => { setPopover(null); onCopyFromOther({ kind: 'answer', stepId: step.id, jumpIndex }); }} className={neutralBtn}>
+              他の手順書からコピーして置く
+            </button>
+          )}
           <p className="text-xs leading-5 text-slate-500">
             「質問を追加」は、質問文をタイトルにした本文なしのステップを作り、すぐ次の分岐にします。
           </p>
@@ -349,6 +398,11 @@ export default function FlowBuilderModal({ steps, onChange, onClose, onEditStep,
           <button type="button" onClick={() => selectStepAfterCreate(addStepBefore(sorted, step.id))} className={neutralBtn}>
             ＋ この前にステップを挿入
           </button>
+          {onCopyFromOther && !branched && (
+            <button type="button" onClick={() => { setPopover(null); onCopyFromOther({ kind: 'after', stepId: step.id }); }} className={neutralBtn}>
+              他の手順書からコピーして次に入れる
+            </button>
+          )}
           {!branched && (
             <button
               type="button"
@@ -518,32 +572,6 @@ export default function FlowBuilderModal({ steps, onChange, onClose, onEditStep,
     );
   };
 
-  /* ---- 箱の直下に出す小さなメニュー（項目はここで組み立て、描画は FlowPopover） ---- */
-  const popoverItems = (() => {
-    if (!popover) return null;
-    const { box } = popover;
-    const step = box.node.stepId ? sorted.find((s) => s.id === box.node.stepId) : null;
-    if (!step) return null;
-    const jumpIndex = box.node.jumpIndex ?? 0;
-    const items: PopoverItem[] =
-      box.kind === 'placeholder'
-        ? [
-            { label: '＋ ステップを追加', onClick: () => selectStepAfterCreate(addAnswerStep(sorted, step.id, jumpIndex)) },
-            { label: '？ 質問を追加（続けて分岐）', onClick: () => selectStepAfterCreate(addAnswerQuestion(sorted, step.id, jumpIndex), true), accent: true },
-          ]
-        : [
-            ...(hasBranch(step)
-              ? []
-              : [
-                  { label: '＋ 次にステップを追加', onClick: () => selectStepAfterCreate(addStepAfter(sorted, step.id)) },
-                  { label: '？ ここで分岐', onClick: () => { apply(addBranch(sorted, step.id)); setSelectedId(questionNodeId(step.id)); }, accent: true },
-                ]),
-            { label: '＋ この前にステップを挿入', onClick: () => selectStepAfterCreate(addStepBefore(sorted, step.id)) },
-          ];
-    const title = box.kind === 'placeholder' ? `「${step.jumps?.[box.node.jumpIndex ?? 0]?.label || `答え${(box.node.jumpIndex ?? 0) + 1}`}」の先に` : stepLabel(sorted, step);
-    return { title, items };
-  })();
-
   const unreachableCount = graph.nodes.filter((n) => !!n.stepId && (n.kind === 'step' || n.kind === 'question') && n.unreachable).length;
 
   return (
@@ -681,7 +709,7 @@ export default function FlowBuilderModal({ steps, onChange, onClose, onEditStep,
           </div>
         )}
       </div>
-      {popover && popoverItems && <FlowPopover ref={popoverRef} rect={popover.rect} title={popoverItems.title} items={popoverItems.items} />}
+      {popover && <FlowPopover ref={popoverRef} rect={popover.rect} title={popover.title} items={popover.items} />}
     </div>
   );
 }

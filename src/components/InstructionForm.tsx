@@ -45,6 +45,8 @@ import StepCopyModal from './StepCopyModal';
 import GoogleLoginButton from './GoogleLoginButton';
 import { DriveFileInfo } from '@/lib/googleDrive';
 import { insertSteps } from '@/lib/copySteps';
+import { insertStepsAfterInFlow, attachStepsToAnswer } from '@/lib/flowModel';
+import type { CopyTarget } from './FlowBuilderModal';
 import { viewerInstructionUrl } from '@/lib/viewerUrl';
 import { FEATURES } from '@/lib/appMode';
 import { useTaskMasterAvailable } from '@/lib/taskMasterAccess';
@@ -147,6 +149,8 @@ export default function InstructionForm({ initialData, approvalMode = false, asN
   const [showCopyPicker, setShowCopyPicker] = useState(false);
   const [copyLoginPrompt, setCopyLoginPrompt] = useState(false);
   const [copySource, setCopySource] = useState<{ instruction: WorkInstruction; name: string } | null>(null);
+  // コピーしたステップをどこに入れるか。null は末尾、number はその添字の後。図から呼ばれたときは CopyTarget
+  const [copyTarget, setCopyTarget] = useState<number | CopyTarget | null>(null);
   const taskMasterAvailable = useTaskMasterAvailable();
   const [routeIssueCount, setRouteIssueCount] = useState(0);
   const [storageEstimate, setStorageEstimate] = useState<{ usage: number; quota: number } | null>(null);
@@ -289,7 +293,8 @@ export default function InstructionForm({ initialData, approvalMode = false, asN
   };
 
   // 他の手順書（Drive）からステップをコピーする
-  const handleCopyStepsClick = () => {
+  const handleCopyStepsClick = (target: number | CopyTarget | null = null) => {
+    setCopyTarget(target);
     if (!isGoogleConfigured() || !auth.isSignedIn) {
       setCopyLoginPrompt(true);
       return;
@@ -311,11 +316,33 @@ export default function InstructionForm({ initialData, approvalMode = false, asN
 
   const handleCopySteps = (incoming: Step[], insertAfterIndex: number | null) => {
     if (incoming.length === 0) return;
-    setSteps((prev) => insertSteps(prev, incoming, insertAfterIndex));
+    const target = copyTarget;
+    setSteps((prev) => {
+      if (target && typeof target === 'object') {
+        if (target.kind === 'answer') return attachStepsToAnswer(prev, target.stepId, target.jumpIndex, incoming);
+        return insertStepsAfterInFlow(prev, target.stepId, incoming);
+      }
+      return insertSteps(prev, incoming, insertAfterIndex);
+    });
     setCopySource(null);
-    const firstId = incoming[0].id;
-    setTimeout(() => scrollToEditStep(firstId), 150);
+    setCopyTarget(null);
+    if (!showFlowBuilder) {
+      const firstId = incoming[0].id;
+      setTimeout(() => scrollToEditStep(firstId), 150);
+    }
   };
+
+  /** 図から見た挿入位置の説明文 */
+  const copyTargetLabel = (() => {
+    if (!copyTarget || typeof copyTarget !== 'object') return undefined;
+    const step = steps.find((s) => s.id === copyTarget.stepId);
+    const name = step ? `ステップ ${steps.indexOf(step) + 1}「${step.title?.trim() || '無題'}」` : 'ステップ';
+    if (copyTarget.kind === 'answer') {
+      const label = step?.jumps?.[copyTarget.jumpIndex]?.label || `答え${copyTarget.jumpIndex + 1}`;
+      return `${name} の答え「${label}」の先`;
+    }
+    return `${name} の後`;
+  })();
 
   const handleStepChange = (index: number, updatedStep: Step) => {
     const newSteps = [...steps];
@@ -1469,13 +1496,24 @@ export default function InstructionForm({ initialData, approvalMode = false, asN
                     />
                   </div>
                   {index < steps.length - 1 && (
-                    <button
-                      type="button"
-                      onClick={() => handleInsertStep(index)}
-                      className="w-full rounded-lg border border-dashed border-slate-300 bg-white py-2 text-sm font-medium text-slate-500 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700"
-                    >
-                      + ここにステップを挿入
-                    </button>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleInsertStep(index)}
+                        className="flex-1 rounded-lg border border-dashed border-slate-300 bg-white py-2 text-sm font-medium text-slate-500 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700"
+                      >
+                        + ここにステップを挿入
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleCopyStepsClick(index)}
+                        title="他の手順書のステップをここにコピーします"
+                        className="rounded-lg border border-dashed border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-500 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700"
+                        data-copy-steps-after={index}
+                      >
+                        他の手順書からコピー
+                      </button>
+                    </div>
                   )}
                 </Fragment>
               ))}
@@ -1489,7 +1527,7 @@ export default function InstructionForm({ initialData, approvalMode = false, asN
               </button>
               <button
                 type="button"
-                onClick={handleCopyStepsClick}
+                onClick={() => handleCopyStepsClick(null)}
                 className="w-full rounded-lg border border-dashed border-slate-300 bg-white py-2.5 text-sm font-medium text-slate-600 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700"
                 data-copy-steps
               >
@@ -1991,23 +2029,13 @@ export default function InstructionForm({ initialData, approvalMode = false, asN
         <QrCodeModal url={saveSuccessModal.viewUrl} title={title.trim() || '手順書'} subtitle={department || undefined} onClose={() => setShowSaveQr(false)} />
       )}
 
-      <DriveJsonFilePicker open={showCopyPicker} onClose={() => setShowCopyPicker(false)} onFileLoaded={handleCopySourceLoaded} />
-      {copySource && (
-        <StepCopyModal
-          source={copySource.instruction}
-          sourceName={copySource.name}
-          currentSteps={steps}
-          onCopy={handleCopySteps}
-          onClose={() => setCopySource(null)}
-        />
-      )}
-
       {showFlowBuilder && (
         <FlowBuilderModal
           steps={steps}
           onChange={setSteps}
           onClose={() => setShowFlowBuilder(false)}
           onEditStep={scrollToEditStep}
+          onCopyFromOther={(target) => handleCopyStepsClick(target)}
           disabledReason={
             conditions.length > 0
               ? 'この手順書は「条件グループ」で分岐を設定しています。図で組み立てる方式と条件グループは同時に使えません。下の変換を使うか、条件グループをすべて削除してからお使いください。'
@@ -2029,6 +2057,20 @@ export default function InstructionForm({ initialData, approvalMode = false, asN
             setConditions([]);
             setGroupParents({});
           }}
+        />
+      )}
+
+      {/* 他の手順書からコピー（図の上にも重なるよう、図より後に描く） */}
+      <DriveJsonFilePicker open={showCopyPicker} onClose={() => { setShowCopyPicker(false); }} onFileLoaded={handleCopySourceLoaded} />
+      {copySource && (
+        <StepCopyModal
+          source={copySource.instruction}
+          sourceName={copySource.name}
+          currentSteps={steps}
+          defaultInsertAfter={typeof copyTarget === 'number' ? copyTarget : null}
+          fixedPositionLabel={copyTargetLabel}
+          onCopy={handleCopySteps}
+          onClose={() => { setCopySource(null); setCopyTarget(null); }}
         />
       )}
 

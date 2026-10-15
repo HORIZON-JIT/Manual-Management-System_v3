@@ -12,6 +12,10 @@ interface StepCopyModalProps {
   currentSteps: Step[];
   onCopy: (steps: Step[], insertAfterIndex: number | null) => void;
   onClose: () => void;
+  /** 挿入位置の初期値（ステップの添字。null は末尾） */
+  defaultInsertAfter?: number | null;
+  /** 挿入位置を固定して文言で示す（図から呼んだときなど）。指定時は位置のプルダウンを出さない */
+  fixedPositionLabel?: string;
 }
 
 const excerpt = (text: string, max = 60) => {
@@ -20,10 +24,10 @@ const excerpt = (text: string, max = 60) => {
 };
 
 /** 別の手順書からステップを選んで取り込むモーダル */
-export default function StepCopyModal({ source, sourceName, currentSteps, onCopy, onClose }: StepCopyModalProps) {
+export default function StepCopyModal({ source, sourceName, currentSteps, onCopy, onClose, defaultInsertAfter = null, fixedPositionLabel }: StepCopyModalProps) {
   const sorted = useMemo(() => [...(source.steps ?? [])].sort((a, b) => a.orderIndex - b.orderIndex), [source.steps]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [insertAfter, setInsertAfter] = useState<string>('end');
+  const [insertAfter, setInsertAfter] = useState<string>(defaultInsertAfter === null || defaultInsertAfter === undefined ? 'end' : String(defaultInsertAfter));
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -49,7 +53,7 @@ export default function StepCopyModal({ source, sourceName, currentSteps, onCopy
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3 sm:p-6" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }} role="dialog" aria-modal="true">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-3 sm:p-6" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }} role="dialog" aria-modal="true">
       <div className="flex max-h-[calc(100vh-24px)] w-full max-w-3xl flex-col rounded-2xl bg-white shadow-xl">
         <div className="flex items-start justify-between gap-3 border-b border-slate-200 px-5 py-4">
           <div className="min-w-0">
@@ -108,6 +112,9 @@ export default function StepCopyModal({ source, sourceName, currentSteps, onCopy
         </div>
 
         <div className="space-y-3 border-t border-slate-200 px-5 py-4">
+          {fixedPositionLabel ? (
+            <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">挿入位置: {fixedPositionLabel}</p>
+          ) : (
           <div className="flex flex-wrap items-center gap-2 text-sm">
             <label className="text-xs font-semibold text-slate-600">挿入位置</label>
             <select value={insertAfter} onChange={(e) => setInsertAfter(e.target.value)} className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400" data-copy-position>
@@ -117,6 +124,7 @@ export default function StepCopyModal({ source, sourceName, currentSteps, onCopy
               ))}
             </select>
           </div>
+          )}
           <p className="text-xs leading-5 text-slate-500">
             画像・注釈・注意・チェック項目・関連リンクごとコピーします。元の手順書の条件や、選んだ範囲の外への進み先は引き継ぎません（選んだ範囲内の分岐は残ります）。
           </p>
