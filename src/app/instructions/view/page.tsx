@@ -24,9 +24,9 @@ import {
   getAuthState,
   addAuthListener,
   GoogleAuthState,
-  signIn,
   initGoogleAuth,
 } from '@/lib/googleAuth';
+import GoogleLoginButton from '@/components/GoogleLoginButton';
 import { getTempData } from '@/lib/tempStorage';
 import { computeRoute, DEFAULT_JUMP_VALUE } from '@/lib/routeEngine';
 import ViewHistoryModal from '@/components/ViewHistoryModal';
@@ -228,12 +228,11 @@ function InstructionViewContent() {
             この手順書を閲覧するにはGoogleログインが必要です
           </p>
           {isGoogleConfigured() && (
-            <button
-              onClick={() => signIn()}
+            <GoogleLoginButton
+              align="center"
+              showIcon={false}
               className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition"
-            >
-              Googleでログイン
-            </button>
+            />
           )}
           <Link href="/" className="text-sm text-blue-600 hover:text-blue-800">
             ホームへ戻る

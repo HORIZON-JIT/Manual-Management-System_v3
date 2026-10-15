@@ -12,8 +12,8 @@ import {
   GoogleAuthState,
   initGoogleAuth,
   isGoogleConfigured,
-  signIn,
 } from '@/lib/googleAuth';
+import GoogleLoginButton from '@/components/GoogleLoginButton';
 import { getInstruction } from '@/lib/storage';
 import { getTempData, removeTempData } from '@/lib/tempStorage';
 import InstructionForm from '@/components/InstructionForm';
@@ -103,13 +103,11 @@ function EditInstructionContent() {
       return (
         <div className="flex min-h-[50vh] flex-col items-center justify-center gap-4 px-4 text-center">
           <p className="text-lg font-semibold text-slate-700">承認用画面を開くにはGoogleログインが必要です</p>
-          <button
-            type="button"
-            onClick={signIn}
+          <GoogleLoginButton
+            align="center"
+            showIcon={false}
             className="rounded-lg bg-slate-950 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800"
-          >
-            Googleでログイン
-          </button>
+          />
         </div>
       );
     }
