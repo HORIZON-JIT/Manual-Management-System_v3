@@ -22,7 +22,7 @@ export interface Form63Options {
 
 const EMU_PER_PX = 9525;
 const STEP_IMAGE_WIDTH_PX = 416; // 約110mm（本文幅の約2/3）
-const IMAGE_MAX_HEIGHT_PX = 500;
+const IMAGE_MAX_HEIGHT_PX = 360; // 約95mm（縦長のメール画面などが 1 ページを占めないように）
 
 function esc(text: string): string {
   return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -44,6 +44,30 @@ function fmtDateDot(iso?: string): string {
 
 function splitLines(text?: string): string[] {
   return (text ?? '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+}
+
+/**
+ * 本文行の種類。
+ * - step: 手順（番号を付ける）
+ * - sub: 小項目（「・」の箇条書き、宛先／CC、ファイルのパスなど。番号なしで字下げ）
+ * - example: 例文ブロック（「↓例文」「（計算例）」以降のメール文面や計算例。番号なしでさらに字下げ）
+ * - note: 注意・確認・分岐（※ □ →）。本文の後ろにまとめる
+ */
+type LineKind = 'step' | 'sub' | 'example' | 'note';
+const EXAMPLE_START = /^(?:↓\s*|<|＜)?\s*(?:例文|メール例|文例|計算例|入力例|記入例)\s*[:：]?\s*$|^[（(]\s*(?:例文|計算例|入力例|記入例)\s*[)）]\s*$/;
+const SUB_LINE = /^[・･●○◆■▶▸◇□]|^[-－‐]\s|^(?:宛先|送信先|CC|Cc|cc|BCC|To|TO|件名|添付|保管先|保存先|格納先|URL|パス|Pass)\s*[:：]|^["“「]?\\\\|^https?:\/\//;
+const NOTE_LINE = /^[※□→]/;
+
+function classifyLines(lines: string[]): { text: string; kind: LineKind }[] {
+  const out: { text: string; kind: LineKind }[] = [];
+  let inExample = false;
+  for (const l of lines) {
+    if (NOTE_LINE.test(l)) { out.push({ text: l, kind: 'note' }); continue; }
+    if (EXAMPLE_START.test(l)) { inExample = true; out.push({ text: l, kind: 'sub' }); continue; }
+    if (inExample) { out.push({ text: l, kind: 'example' }); continue; }
+    out.push({ text: l, kind: SUB_LINE.test(l) || /^[（(]例[)）]/.test(l) ? 'sub' : 'step' });
+  }
+  return out;
 }
 
 // ---- OOXML の部品 ----
@@ -94,10 +118,17 @@ function emptyParagraph(): string {
   return '<w:p><w:pPr><w:spacing w:line="240" w:lineRule="atLeast"/></w:pPr></w:p>';
 }
 
-function drawingParagraph(rId: string, docPrId: number, widthPx: number, heightPx: number, indentLeft: number): string {
+/** 画像の下に付ける小さな説明（中央寄せ） */
+function captionParagraph(text: string): string {
+  return `<w:p><w:pPr><w:spacing w:before="40" w:after="120" w:line="240" w:lineRule="atLeast"/><w:jc w:val="center"/></w:pPr>` +
+    `<w:r><w:rPr><w:rFonts w:hint="eastAsia"/><w:sz w:val="18"/><w:color w:val="595959"/></w:rPr><w:t xml:space="preserve">${esc(text)}</w:t></w:r></w:p>`;
+}
+
+function drawingParagraph(rId: string, docPrId: number, widthPx: number, heightPx: number, indentLeft: number, center = false): string {
   const cx = Math.round(widthPx * EMU_PER_PX);
   const cy = Math.round(heightPx * EMU_PER_PX);
-  return `<w:p><w:pPr><w:spacing w:line="240" w:lineRule="atLeast"/><w:ind w:left="${indentLeft}"/></w:pPr><w:r><w:drawing>` +
+  const align = center ? '<w:jc w:val="center"/>' : `<w:ind w:left="${indentLeft}"/>`;
+  return `<w:p><w:pPr><w:spacing w:before="80" w:line="240" w:lineRule="atLeast"/>${align}</w:pPr><w:r><w:drawing>` +
     `<wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="${cx}" cy="${cy}"/><wp:effectExtent l="0" t="0" r="0" b="0"/>` +
     `<wp:docPr id="${docPrId}" name="図 ${docPrId}"/><wp:cNvGraphicFramePr><a:graphicFrameLocks xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" noChangeAspect="1"/></wp:cNvGraphicFramePr>` +
     `<a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">` +
@@ -193,18 +224,41 @@ function buildBody(instruction: WorkInstruction, options: Form63Options, media: 
       for (const item of step.checkItems ?? []) if (item.label?.trim()) notes.push(`□ ${item.label.trim()}`);
     }
     if (lines.length === 0) lines = [heading];
-    lines.forEach((l, i) => parts.push(numberedParagraph(i + 1, l)));
+    const classified = classifyLines(lines);
+    notes.unshift(...classified.filter((c) => c.kind === 'note').map((c) => c.text));
+    // 手順が 1 つだけなら番号を付けない（「1.」だけが並ぶのを避ける）
+    const stepCount = classified.filter((c) => c.kind === 'step').length;
+    let no = 0;
+    for (const c of classified) {
+      if (c.kind === 'note') continue;
+      if (c.kind === 'step') {
+        no += 1;
+        parts.push(stepCount > 1 ? numberedParagraph(no, c.text) : bodyParagraph(c.text, { indentLeft: 700 }));
+      } else if (c.kind === 'sub') {
+        parts.push(bodyParagraph(c.text, { indentLeft: 900 }));
+      } else {
+        parts.push(bodyParagraph(c.text, { indentLeft: 1300 }));
+      }
+    }
     for (const n of notes) parts.push(bodyParagraph(n, { indentLeft: 700 }));
 
-    for (const url of getStepImages(step)) {
+    const images = getStepImages(step);
+    images.forEach((url, imgIndex) => {
       const parsed = parseDataUrl(url);
-      if (!parsed) continue;
+      if (!parsed) return;
       const size = imageSize(parsed.data, parsed.ext);
-      const w = STEP_IMAGE_WIDTH_PX;
-      const h = Math.min(IMAGE_MAX_HEIGHT_PX, Math.max(40, Math.round((w * size.height) / Math.max(size.width, 1))));
+      // 縦横比を保ったまま、幅と高さの両方を上限内に収める
+      const ratio = Math.max(size.height, 1) / Math.max(size.width, 1);
+      let w = STEP_IMAGE_WIDTH_PX;
+      let h = Math.round(w * ratio);
+      if (h > IMAGE_MAX_HEIGHT_PX) { h = IMAGE_MAX_HEIGHT_PX; w = Math.round(h / ratio); }
+      h = Math.max(40, h);
       const { rId, docPrId } = media.add(parsed.data, parsed.ext);
-      parts.push(drawingParagraph(rId, docPrId, w, h, 700));
-    }
+      parts.push(drawingParagraph(rId, docPrId, w, h, 0, true));
+      const caption = step.imageCaptions?.[imgIndex]?.trim();
+      const label = images.length > 1 ? `図${imgIndex + 1}` : '';
+      if (caption || label) parts.push(captionParagraph([label, caption].filter(Boolean).join('　')));
+    });
     parts.push(emptyParagraph());
   }
   return parts.join('');
