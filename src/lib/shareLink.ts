@@ -73,3 +73,15 @@ export function getInstructionsBaseUrl(subRoute: string): string {
   const basePath = repo ? `${repo}${sub}` : '';
   return `${origin}${basePath}/instructions/${subRoute}`;
 }
+
+/**
+ * アプリ内のパスにサイトのフォルダ名（basePath）を付ける。next.config.ts と同じ規則。
+ * Next.js の <Link> や router.push は自動で付くが、素の <a href>（新しいタブで開くリンクなど）には付かないので、これを通す。
+ * window を使わないので描画中に呼んでよい。
+ */
+export function withBasePath(path: string): string {
+  if (process.env.NODE_ENV !== 'production') return path;
+  const repo = process.env.NEXT_PUBLIC_REPO_NAME || 'FC';
+  const sub = process.env.NEXT_PUBLIC_BASE_SUBPATH ? `/${process.env.NEXT_PUBLIC_BASE_SUBPATH}` : '';
+  return `/${repo}${sub}${path.startsWith('/') ? path : `/${path}`}`;
+}

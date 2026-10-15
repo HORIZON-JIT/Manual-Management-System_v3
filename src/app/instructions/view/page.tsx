@@ -16,7 +16,7 @@ import {
   JUMP_END_TARGET,
 } from '@/types/instruction';
 import { getInstruction } from '@/lib/storage';
-import { parseShareData } from '@/lib/shareLink';
+import { parseShareData, withBasePath } from '@/lib/shareLink';
 import { downloadDriveFile } from '@/lib/googleDrive';
 import AuthErrorNotice, { AUTH_EXPIRED_MESSAGE, driveErrorMessage } from '@/components/AuthErrorNotice';
 import {
@@ -676,11 +676,12 @@ function InstructionViewContent() {
                             </div>
                           );
                         }
+                        // 新しいタブで開く素の <a> なので、サイトのフォルダ名（basePath）を自分で付ける
                         const href =
                           link.type === 'instruction'
                             ? link.driveFileId
-                              ? `/instructions/view?driveFileId=${link.driveFileId}`
-                              : `/instructions/view?id=${link.instructionId}`
+                              ? withBasePath(`/instructions/view?driveFileId=${encodeURIComponent(link.driveFileId)}`)
+                              : withBasePath(`/instructions/view?id=${encodeURIComponent(link.instructionId ?? '')}`)
                             : link.url;
                         return (
                           <a
