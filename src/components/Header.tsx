@@ -42,22 +42,23 @@ export default function Header() {
             {/* ファビコン（app/icon.svg）と同じ「JIT」マーク。外部ファイルに頼らずインラインで描く */}
             <svg
               viewBox="0 0 64 64"
-              className="h-9 w-9 shrink-0 rounded-md shadow-[0_10px_24px_rgba(0,0,0,0.16)]"
+              className="h-9 w-9 shrink-0 rounded-[9px] shadow-[0_10px_24px_rgba(0,0,0,0.16)]"
               role="img"
               aria-label="JIT"
             >
               <defs>
                 <linearGradient id="jit-logo-gold" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="64" y2="64">
-                  <stop offset="0" stopColor="#f0d9a6" />
-                  <stop offset="1" stopColor="#a48149" />
+                  <stop offset="0" stopColor="#e2c98f" />
+                  <stop offset="1" stopColor="#b08d57" />
                 </linearGradient>
               </defs>
-              <rect width="64" height="64" rx="14" fill="#14171f" />
-              <g fill="none" stroke="url(#jit-logo-gold)" strokeWidth="7.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M22 18 V37.5 a7.5 7.5 0 0 1 -15 0" />
-                <path d="M33 18 V46" />
-                <path d="M40 18 H58 M49 18 V46" />
-              </g>
+              <rect width="64" height="64" rx="15.2" fill="#161a24" />
+              <rect x="0.84" y="0.84" width="62.32" height="62.32" rx="14.4" fill="none" stroke="#c9a665" strokeOpacity="0.35" strokeWidth="1.68" />
+              {/* Zen Kaku Gothic New Bold の「JIT」を図形にしたもの（フォントの読み込みに頼らない） */}
+              <path
+                fill="url(#jit-logo-gold)"
+                d="M20.31 41.06Q18.29 41.06 17.02 40.31Q15.76 39.56 15.19 38.2Q14.62 36.83 14.62 35.04H17.53Q17.53 36.68 18.24 37.44Q18.95 38.2 20.31 38.2Q21.68 38.2 22.36 37.44Q23.04 36.68 23.04 35.04V22.94H26V35.04Q26 36.83 25.42 38.2Q24.84 39.56 23.59 40.31Q22.34 41.06 20.31 41.06ZM29.85 40.65V22.94H32.76V40.65ZM41.11 40.65V25.65H35.77V22.94H49.38V25.65H44.07V40.65Z"
+              />
             </svg>
             <span className="truncate text-[15px] font-semibold tracking-[0.08em]">{DEPARTMENT.brandLabel}</span>
             <span className="shrink-0 rounded-md border border-neutral-300 px-1.5 py-0.5 text-[11px] font-semibold leading-none tracking-wide text-neutral-500">
