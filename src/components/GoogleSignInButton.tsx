@@ -50,10 +50,10 @@ export default function GoogleSignInButton() {
           <button
             onClick={handleSignIn}
             disabled={busy}
-            title="ログインの有効期限が切れています。押すと再ログインします"
+            title="ログインの有効期限が切れています。押すと Google の画面に移動して再ログインします"
             className="rounded-md border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-xs font-semibold text-amber-800 transition hover:bg-amber-100 disabled:opacity-50"
           >
-            {busy ? 'ログイン中...' : '再ログイン'}
+            {busy ? '移動中...' : '再ログイン'}
           </button>
         ) : (
           <button
@@ -91,7 +91,7 @@ export default function GoogleSignInButton() {
           d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
         />
       </svg>
-      {busy ? 'ログイン中...' : 'Google Drive'}
+      {busy ? '移動中...' : 'Google Drive'}
     </button>
   );
 }

@@ -48,7 +48,7 @@ export default function AuthErrorNotice({ error, onRetry, className = '', tone =
             disabled={busy}
             className="shrink-0 rounded-lg bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-50"
           >
-            {busy ? 'ログイン中...' : '再ログイン'}
+            {busy ? '移動中...' : '再ログイン'}
           </button>
         )}
       </div>

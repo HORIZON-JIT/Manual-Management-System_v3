@@ -1,3 +1,5 @@
+import { appPath, consumeRedirectResult, startRedirectLogin } from '@/lib/oauthRedirect';
+
 const CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '';
 const SCOPES =
   'openid email profile https://www.googleapis.com/auth/drive https://www.googleapis.com/auth/spreadsheets';
@@ -5,14 +7,11 @@ const SCOPES =
 const STORAGE_TOKEN_KEY = 'google_auth_token';
 const STORAGE_EXPIRY_KEY = 'google_auth_expiry';
 const STORAGE_USER_KEY = 'google_auth_user';
+/** 起動時の自動再ログイン（prompt=none）をこのタブで試したか。失敗したときに移動を繰り返さないため */
+const AUTO_RELOGIN_KEY = 'google_auth_auto_relogin_tried';
 
-// トークン更新の調整値
-const REFRESH_LEAD_MS = 5 * 60 * 1000; // 失効の5分前から更新対象にする
-const MIN_REFRESH_DELAY_MS = 20 * 1000; // 次回更新までの最短間隔
-const SILENT_RETRY_MS = 60 * 1000; // サイレント更新に失敗したときの再試行間隔
-const SILENT_TIMEOUT_MS = 8 * 1000; // サイレント更新の応答を待つ上限
-const INIT_SILENT_WAIT_MS = 4 * 1000; // 起動時にサイレント再ログインの結果を待つ上限
-const STALE_POPUP_CLOSED_MS = 1500; // 出し直し直後に届いた古いポップアップの「閉じた」通知を無視する時間
+// トークンの余裕（これより残りが短ければ切れたものとして扱う）
+const TOKEN_MARGIN_MS = 60 * 1000;
 
 export interface GoogleAuthState {
   isInitialized: boolean;
@@ -65,24 +64,13 @@ const authState: GoogleAuthState = {
   userPhoto: null,
 };
 
-let tokenClient: google.accounts.oauth2.TokenClient | null = null;
 const listeners: Set<AuthListener> = new Set();
 
 let initPromise: Promise<void> | null = null;
-let refreshTimer: ReturnType<typeof setTimeout> | null = null;
 let expiryTimer: ReturnType<typeof setTimeout> | null = null;
 let tokenExpiry = 0; // アクセストークンの失効時刻(epoch ms)
+let redirecting = false;
 
-// requestAccessToken は callback で結果が返るので、Promise に包んで 1 件ずつ処理する
-interface PendingTokenRequest {
-  resolve: (response: google.accounts.oauth2.TokenResponse) => void;
-  reject: (error: Error) => void;
-  silent: boolean;
-  timer: ReturnType<typeof setTimeout> | null;
-  startedAt: number;
-}
-let pending: PendingTokenRequest | null = null;
-let pendingPromise: Promise<google.accounts.oauth2.TokenResponse> | null = null;
 
 function notifyListeners() {
   listeners.forEach((fn) => fn({ ...authState }));
@@ -225,150 +213,89 @@ function restoreSession(): { hasAccount: boolean; tokenValid: boolean } {
 /* ---- タイマー ---- */
 
 function clearTimers() {
-  if (refreshTimer) {
-    clearTimeout(refreshTimer);
-    refreshTimer = null;
-  }
   if (expiryTimer) {
     clearTimeout(expiryTimer);
     expiryTimer = null;
   }
 }
 
-/** 失効の少し前にサイレント更新し、失効時刻には needsReauth を立てる */
+/**
+ * 失効時刻に needsReauth を立てる（「再ログイン」を表示）。
+ * ページ移動を伴うため、使用中に自動で再ログインはしない。
+ */
 function scheduleTimers() {
   clearTimers();
   if (!tokenExpiry) return;
-  const refreshDelay = Math.max(tokenExpiry - Date.now() - REFRESH_LEAD_MS, MIN_REFRESH_DELAY_MS);
-  refreshTimer = setTimeout(() => {
-    silentRefresh().catch(() => {});
-  }, refreshDelay);
-  const expiryDelay = Math.max(tokenExpiry - Date.now(), 0);
+  const expiryDelay = Math.max(tokenExpiry - TOKEN_MARGIN_MS - Date.now(), 0);
   expiryTimer = setTimeout(() => {
-    if (!hasValidToken() && authState.isSignedIn && !authState.needsReauth) {
+    if (!hasValidToken(TOKEN_MARGIN_MS) && authState.isSignedIn && !authState.needsReauth) {
       authState.needsReauth = true;
       notifyListeners();
     }
   }, expiryDelay + 500);
 }
 
-/* ---- トークン取得（Promise 化） ---- */
-
-function settlePending(response: google.accounts.oauth2.TokenResponse | null, error?: Error) {
-  const p = pending;
-  if (!p) return;
-  pending = null;
-  pendingPromise = null;
-  if (p.timer) clearTimeout(p.timer);
-  if (response && !response.error) p.resolve(response);
-  else p.reject(error ?? new Error(response?.error || 'token request failed'));
-}
+/* ---- ページ移動によるログイン ---- */
 
 /**
- * GIS にトークンを要求する。同時に複数呼ばれたら同じ要求を共有する。
- * silent=true は UI を出さない（prompt:''）。ブラウザや Cookie 設定によっては失敗する。
+ * Google へ移動する直前に実行する処理（編集中の内容を下書きに保存するなど）。
+ * 戻り値にアプリ内のパスを返すと、ログイン後はそのページへ戻る。
  */
-function requestToken(options: { silent: boolean; prompt?: string }): Promise<google.accounts.oauth2.TokenResponse> {
-  if (!tokenClient) return Promise.reject(new AuthRequiredError('Google 認証の準備ができていません。'));
-  if (pendingPromise) return pendingPromise;
-  const client = tokenClient;
-  pendingPromise = new Promise((resolve, reject) => {
-    pending = { resolve, reject, silent: options.silent, timer: null, startedAt: Date.now() };
-    if (options.silent) {
-      pending.timer = setTimeout(() => settlePending(null, new Error('silent token request timed out')), SILENT_TIMEOUT_MS);
-    }
-    try {
-      const config: { prompt?: string; hint?: string } = { prompt: options.silent ? '' : (options.prompt ?? '') };
-      if (authState.userEmail) config.hint = authState.userEmail;
-      client.requestAccessToken(config);
-    } catch (e) {
-      settlePending(null, e instanceof Error ? e : new Error(String(e)));
-    }
-  });
-  return pendingPromise;
+type BeforeRedirectHook = () => Promise<string | null | void>;
+const beforeRedirectHooks: Set<BeforeRedirectHook> = new Set();
+
+export function addBeforeRedirectHook(hook: BeforeRedirectHook): () => void {
+  beforeRedirectHooks.add(hook);
+  return () => beforeRedirectHooks.delete(hook);
 }
 
-/**
- * 対話ログイン（ポップアップ）を要求する。
- * 前の要求（閉じられずに残ったポップアップ、起動時のサイレント更新など）が残っていると
- * 新しい要求がそれに相乗りして何も起きないので、打ち切ってから出し直す。
- * ポップアップはクリック直後でないとブロックされるため、この関数の前で長く待たないこと。
- */
-function requestInteractiveToken(): Promise<google.accounts.oauth2.TokenResponse> {
-  if (pending) settlePending(null, new Error('superseded'));
-  return requestToken({ silent: false, prompt: authState.userEmail ? '' : 'select_account' });
-}
-
-async function applyToken(response: google.accounts.oauth2.TokenResponse, silent: boolean) {
-  authState.isSignedIn = true;
-  authState.needsReauth = false;
-  authState.accessToken = response.access_token;
-  gapi.client.setToken({ access_token: response.access_token });
-  saveToken(response.access_token, response.expires_in ?? 3600);
-  // ユーザー情報は初回・対話ログイン時のみ取得（自動更新では変わらない）
-  if (!silent || !authState.userEmail) {
-    await fetchUserInfo(response.access_token);
-  } else {
-    saveCachedUserInfo();
+/** Google のログイン画面へ移動する。移動するのでこの Promise は解決しない */
+async function redirectToLogin(options: { silent?: boolean } = {}): Promise<never> {
+  if (!redirecting) {
+    redirecting = true;
+    let returnTo: string | null = null;
+    for (const hook of beforeRedirectHooks) {
+      try {
+        const path = await hook();
+        if (path) returnTo = appPath(path);
+      } catch {
+        // 保存に失敗しても、ログインは続ける
+      }
+    }
+    startRedirectLogin({
+      clientId: CLIENT_ID,
+      scope: SCOPES,
+      loginHint: authState.userEmail,
+      silent: options.silent,
+      selectAccount: !options.silent && !authState.userEmail,
+      returnTo,
+    });
   }
-  scheduleTimers();
-  notifyListeners();
-}
-
-/** UI を出さずにトークンを更新する。失敗したら needsReauth を立てて例外を投げる */
-async function silentRefresh(): Promise<string> {
-  if (!authState.isSignedIn) throw new AuthRequiredError();
-  try {
-    const response = await requestToken({ silent: true });
-    await applyToken(response, true);
-    return response.access_token;
-  } catch (e) {
-    if (hasValidToken(60_000)) {
-      // まだ有効なら後で再試行するだけ
-      if (refreshTimer) clearTimeout(refreshTimer);
-      refreshTimer = setTimeout(() => {
-        silentRefresh().catch(() => {});
-      }, SILENT_RETRY_MS);
-      return authState.accessToken as string;
-    }
-    if (!authState.needsReauth) {
-      authState.needsReauth = true;
-      notifyListeners();
-    }
-    throw e instanceof AuthRequiredError ? e : new AuthRequiredError();
-  }
+  return new Promise<never>(() => {});
 }
 
 /**
  * 有効なアクセストークンを返す。Drive/Sheets の呼び出し前に必ず使う。
- * - 期限に余裕があればそのまま返す
- * - 近い／切れていればサイレント更新
- * - interactive=true なら、サイレント更新に失敗したときポップアップで再ログインを求める（ユーザー操作の直後に呼ぶこと）
+ * - 期限内ならそのまま返す
+ * - 切れていて interactive=true なら、Google のログイン画面へ移動する（ユーザー操作から呼ぶこと）
+ * - 切れていて interactive=false なら AuthRequiredError（画面に「再ログイン」を出す）
  */
 export async function ensureAccessToken(options: { interactive?: boolean; force?: boolean } = {}): Promise<string> {
   if (!isGoogleConfigured()) throw new AuthRequiredError('Google 連携が設定されていません。');
   await initGoogleAuth();
-  if (!options.force && hasValidToken(REFRESH_LEAD_MS)) return authState.accessToken as string;
+  if (!options.force && hasValidToken(TOKEN_MARGIN_MS)) return authState.accessToken as string;
 
-  if (authState.isSignedIn || authState.userEmail) {
-    try {
-      return await silentRefresh();
-    } catch {
-      // 対話にフォールバック
-    }
+  if (authState.isSignedIn && !authState.needsReauth) {
+    authState.needsReauth = true;
+    notifyListeners();
   }
   if (!options.interactive) throw new AuthRequiredError();
-
-  const response = await requestInteractiveToken().catch(() => {
-    throw new AuthRequiredError('Google ログインがキャンセルされました。');
-  });
-  await applyToken(response, false);
-  return response.access_token;
+  return redirectToLogin();
 }
 
 /**
  * Drive/Sheets の呼び出しを認証つきで実行する。
- * 事前に有効なトークンを確保し、それでも 401 が返ったら強制更新して 1 回だけやり直す。
+ * 事前に有効なトークンを確保し、それでも 401 が返ったら再ログインを求める。
  */
 export async function withGoogleAuth<T>(fn: (token: string) => Promise<T>, options: { interactive?: boolean } = {}): Promise<T> {
   const token = await ensureAccessToken(options);
@@ -376,6 +303,8 @@ export async function withGoogleAuth<T>(fn: (token: string) => Promise<T>, optio
     return await fn(token);
   } catch (e) {
     if (!isAuthRequiredError(e)) throw e;
+    // トークンが取り消された・権限が変わったなど
+    clearToken();
     const fresh = await ensureAccessToken({ ...options, force: true });
     try {
       return await fn(fresh);
@@ -388,44 +317,76 @@ export async function withGoogleAuth<T>(fn: (token: string) => Promise<T>, optio
 
 /* ---- 初期化 ---- */
 
+/** 直前の signIn が失敗した理由（画面に出す文言）。成功・未実行なら null */
+let lastSignInError: string | null = null;
+
+export function getLastSignInError(): string | null {
+  return lastSignInError;
+}
+
+function signInErrorMessage(error: string): string {
+  if (/access_denied/i.test(error)) return 'ログインが完了しませんでした（Google の画面でキャンセルされました）。もう一度押してください。';
+  return `ログインできませんでした（${error}）。もう一度押してください。`;
+}
+
+function markAutoReloginTried(tried: boolean) {
+  try {
+    if (tried) sessionStorage.setItem(AUTO_RELOGIN_KEY, '1');
+    else sessionStorage.removeItem(AUTO_RELOGIN_KEY);
+  } catch {
+    // 無視
+  }
+}
+
+function autoReloginTried(): boolean {
+  try {
+    return sessionStorage.getItem(AUTO_RELOGIN_KEY) === '1';
+  } catch {
+    return true; // 記録できない環境では、移動を繰り返さないよう試さない
+  }
+}
+
 export function initGoogleAuth(): Promise<void> {
   if (!isGoogleConfigured()) return Promise.resolve();
   if (initPromise) return initPromise;
   initPromise = (async () => {
-    await loadScript('https://accounts.google.com/gsi/client');
+    // Google のログイン画面から戻ってきた直後なら、結果を受け取る（URL からはすぐ消す）
+    const { result, returnTo } = consumeRedirectResult();
+    if (result?.kind === 'token') {
+      markAutoReloginTried(false);
+      saveToken(result.accessToken, result.expiresIn);
+      // 元のページへ戻る。トークンは保存済みなので、移動先でそのまま使える
+      if (returnTo) {
+        window.location.replace(returnTo);
+        return new Promise<void>(() => {});
+      }
+    } else if (result?.kind === 'error' && !result.silent) {
+      lastSignInError = signInErrorMessage(result.error);
+    }
+
     await loadScript('https://apis.google.com/js/api.js');
     await new Promise<void>((resolve) => gapi.load('client', () => resolve()));
     await gapi.client.init({});
 
-    tokenClient = google.accounts.oauth2.initTokenClient({
-      client_id: CLIENT_ID,
-      scope: SCOPES,
-      callback: (response) => settlePending(response),
-      error_callback: (error) => {
-        // 打ち切った前の要求のポップアップが閉じた通知が、出し直した直後の要求に届くことがあるので無視する
-        if (error?.type === 'popup_closed' && pending && !pending.silent && Date.now() - pending.startedAt < STALE_POPUP_CLOSED_MS) return;
-        settlePending(null, new Error(error?.type || error?.message || 'token request failed'));
-      },
-    });
-
-    const { tokenValid } = restoreSession();
+    const { hasAccount, tokenValid } = restoreSession();
     if (tokenValid) {
       gapi.client.setToken({ access_token: authState.accessToken as string });
       scheduleTimers();
-      fetchUserInfo(authState.accessToken as string).then(() => notifyListeners());
-    } else if (authState.isSignedIn) {
-      // 以前ログインした端末: 画面を「未ログイン」にせず、まずサイレント再ログインを試す（最大数秒待つ）
-      await Promise.race([
-        silentRefresh().catch(() => {}),
-        new Promise<void>((resolve) => setTimeout(resolve, INIT_SILENT_WAIT_MS)),
-      ]);
+      if (result?.kind === 'token' || !hasAccount) await fetchUserInfo(authState.accessToken as string);
+      else fetchUserInfo(authState.accessToken as string).then(() => notifyListeners());
+    } else if (hasAccount && !autoReloginTried() && !(result?.kind === 'error')) {
+      // 以前ログインした端末でトークンが切れている: 1タブ1回だけ、画面を出さない再ログイン（prompt=none）へ移動する。
+      // Google にログイン済みなら一瞬で戻ってくる。だめなら「再ログイン」を表示する。
+      markAutoReloginTried(true);
+      return redirectToLogin({ silent: true });
     }
 
-    // スリープ復帰・タブ再表示・ウィンドウ復帰時に、失効が近ければ静かに更新する
+    // 使用中に期限が切れていたら（スリープ復帰など）、「再ログイン」を表示する
     const onWake = () => {
-      if (document.hidden || !authState.isSignedIn) return;
-      if (authState.needsReauth || !hasValidToken(REFRESH_LEAD_MS)) {
-        silentRefresh().catch(() => {});
+      if (document.hidden || !authState.isSignedIn || authState.needsReauth) return;
+      if (!hasValidToken(TOKEN_MARGIN_MS)) {
+        authState.needsReauth = true;
+        notifyListeners();
       }
     };
     document.addEventListener('visibilitychange', onWake);
@@ -440,24 +401,10 @@ export function initGoogleAuth(): Promise<void> {
   return initPromise;
 }
 
-/** ヘッダーの「Google Drive」「再ログイン」ボタン。ユーザー操作から呼ぶ */
-let lastSignInError: string | null = null;
-
-/** 直前の signIn が失敗した理由（画面に出す文言）。成功・未実行なら null */
-export function getLastSignInError(): string | null {
-  return lastSignInError;
-}
-
-function signInErrorMessage(e: unknown): string {
-  const m = e instanceof Error ? e.message : String(e);
-  if (/popup_failed_to_open/i.test(m)) return 'ログイン画面を開けませんでした（ポップアップがブロックされた可能性）。もう一度押すか、ブラウザでこのサイトのポップアップを許可してください。';
-  if (/popup_closed|access_denied|cancel/i.test(m)) return 'ログインが完了しませんでした。もう一度押してください。';
-  return `ログインできませんでした（${m}）。もう一度押してください。`;
-}
-
 /**
- * ログインボタンから呼ぶ。サイレント更新は挟まず、すぐにポップアップを出す
- * （先にサイレント更新を試すとクリックの権限を使い切り、ポップアップがブロックされるため）。
+ * ログインボタン・「再ログイン」から呼ぶ。Google のログイン画面へページごと移動する
+ * （ポップアップは使わないので、ブラウザにブロックされない）。
+ * すでに有効なトークンがあれば移動せずに true を返す。
  */
 export async function signIn(): Promise<boolean> {
   lastSignInError = null;
@@ -465,27 +412,15 @@ export async function signIn(): Promise<boolean> {
     lastSignInError = 'Google 連携が設定されていません。管理者に連絡してください。';
     return false;
   }
-  if (!tokenClient) {
-    try {
-      await initGoogleAuth();
-    } catch {
-      lastSignInError = 'Google の読み込みに失敗しました。通信環境を確認して、もう一度押してください。';
-      return false;
-    }
-    // 起動処理の中でログイン状態が復元できた
-    if (authState.isSignedIn && hasValidToken(REFRESH_LEAD_MS)) return true;
-  }
   try {
-    const response = await requestInteractiveToken();
-    await applyToken(response, false);
-    return true;
-  } catch (e) {
-    // もう一度押されて出し直した場合は、新しい方の結果に任せる
-    if (e instanceof Error && e.message === 'superseded') return false;
-    lastSignInError = signInErrorMessage(e);
+    await initGoogleAuth();
+  } catch {
+    lastSignInError = 'Google の読み込みに失敗しました。通信環境を確認して、もう一度押してください。';
     notifyListeners();
     return false;
   }
+  if (authState.isSignedIn && !authState.needsReauth && hasValidToken(TOKEN_MARGIN_MS)) return true;
+  return redirectToLogin();
 }
 
 /** 承認などでユーザーのメールが必要なときに、必要ならログインさせて状態を返す */
@@ -506,15 +441,20 @@ export async function ensureGoogleUserInfo(): Promise<GoogleAuthState> {
 export function signOut(): void {
   const token = authState.accessToken;
   if (token) {
+    // トークンを取り消す（結果は待たない）
+    fetch(`https://oauth2.googleapis.com/revoke?token=${encodeURIComponent(token)}`, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    }).catch(() => {});
     try {
-      google.accounts.oauth2.revoke(token);
       gapi.client.setToken(null);
     } catch {
       // 無視
     }
   }
   clearTimers();
-  settlePending(null, new AuthRequiredError('サインアウトしました。'));
+  markAutoReloginTried(false);
   authState.isSignedIn = false;
   authState.needsReauth = false;
   authState.accessToken = null;
