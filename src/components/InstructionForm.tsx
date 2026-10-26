@@ -17,7 +17,7 @@ import {
   getInstructionRevision,
   getStepConditionIds,
 } from '@/types/instruction';
-import { saveInstruction, getStorageEstimate, formatBytesShort, LOW_STORAGE_BYTES } from '@/lib/storage';
+import { saveInstruction, getInstruction, getStorageEstimate, formatBytesShort, LOW_STORAGE_BYTES } from '@/lib/storage';
 import { buildExcelBuffer, ExcelNavMode } from '@/lib/exportSpreadsheet';
 import { uploadAsGoogleSheet, saveFileToDrive, getTargetFolder } from '@/lib/googleDrive';
 import { addStepNavLinks, addSheetCheckboxes } from '@/lib/sheetsNavLinks';
@@ -30,6 +30,7 @@ import {
   ensureAccessToken,
   isAuthRequiredError,
   signIn,
+  addBeforeRedirectHook,
   GoogleAuthState,
 } from '@/lib/googleAuth';
 import { getCustomDepartments, addCustomDepartment } from '@/lib/customDepartments';
@@ -711,6 +712,14 @@ export default function InstructionForm({ initialData, approvalMode = false, asN
     };
   }, []);
 
+  // 再ログインで Google の画面へ移動する前に、編集中の内容を下書きへ保存し、戻ったらその下書きを開く
+  useEffect(() => addBeforeRedirectHook(async () => {
+    await runAutoSaveRef.current();
+    const saved = await getInstruction(instructionIdRef.current).catch(() => null);
+    if (!saved) return null;
+    return `/instructions/edit?id=${encodeURIComponent(instructionIdRef.current)}${approvalMode ? '&mode=approval' : ''}`;
+  }), [approvalMode]);
+
   const handleDraftSave = async (continueEditing: boolean) => {
     const instruction = buildInstruction('draft');
     if (!instruction) return;
@@ -828,7 +837,7 @@ export default function InstructionForm({ initialData, approvalMode = false, asN
       return;
     }
 
-    // ボタン押下の直後なので、必要ならここでログインのポップアップを出せる
+    // ログインが切れていれば、編集内容を下書きに残して Google の画面へ移動する（戻ったら保存をやり直す）
     setSaving(true);
     try {
       await ensureAccessToken({ interactive: true });
