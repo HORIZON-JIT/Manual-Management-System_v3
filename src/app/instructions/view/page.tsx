@@ -33,6 +33,7 @@ import ViewHistoryModal from '@/components/ViewHistoryModal';
 import FlowchartModal from '@/components/FlowchartModal';
 import Form63ExportModal from '@/components/Form63ExportModal';
 import QrCodeModal from '@/components/QrCodeModal';
+import ImageLightbox from '@/components/ImageLightbox';
 import { viewerInstructionUrl } from '@/lib/viewerUrl';
 import { VIEWER_ONLY } from '@/lib/appMode';
 
@@ -63,6 +64,8 @@ function InstructionViewContent() {
   const [viewingSnapshot, setViewingSnapshot] = useState<InstructionSnapshot | null>(null);
   const [viewUrlCopied, setViewUrlCopied] = useState(false);
   const [showQr, setShowQr] = useState(false);
+  // 画像の拡大表示（ステップ内の画像を前後に切り替えられる）
+  const [lightbox, setLightbox] = useState<{ title: string; images: { src: string; alt: string; caption?: string }[]; index: number } | null>(null);
   // 完了カードへの自動スクロールは、読み飛ばし防止モードで最後の「次へ」を押して終わりに着いたときだけ行う。
   // 開いた直後や、分岐・条件を選んで完了になったとき（選んだ先のステップへのスクロールを優先）は飛ばない。
   const [scrollToCompletion, setScrollToCompletion] = useState(false);
@@ -631,12 +634,32 @@ function InstructionViewContent() {
                           : 'max-w-full h-auto mx-auto';
                     return (
                     <div key={imgIdx} className="rounded-lg border border-slate-200 overflow-hidden">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={imgUrl}
-                        alt={`ステップ${stepNumbers[index]} の画像 ${imgIdx + 1}`}
-                        className={imgSizeClass}
-                      />
+                      <button
+                        type="button"
+                        className="group relative block w-full cursor-zoom-in"
+                        title="クリックで拡大"
+                        onClick={() =>
+                          setLightbox({
+                            title: `ステップ${stepNumbers[index]}　${step.title}`,
+                            images: getStepImages(step).map((src, i) => ({
+                              src,
+                              alt: `ステップ${stepNumbers[index]} の画像 ${i + 1}`,
+                              caption: getImageCaption(step, i) || undefined,
+                            })),
+                            index: imgIdx,
+                          })
+                        }
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={imgUrl}
+                          alt={`ステップ${stepNumbers[index]} の画像 ${imgIdx + 1}`}
+                          className={imgSizeClass}
+                        />
+                        <span className="pointer-events-none absolute bottom-2 right-2 rounded-md bg-slate-950/70 px-2 py-1 text-xs font-semibold text-white opacity-80 transition group-hover:opacity-100 no-print">
+                          ⤢ 拡大
+                        </span>
+                      </button>
                       {getImageCaption(step, imgIdx) && (
                         <p className="px-3 py-2 text-sm text-slate-600 bg-slate-50 border-t border-slate-200">
                           {getImageCaption(step, imgIdx)}
@@ -936,6 +959,16 @@ function InstructionViewContent() {
       {showForm63 && (
         <Form63ExportModal instruction={instruction} onClose={() => setShowForm63(false)} />
       )}
+      {lightbox && (
+        <ImageLightbox
+          images={lightbox.images}
+          index={lightbox.index}
+          title={lightbox.title}
+          onIndexChange={(i) => setLightbox((cur) => (cur ? { ...cur, index: i } : cur))}
+          onClose={() => setLightbox(null)}
+        />
+      )}
+
       {showQr && appViewUrl && (
         <QrCodeModal url={appViewUrl} title={instruction.title} subtitle={instruction.department} onClose={() => setShowQr(false)} />
       )}
