@@ -15,8 +15,7 @@ import { copyAsNewInstruction, TEMPLATE_TEMP_KEY } from '@/lib/templateCopy';
 import QrCodeModal from '@/components/QrCodeModal';
 import GoogleLoginButton from '@/components/GoogleLoginButton';
 import { viewerInstructionUrl } from '@/lib/viewerUrl';
-import { FEATURES, VIEWER_ONLY } from '@/lib/appMode';
-import { useTaskMasterAvailable } from '@/lib/taskMasterAccess';
+import { VIEWER_ONLY } from '@/lib/appMode';
 import PasswordGateModal from '@/components/PasswordGateModal';
 import { isFromVideoUnlocked } from '@/lib/videoGate';
 
@@ -104,11 +103,19 @@ function EditorHomePage() {
   const [showTemplatePicker, setShowTemplatePicker] = useState(false);
   const [showQrPicker, setShowQrPicker] = useState(false);
   const [showVideoGate, setShowVideoGate] = useState(false);
-  const taskMasterAvailable = useTaskMasterAvailable();
   const [qrTarget, setQrTarget] = useState<{ url: string; title: string; subtitle?: string } | null>(null);
   const [showExcelPicker, setShowExcelPicker] = useState(false);
   const [showApprovalRequestPicker, setShowApprovalRequestPicker] = useState(false);
   const [showNotifyPicker, setShowNotifyPicker] = useState(false);
+
+  // 廃止したタスクマスタ連携（スプレッドシート）が端末に残した設定・メールアドレスの記録を消す
+  useEffect(() => {
+    try {
+      ['task_master_visibility', 'task_master_member_cache', 'task_master_spreadsheet_id'].forEach((key) => localStorage.removeItem(key));
+    } catch {
+      // 無視
+    }
+  }, []);
 
   // ヘッダーなど別の場所でログインしたら、ログイン案内を閉じる
   useEffect(() => addAuthListener((state) => {
@@ -472,14 +479,6 @@ function EditorHomePage() {
           ),
           onClick: handleNotifyClick,
         },
-        ...(FEATURES.taskMasterLink && taskMasterAvailable
-          ? [{
-              title: 'タスクの手順書URLを更新',
-              description: 'タスク管理アプリのタスクマスタに登録。',
-              icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 0 0-5.656 0l-4 4a4 4 0 1 0 5.656 5.656l1.102-1.101m-.758-4.899a4 4 0 0 0 5.656 0l4-4a4 4 0 0 0-5.656-5.656l-1.1 1.1" />,
-              href: '/instructions/task-links',
-            }]
-          : []),
       ],
     },
   ];

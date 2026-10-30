@@ -49,8 +49,6 @@ import { insertSteps } from '@/lib/copySteps';
 import { insertStepsAfterInFlow, attachStepsToAnswer } from '@/lib/flowModel';
 import type { CopyTarget } from './FlowBuilderModal';
 import { viewerInstructionUrl } from '@/lib/viewerUrl';
-import { FEATURES } from '@/lib/appMode';
-import { useTaskMasterAvailable } from '@/lib/taskMasterAccess';
 import { checkRoutes } from '@/lib/routeCheck';
 import { buildDriveMeta, buildSearchText } from '@/lib/driveMeta';
 import { tryConvertConditionsToFlow } from '@/lib/convertConditions';
@@ -152,7 +150,6 @@ export default function InstructionForm({ initialData, approvalMode = false, asN
   const [copySource, setCopySource] = useState<{ instruction: WorkInstruction; name: string } | null>(null);
   // コピーしたステップをどこに入れるか。null は末尾、number はその添字の後。図から呼ばれたときは CopyTarget
   const [copyTarget, setCopyTarget] = useState<number | CopyTarget | null>(null);
-  const taskMasterAvailable = useTaskMasterAvailable();
   const [routeIssueCount, setRouteIssueCount] = useState(0);
   const [storageEstimate, setStorageEstimate] = useState<{ usage: number; quota: number } | null>(null);
   const [showStepIndex, setShowStepIndex] = useState(false);
@@ -1991,15 +1988,6 @@ export default function InstructionForm({ initialData, approvalMode = false, asN
                     QRコード
                   </button>
                 </div>
-                {FEATURES.taskMasterLink && taskMasterAvailable && saveSuccessModal.driveFileId && (
-                  <button
-                    type="button"
-                    onClick={() => router.push(`/instructions/task-links?driveFileId=${encodeURIComponent(saveSuccessModal.driveFileId!)}`)}
-                    className="mt-2 text-xs font-semibold text-blue-800 underline decoration-blue-300 underline-offset-2 hover:text-blue-900"
-                  >
-                    タスク管理アプリのタスクマスタにこの手順書を登録する →
-                  </button>
-                )}
               </div>
             )}
 
