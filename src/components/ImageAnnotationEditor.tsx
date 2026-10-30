@@ -2,6 +2,7 @@
 
 import { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import type { ImageAnnotation } from '@/types/instruction';
+import { compressImageSource } from '@/lib/compressImage';
 
 type Annotation = ImageAnnotation;
 
@@ -396,7 +397,7 @@ export default function ImageAnnotationEditor({ imageDataUrl, originalImageDataU
     const octx = off.getContext('2d');
     if (!octx) return;
     octx.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
-    const nextBase = off.toDataURL('image/jpeg', 0.92);
+    const nextBase = compressImageSource(off, sw, sh);
     const cx = cropRect.x, cy = cropRect.y, cw = cropRect.width, ch = cropRect.height;
     const mapX = (x: number) => (x - cx) / cw;
     const mapY = (y: number) => (y - cy) / ch;
@@ -562,7 +563,8 @@ export default function ImageAnnotationEditor({ imageDataUrl, originalImageDataU
     const canvas = canvasRef.current;
     if (!canvas) return;
     redraw(annotations, undefined, false, null);
-    const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+    // 貼り付け時と同じ規則で圧縮する（画質を下げすぎず、重さは抑える）
+    const dataUrl = compressImageSource(canvas, canvas.width, canvas.height);
     onSave(dataUrl, annotations, baseChangedRef.current ? baseDataUrl : undefined);
   };
 
