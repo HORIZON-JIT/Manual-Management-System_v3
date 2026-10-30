@@ -2,6 +2,7 @@ import JSZip from 'jszip';
 import { WorkInstruction, getStepImages, JUMP_END_TARGET } from '@/types/instruction';
 import type { RewrittenText } from './formalTextRoundTrip';
 import { FORM63_TEMPLATE_BASE64 } from './form63TemplateData';
+import { withExportableImages } from '@/lib/exportImages';
 
 /**
  * 会社規定の作業手順書用紙「(株)ホリゾン 様式6-3号」の正式な雛形（.docx）に、手順書の内容を流し込む。
@@ -321,7 +322,9 @@ function base64ToBytes(b64: string): Uint8Array {
   return bytes;
 }
 
-export async function buildForm63(instruction: WorkInstruction, options: Form63Options = {}): Promise<Blob> {
+export async function buildForm63(source: WorkInstruction, options: Form63Options = {}): Promise<Blob> {
+  // WebP の画像は Word に入らないので PNG にしておく
+  const instruction = await withExportableImages(source);
   const zip = await JSZip.loadAsync(base64ToBytes(FORM63_TEMPLATE_BASE64));
   const docPath = 'word/document.xml';
   const headerPath = 'word/header1.xml';
