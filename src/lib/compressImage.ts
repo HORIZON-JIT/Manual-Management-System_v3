@@ -1,6 +1,15 @@
-const MAX_DIMENSION = 1280;
-const JPEG_QUALITY = 0.65;
-const TARGET_SIZE = 150_000; // target ~150KB per image for localStorage friendliness
+/*
+ * 画像は手順書の JSON に埋め込まれるため、重くなりすぎないように縮小・圧縮する。
+ * パソコンで拡大しても文字が読めるよう、フルHDの画面写真（横 1920px）は縮小しない。
+ * 目安を超えるときは、まず画質を少し下げ、それでも超えるなら解像度を下げる
+ * （画質を下げすぎると文字の輪郭がにじむため、画質には下限を設ける）。
+ */
+const MAX_DIMENSION = 1920;
+const MIN_DIMENSION = 1440; // 目安を超えても、長辺はここまでしか縮めない（細かい表でも拡大して読める）
+const JPEG_QUALITY = 0.85;
+const MIN_JPEG_QUALITY = 0.75;
+const TARGET_SIZE = 300_000; // 1 枚あたりの目安（バイト）
+const BASE64_RATIO = 1.37; // data URL は Base64 のため約 37% 大きくなる
 
 /** 縮小後のサイズ（長辺 MAX_DIMENSION 以内）を返す */
 export function fitDimensions(width: number, height: number, max = MAX_DIMENSION): { width: number; height: number } {
@@ -9,39 +18,43 @@ export function fitDimensions(width: number, height: number, max = MAX_DIMENSION
   return { width: Math.round(width * (max / height)), height: max };
 }
 
-/**
- * 画像ソース（img / video / canvas）を 1280px 以内に縮小して JPEG の data URL にする。
- * 150KB を超える場合は品質を段階的に下げる。
- */
-export function compressImageSource(source: CanvasImageSource, srcWidth: number, srcHeight: number): string {
-  const { width, height } = fitDimensions(srcWidth, srcHeight);
+function encode(source: CanvasImageSource, srcWidth: number, srcHeight: number, max: number, quality: number): string {
+  const { width, height } = fitDimensions(srcWidth, srcHeight, max);
   const canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;
   const ctx = canvas.getContext('2d')!;
-  // Fill white background to prevent transparent areas becoming black in JPEG
+  // 透明部分が JPEG で黒くならないよう白で塗る
   ctx.fillStyle = '#FFFFFF';
   ctx.fillRect(0, 0, width, height);
+  ctx.imageSmoothingQuality = 'high';
   ctx.drawImage(source, 0, 0, width, height);
+  return canvas.toDataURL('image/jpeg', quality);
+}
 
-  // First pass at default quality
-  let dataUrl = canvas.toDataURL('image/jpeg', JPEG_QUALITY);
+/**
+ * 画像ソース（img / video / canvas）を長辺 1920px 以内の JPEG の data URL にする。
+ * 約 300KB を超える場合は画質を 0.75 まで下げ、それでも超えるなら長辺 1440px まで段階的に縮める。
+ */
+export function compressImageSource(source: CanvasImageSource, srcWidth: number, srcHeight: number): string {
+  const limit = TARGET_SIZE * BASE64_RATIO;
+  let max = MAX_DIMENSION;
+  let dataUrl = encode(source, srcWidth, srcHeight, max, JPEG_QUALITY);
+  if (dataUrl.length <= limit) return dataUrl;
 
-  // If still too large, progressively lower quality
-  let quality = JPEG_QUALITY;
-  while (dataUrl.length > TARGET_SIZE * 1.37 && quality > 0.3) {
-    // 1.37 accounts for Base64 overhead (~37%)
-    quality -= 0.1;
-    dataUrl = canvas.toDataURL('image/jpeg', quality);
+  for (let quality = JPEG_QUALITY - 0.05; quality >= MIN_JPEG_QUALITY - 0.001; quality -= 0.05) {
+    dataUrl = encode(source, srcWidth, srcHeight, max, quality);
+    if (dataUrl.length <= limit) return dataUrl;
+  }
+  while (max > MIN_DIMENSION && Math.max(srcWidth, srcHeight) > MIN_DIMENSION) {
+    max = Math.max(MIN_DIMENSION, Math.round(max * 0.85));
+    dataUrl = encode(source, srcWidth, srcHeight, max, MIN_JPEG_QUALITY);
+    if (dataUrl.length <= limit) return dataUrl;
   }
   return dataUrl;
 }
 
-/**
- * Compress an image file using Canvas API.
- * Resizes to fit within MAX_DIMENSION on longest side and converts to JPEG.
- * If the result exceeds TARGET_SIZE, re-compresses at lower quality.
- */
+/** 画像ファイルを読み込んで compressImageSource と同じ規則で JPEG にする */
 export function compressImage(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();

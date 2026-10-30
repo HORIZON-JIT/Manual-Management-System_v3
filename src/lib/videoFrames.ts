@@ -76,7 +76,7 @@ export function seekTo(video: HTMLVideoElement, timeSec: number): Promise<void> 
   });
 }
 
-/** 指定時刻のフレームを 1280px 以内の JPEG data URL で返す */
+/** 指定時刻のフレームを長辺 1920px 以内の JPEG data URL で返す（compressImageSource の規則） */
 export async function captureFrameAt(video: HTMLVideoElement, timeSec: number): Promise<string> {
   await seekTo(video, timeSec);
   return compressImageSource(video, video.videoWidth, video.videoHeight);
