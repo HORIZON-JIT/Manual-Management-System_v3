@@ -1,5 +1,6 @@
 ﻿import ExcelJS from 'exceljs';
 import { WorkInstruction, Condition, getApprovalStatus, getCategoryLabel, getStepImages, getImageCaption } from '@/types/instruction';
+import { withExportableImages } from '@/lib/exportImages';
 
 /** Estimate row height for text in merged content columns */
 function calcRowHeight(text: string, charsPerLine: number, lineHeight: number, minHeight: number): number {
@@ -164,7 +165,9 @@ export async function exportToExcel(instruction: WorkInstruction, navMode: Excel
   downloadBuffer(buffer, `${instruction.title}_手順書.xlsx`);
 }
 
-export async function buildExcelBuffer(instruction: WorkInstruction, navMode: ExcelNavMode = 'scroll'): Promise<ExcelBuildResult> {
+export async function buildExcelBuffer(source: WorkInstruction, navMode: ExcelNavMode = 'scroll'): Promise<ExcelBuildResult> {
+  // WebP の画像は Excel に入らないので PNG にしておく
+  const instruction = await withExportableImages(source);
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet('作業手順書', {
     pageSetup: { paperSize: 9, orientation: 'landscape', fitToPage: true, fitToWidth: 1 },

@@ -14,6 +14,7 @@
 } from 'docx';
 import { saveAs } from 'file-saver';
 import { WorkInstruction, getCategoryLabel, getStepImages, getImageCaption } from '@/types/instruction';
+import { withExportableImages } from '@/lib/exportImages';
 
 function parseDataUrl(dataUrl: string): { buffer: Uint8Array; extension: 'png' | 'jpg' } {
   const match = dataUrl.match(/^data:image\/(png|jpe?g|gif|webp);base64,(.+)$/);
@@ -106,7 +107,9 @@ function createStepHeaderTable(index: number, title: string): Table {
   });
 }
 
-export async function exportToWord(instruction: WorkInstruction): Promise<void> {
+export async function exportToWord(source: WorkInstruction): Promise<void> {
+  // WebP の画像は Word に入らないので PNG にしておく
+  const instruction = await withExportableImages(source);
   const sortedSteps = [...instruction.steps].sort((a, b) => a.orderIndex - b.orderIndex);
   const children: (Paragraph | Table)[] = [];
 
