@@ -100,7 +100,7 @@ function BulkSequentialTool() {
         if (setting === 'on') json.sequential = true;
         else delete json.sequential;
         const buffer = new TextEncoder().encode(JSON.stringify(json, null, 2)).buffer;
-        await saveFileToDrive(buffer, row.name, 'application/json', { modifiedTime: row.modifiedTime, appProperties: buildDriveMeta(json), description: buildSearchText(json) });
+        await saveFileToDrive(buffer, row.name, 'application/json', { modifiedTime: row.modifiedTime, appProperties: buildDriveMeta(json), description: buildSearchText(json), fileId: row.id });
         ok += 1;
         setRows((prev) => prev.map((item) => item.id === row.id ? { ...item, sequential: setting === 'on', selected: false } : item));
       } catch (err) {

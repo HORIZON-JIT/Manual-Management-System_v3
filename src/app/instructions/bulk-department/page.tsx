@@ -155,7 +155,7 @@ function BulkDepartmentTool() {
         json.department = department;
         const buffer = new TextEncoder().encode(JSON.stringify(json)).buffer;
         // 更新日時は据え置く（部署付与だけのため）
-        await saveFileToDrive(buffer, row.name, 'application/json', { modifiedTime: row.modifiedTime, appProperties: buildDriveMeta(json), description: buildSearchText(json) });
+        await saveFileToDrive(buffer, row.name, 'application/json', { modifiedTime: row.modifiedTime, appProperties: buildDriveMeta(json), description: buildSearchText(json), fileId: row.id });
         ok += 1;
         setRows((prev) =>
           prev.map((r) => (r.id === row.id ? { ...r, department, selected: false } : r)),

@@ -145,16 +145,7 @@ export async function saveInstruction(instruction: WorkInstruction): Promise<voi
   try {
     const tx = db.transaction(STORE_NAME, 'readwrite');
     const store = tx.objectStore(STORE_NAME);
-    const existing = await requestToPromise(store.get(toStore.id));
-    if (!existing && toStore.status === 'draft' && toStore.title.trim()) {
-      // 同じタイトルの古い下書きは置き換える（従来どおり）
-      const all = (await requestToPromise(store.getAll())) as WorkInstruction[];
-      for (const inst of all) {
-        if (inst.status === 'draft' && inst.title.trim() === toStore.title.trim() && inst.id !== toStore.id) {
-          store.delete(inst.id);
-        }
-      }
-    }
+    // 下書きは id ごとに保存する。同じタイトルでも別の下書き（コピーなど）は消さない
     store.put(toStore);
     await transactionDone(tx);
   } catch (error) {
