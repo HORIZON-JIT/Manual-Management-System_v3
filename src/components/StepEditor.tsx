@@ -68,7 +68,9 @@ export default function StepEditor({
   const [annotatingIdx, setAnnotatingIdx] = useState<number | null>(null);
   const [replaceTargetIdx, setReplaceTargetIdx] = useState<number | null>(null);
   const [popupSupported, setPopupSupported] = useState(false);
-  const pendingPopups = useRef<Map<string, number>>(new Map());
+  // 別ウィンドウで注釈中の画像。開いたときの画像そのものを覚え、保存時にどの画像かを探し直す
+  // （開いている間に差し替え・削除・並べ替えがあっても、別の画像を上書きしないため）
+  const pendingPopups = useRef<Map<string, string>>(new Map());
   const [showUrlForm, setShowUrlForm] = useState(false);
   const [urlInput, setUrlInput] = useState('');
   const [urlLabelInput, setUrlLabelInput] = useState('');
@@ -185,8 +187,10 @@ export default function StepEditor({
     ch.onmessage = async (event) => {
       const token: string | undefined = event.data?.token;
       if (!token || !pendingPopups.current.has(token)) return;
-      const idx = pendingPopups.current.get(token)!;
+      const openedImage = pendingPopups.current.get(token)!;
       pendingPopups.current.delete(token);
+      // 開いたときの画像が今どこにあるか。差し替え・削除されていれば -1
+      const idx = imagesRef.current.indexOf(openedImage);
       let res: { action?: string; url?: string; annotations?: ImageAnnotation[]; base?: string } | null = null;
       if (!event.data?.fallbackCancel) {
         const raw = await getTempData('annotate_res_' + token);
@@ -198,7 +202,9 @@ export default function StepEditor({
           }
         }
       }
-      if (res?.action === 'save' && res.url) applyAnnotationSave(idx, res.url, res.annotations ?? [], res.base);
+      if (idx < 0 && (res?.action === 'save' || res?.action === 'restore')) {
+        alert('注釈を編集している間に画像が差し替え・削除されたため、注釈は反映しませんでした。');
+      } else if (res?.action === 'save' && res.url) applyAnnotationSave(idx, res.url, res.annotations ?? [], res.base);
       else if (res?.action === 'restore') applyAnnotationRestore(idx);
       // cancel / fallbackCancel / null は何もしない
       await removeTempData('annotate_src_' + token);
@@ -237,7 +243,7 @@ export default function StepEditor({
         setAnnotatingIdx(idx);
         return;
       }
-      pendingPopups.current.set(token, idx);
+      pendingPopups.current.set(token, imagesRef.current[idx]);
     },
     [popupSupported, getAnnotationSource],
   );
@@ -318,12 +324,17 @@ export default function StepEditor({
         (_, i) => i !== imageIndex,
       );
       const updatedSizes = (currentStep.imageDisplaySizes ?? []).filter((_, i) => i !== imageIndex);
+      // 注釈の下地と注釈も同じ位置を消す（残すと、後ろの画像に前の画像の注釈が付いてしまう）
+      const updatedOriginals = (currentStep.originalImageDataUrls ?? []).filter((_, i) => i !== imageIndex);
+      const updatedAnnotations = (currentStep.imageAnnotations ?? []).filter((_, i) => i !== imageIndex);
       onChange({
         ...currentStep,
         imageDataUrl: undefined,
         imageDataUrls: updatedImages.length > 0 ? updatedImages : undefined,
         imageCaptions: updatedCaptions.length > 0 ? updatedCaptions : undefined,
         imageDisplaySizes: updatedSizes.some((s) => s) ? updatedSizes : undefined,
+        originalImageDataUrls: updatedOriginals.some((o) => o) ? updatedOriginals : undefined,
+        imageAnnotations: updatedAnnotations.some((a) => a && a.length) ? updatedAnnotations : undefined,
       });
     },
     [onChange],
@@ -351,6 +362,13 @@ export default function StepEditor({
         captions[imageIndex],
       ];
       [sizes[imageIndex], sizes[targetIndex]] = [sizes[targetIndex], sizes[imageIndex]];
+      // 注釈の下地と注釈も一緒に入れ替える
+      const originals = [...(currentStep.originalImageDataUrls ?? [])];
+      while (originals.length < updatedImages.length) originals.push('');
+      [originals[imageIndex], originals[targetIndex]] = [originals[targetIndex], originals[imageIndex]];
+      const anns: (ImageAnnotation[] | null)[] = [...(currentStep.imageAnnotations ?? [])];
+      while (anns.length < updatedImages.length) anns.push(null);
+      [anns[imageIndex], anns[targetIndex]] = [anns[targetIndex], anns[imageIndex]];
 
       onChange({
         ...currentStep,
@@ -358,6 +376,8 @@ export default function StepEditor({
         imageDataUrls: updatedImages,
         imageCaptions: captions.some((caption) => caption) ? captions : undefined,
         imageDisplaySizes: sizes.some((s) => s) ? sizes : undefined,
+        originalImageDataUrls: originals.some((o) => o) ? originals : undefined,
+        imageAnnotations: anns.some((a) => a && a.length) ? anns : undefined,
       });
     },
     [onChange],
