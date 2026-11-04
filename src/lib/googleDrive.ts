@@ -1,5 +1,5 @@
 import { WorkInstruction } from '@/types/instruction';
-import { ensureAccessToken, throwForResponse, withGoogleAuth } from '@/lib/googleAuth';
+import { ensureAccessToken, isAuthRequiredError, throwForResponse, withGoogleAuth } from '@/lib/googleAuth';
 import { DriveInstructionMeta, parseDriveMeta } from '@/lib/driveMeta';
 
 const DEFAULT_FOLDER_NAME = 'WorkInstructions';
@@ -461,6 +461,46 @@ export interface SaveFileOptions {
   appProperties?: Record<string, string>;
   /** 本文検索用テキスト（driveMeta.buildSearchText） */
   description?: string;
+  /** 更新するファイルの ID。分かっていれば名前ではなくこの ID のファイルを上書きする（名前は fileName に変わる） */
+  fileId?: string;
+  /**
+   * 手順書の id。fileId が無い（または消えている）ときは同じ名前のファイルを探すが、
+   * その中身が別の手順書なら上書きせずにエラーにする。
+   */
+  instructionId?: string;
+}
+
+/** 同じタイトルの別の手順書があって保存できないとき */
+export class DuplicateTitleError extends Error {
+  constructor(title: string) {
+    super(`保存先フォルダに、同じタイトル「${title}」の別の手順書があります。上書きしないよう保存を止めました。タイトルを変えてから保存してください。`);
+    this.name = 'DuplicateTitleError';
+  }
+}
+
+/** ファイルがあり、ゴミ箱に入っていなければその ID を返す。見つからなければ null */
+async function liveFileId(fileId: string): Promise<string | null> {
+  return withGoogleAuth(async (token) => {
+    const res = await fetch(
+      `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?fields=id,trashed&supportsAllDrives=true`,
+      { headers: { Authorization: `Bearer ${token}` } },
+    );
+    if (res.status === 404) return null;
+    if (!res.ok) await throwForResponse(res, 'Drive API');
+    const file = (await res.json()) as { id: string; trashed?: boolean };
+    return file.trashed ? null : file.id;
+  });
+}
+
+/** Drive 上の JSON が、指定した id の手順書か */
+async function isSameInstruction(fileId: string, instructionId: string): Promise<boolean> {
+  try {
+    const json = JSON.parse(await downloadDriveFile(fileId)) as { id?: string };
+    return json.id === instructionId;
+  } catch (e) {
+    if (isAuthRequiredError(e)) throw e;
+    return false;
+  }
 }
 
 export async function saveFileToDrive(
@@ -476,7 +516,11 @@ export async function saveFileToDrive(
     const hasMeta = options?.appProperties || options?.description !== undefined;
     if (hasMeta && e instanceof Error && /Drive API 400/.test(e.message)) {
       console.warn('metadata rejected, retrying without appProperties/description', e.message);
-      return saveFileToDriveOnce(buffer, fileName, mimeType, { modifiedTime: options?.modifiedTime });
+      return saveFileToDriveOnce(buffer, fileName, mimeType, {
+        modifiedTime: options?.modifiedTime,
+        fileId: options?.fileId,
+        instructionId: options?.instructionId,
+      });
     }
     throw e;
   }
@@ -492,18 +536,28 @@ async function saveFileToDriveOnce(
 
   const folderId = await getTargetFolderId();
 
-  // Check if file already exists in the folder
-  const escapedName = fileName.replace(/'/g, "\\'");
-  const existingRes = await gapiRequest<DriveFileList>({
-    path: 'https://www.googleapis.com/drive/v3/files',
-    params: {
-      q: `name='${escapedName}' and '${folderId}' in parents and trashed=false`,
-      fields: 'files(id,name)',
-      supportsAllDrives: 'true',
-      includeItemsFromAllDrives: 'true',
-    },
-  });
-  const existingFileId = existingRes.result.files.length > 0 ? existingRes.result.files[0].id : null;
+  // 更新するファイルが分かっていれば、その ID のファイルを上書きする（タイトル変更・別フォルダのファイルも同じファイルのまま）
+  let existingFileId = options?.fileId ? await liveFileId(options.fileId) : null;
+
+  if (!existingFileId) {
+    // 分からなければ、保存先フォルダの同じ名前のファイルを探す
+    const escapedName = fileName.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    const existingRes = await gapiRequest<DriveFileList>({
+      path: 'https://www.googleapis.com/drive/v3/files',
+      params: {
+        q: `name='${escapedName}' and '${folderId}' in parents and trashed=false`,
+        fields: 'files(id,name)',
+        supportsAllDrives: 'true',
+        includeItemsFromAllDrives: 'true',
+      },
+    });
+    const found = existingRes.result.files.length > 0 ? existingRes.result.files[0].id : null;
+    // 手順書の場合、同じ名前でも中身が別の手順書なら上書きしない
+    if (found && options?.instructionId && !(await isSameInstruction(found, options.instructionId))) {
+      throw new DuplicateTitleError(fileName.replace(/\.json$/, ''));
+    }
+    existingFileId = found;
+  }
 
   const metadata: Record<string, unknown> = existingFileId
     ? { name: fileName, mimeType }

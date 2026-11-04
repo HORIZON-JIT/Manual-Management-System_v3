@@ -37,7 +37,7 @@ export default function ImageLightbox({ images, index, title, onIndexChange, onC
   const [view, setView] = useState<View>({ scale: 1, x: 0, y: 0 });
   const viewRef = useRef(view);
   const pointers = useRef(new Map<number, { x: number; y: number }>());
-  const gesture = useRef<{ startDist: number; startScale: number; lastX: number; lastY: number; moved: boolean } | null>(null);
+  const gesture = useRef<{ startDist: number; startScale: number; lastX: number; lastY: number; moved: boolean; onBackdrop?: boolean } | null>(null);
 
   useEffect(() => {
     viewRef.current = view;
@@ -168,13 +168,22 @@ export default function ImageLightbox({ images, index, title, onIndexChange, onC
     return { x: e.clientX - rect.left, y: e.clientY - rect.top };
   };
 
+  /** 表示領域の座標 (x, y) が画像の上か（ポインタを捕まえているので、イベントの対象では判定できない） */
+  const isOnImage = (x: number, y: number) => {
+    if (!natural) return false;
+    const v = viewRef.current;
+    return x >= v.x && x <= v.x + natural.w * v.scale && y >= v.y && y <= v.y + natural.h * v.scale;
+  };
+
   const onPointerDown = (e: React.PointerEvent) => {
+    // ボタン（‹ › など）はボタン自身のクリックに任せる
     if ((e.target as HTMLElement).closest('button')) return;
     stageRef.current?.setPointerCapture(e.pointerId);
-    pointers.current.set(e.pointerId, local(e));
+    const p = local(e);
+    pointers.current.set(e.pointerId, p);
     const pts = [...pointers.current.values()];
     if (pts.length === 1) {
-      gesture.current = { startDist: 0, startScale: viewRef.current.scale, lastX: pts[0].x, lastY: pts[0].y, moved: false };
+      gesture.current = { startDist: 0, startScale: viewRef.current.scale, lastX: pts[0].x, lastY: pts[0].y, moved: false, onBackdrop: !isOnImage(p.x, p.y) };
     } else if (pts.length === 2) {
       const [a, b] = pts;
       gesture.current = {
@@ -218,8 +227,12 @@ export default function ImageLightbox({ images, index, title, onIndexChange, onC
   };
 
   const onPointerUp = (e: React.PointerEvent) => {
+    // 押し始めを受け付けていない（ボタン上で押した）指・マウスは無視する
+    if (!pointers.current.has(e.pointerId)) return;
     const wasDrag = gesture.current?.moved ?? false;
-    const onImage = (e.target as HTMLElement).tagName === 'IMG';
+    const startedOnBackdrop = gesture.current?.onBackdrop ?? false;
+    const p = local(e);
+    const onImage = isOnImage(p.x, p.y);
     pointers.current.delete(e.pointerId);
     const pts = [...pointers.current.values()];
     if (pts.length === 1 && gesture.current) {
@@ -227,8 +240,8 @@ export default function ImageLightbox({ images, index, title, onIndexChange, onC
       gesture.current = { ...gesture.current, lastX: pts[0].x, lastY: pts[0].y, startScale: viewRef.current.scale };
     } else if (pts.length === 0) {
       gesture.current = null;
-      // 画像の外を（ドラッグせずに）押したら閉じる
-      if (!wasDrag && !onImage && e.pointerType === 'mouse') onClose();
+      // 画像の外で押して、画像の外で（ドラッグせずに）離したら閉じる
+      if (!wasDrag && startedOnBackdrop && !onImage && e.pointerType === 'mouse') onClose();
     }
   };
 

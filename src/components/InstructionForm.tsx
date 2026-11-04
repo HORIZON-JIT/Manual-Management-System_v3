@@ -104,6 +104,8 @@ export default function InstructionForm({ initialData, approvalMode = false, asN
   const isEdit = !!initialData && !asNew;
   // 下書き・自動保存・完成保存で同じ id を使う（新規作成でも保存のたびに増えない）
   const instructionIdRef = useRef<string>(initialData?.id ?? uuidv4());
+  // Drive 上のこの手順書のファイル。保存のたびに同じファイルを上書きする（タイトルを変えても別ファイルにしない）
+  const driveFileIdRef = useRef<string | undefined>(asNew ? undefined : initialData?.driveFileId);
   const buildPreviewRef = useRef<() => WorkInstruction>(() => ({} as WorkInstruction));
   const titleRef = useRef('');
   const descriptionGuideRef = useRef<HTMLDivElement>(null);
@@ -452,7 +454,7 @@ export default function InstructionForm({ initialData, approvalMode = false, asN
 
     return {
       id: instructionIdRef.current,
-      driveFileId: initialData?.driveFileId,
+      driveFileId: driveFileIdRef.current,
       updateHistory: initialData?.updateHistory,
       approval: initialData?.approval,
       title: title.trim() || '作成中の手順書',
@@ -596,7 +598,7 @@ export default function InstructionForm({ initialData, approvalMode = false, asN
 
     return {
       id: instructionIdRef.current,
-      driveFileId: initialData?.driveFileId,
+      driveFileId: driveFileIdRef.current,
       title: title.trim(),
       category,
       department: department || undefined,
@@ -766,8 +768,14 @@ export default function InstructionForm({ initialData, approvalMode = false, asN
         jsonBuffer,
         `${instruction.title}.json`,
         'application/json',
-        { appProperties: buildDriveMeta(instruction), description: buildSearchText(instruction) },
+        {
+          appProperties: buildDriveMeta(instruction),
+          description: buildSearchText(instruction),
+          fileId: instruction.driveFileId,
+          instructionId: instruction.id,
+        },
       );
+      driveFileIdRef.current = driveFileId;
       const targetFolder = getTargetFolder();
       const folderName = targetFolder?.name || 'WorkInstructions';
       const folderUrl = targetFolder?.id
