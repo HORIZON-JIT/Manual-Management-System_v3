@@ -70,7 +70,12 @@ export default function StepEditor({
   const [popupSupported, setPopupSupported] = useState(false);
   // 別ウィンドウで注釈中の画像。開いたときの画像そのものを覚え、保存時にどの画像かを探し直す
   // （開いている間に差し替え・削除・並べ替えがあっても、別の画像を上書きしないため）
-  const pendingPopups = useRef<Map<string, string>>(new Map());
+  const pendingPopups = useRef<Map<string, { image: string; win: Window }>>(new Map());
+  // 別ウィンドウで注釈中の画像（その画像は差し替え・削除・並べ替えできないようにする）
+  const [popupImages, setPopupImages] = useState<string[]>([]);
+  const syncPopupImages = useCallback(() => {
+    setPopupImages([...pendingPopups.current.values()].map((p) => p.image));
+  }, []);
   const [showUrlForm, setShowUrlForm] = useState(false);
   const [urlInput, setUrlInput] = useState('');
   const [urlLabelInput, setUrlLabelInput] = useState('');
@@ -187,8 +192,9 @@ export default function StepEditor({
     ch.onmessage = async (event) => {
       const token: string | undefined = event.data?.token;
       if (!token || !pendingPopups.current.has(token)) return;
-      const openedImage = pendingPopups.current.get(token)!;
+      const openedImage = pendingPopups.current.get(token)!.image;
       pendingPopups.current.delete(token);
+      syncPopupImages();
       // 開いたときの画像が今どこにあるか。差し替え・削除されていれば -1
       const idx = imagesRef.current.indexOf(openedImage);
       let res: { action?: string; url?: string; annotations?: ImageAnnotation[]; base?: string } | null = null;
@@ -211,7 +217,39 @@ export default function StepEditor({
       await removeTempData('annotate_res_' + token);
     };
     return () => ch.close();
-  }, [applyAnnotationSave, applyAnnotationRestore]);
+  }, [applyAnnotationSave, applyAnnotationRestore, syncPopupImages]);
+
+  // 別ウィンドウが保存も取り消しの通知もなく閉じられたとき（強制終了など）は、少し待ってから注釈中を解除する
+  useEffect(() => {
+    if (popupImages.length === 0) return;
+    const closedSince = new Map<string, number>();
+    const timer = setInterval(() => {
+      let changed = false;
+      for (const [token, p] of pendingPopups.current) {
+        if (!p.win.closed) continue;
+        const since = closedSince.get(token) ?? Date.now();
+        closedSince.set(token, since);
+        if (Date.now() - since < 3000) continue;
+        pendingPopups.current.delete(token);
+        void removeTempData('annotate_src_' + token);
+        void removeTempData('annotate_res_' + token);
+        changed = true;
+      }
+      if (changed) syncPopupImages();
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [popupImages, syncPopupImages]);
+
+  /** この画像の注釈を別ウィンドウで編集中なら、そのウィンドウを前に出す */
+  const focusAnnotationPopup = useCallback((image: string): boolean => {
+    for (const p of pendingPopups.current.values()) {
+      if (p.image === image && !p.win.closed) {
+        p.win.focus();
+        return true;
+      }
+    }
+    return false;
+  }, []);
 
   // 「注釈」クリック時：別ウィンドウで開く。ブロックされたらインライン表示にフォールバック
   const openAnnotation = useCallback(
@@ -220,6 +258,8 @@ export default function StepEditor({
         setAnnotatingIdx(idx);
         return;
       }
+      // すでに別ウィンドウで編集中なら、新しく開かずにそのウィンドウを前に出す
+      if (focusAnnotationPopup(imagesRef.current[idx])) return;
       const { base, initial } = getAnnotationSource(idx);
       const token =
         typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : uuidv4();
@@ -243,9 +283,11 @@ export default function StepEditor({
         setAnnotatingIdx(idx);
         return;
       }
-      pendingPopups.current.set(token, imagesRef.current[idx]);
+      pendingPopups.current.set(token, { image: imagesRef.current[idx], win });
+      syncPopupImages();
+      if (replaceTargetIdx === idx) setReplaceTargetIdx(null);
     },
-    [popupSupported, getAnnotationSource],
+    [popupSupported, getAnnotationSource, focusAnnotationPopup, syncPopupImages, replaceTargetIdx],
   );
 
   useEffect(() => {
@@ -1017,6 +1059,12 @@ export default function StepEditor({
                     alt={`ステップ ${index + 1} の画像 ${imgIdx + 1}`}
                     className="mx-auto max-h-56 max-w-full object-contain"
                   />
+                  {popupImages.includes(imgUrl) && (
+                    <div className="flex flex-wrap items-center gap-2 border-t border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                      <span className="font-semibold">別ウィンドウで注釈を編集中です。</span>
+                      <span>終わるまでこの画像の差し替え・削除・並べ替えはできません。別ウィンドウで「保存して戻る」か、閉じてください。</span>
+                    </div>
+                  )}
                   {replaceTargetIdx === imgIdx && (
                     <div className="flex flex-wrap items-center gap-2 border-t border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-800">
                       <span className="font-semibold">この画像を差し替え中：</span>
@@ -1081,7 +1129,7 @@ export default function StepEditor({
                             <button
                               type="button"
                               onClick={() => moveImage(imgIdx, 'up')}
-                              disabled={imgIdx === 0}
+                              disabled={imgIdx === 0 || popupImages.includes(imgUrl)}
                               className="rounded-full border border-slate-300 bg-white px-3.5 py-2 text-sm font-semibold text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 disabled:border-slate-200 disabled:bg-slate-50 disabled:text-slate-400 disabled:shadow-none"
                             >
                               前へ
@@ -1089,7 +1137,7 @@ export default function StepEditor({
                             <button
                               type="button"
                               onClick={() => moveImage(imgIdx, 'down')}
-                              disabled={imgIdx === images.length - 1}
+                              disabled={imgIdx === images.length - 1 || popupImages.includes(imgUrl)}
                               className="rounded-full border border-slate-300 bg-white px-3.5 py-2 text-sm font-semibold text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 disabled:border-slate-200 disabled:bg-slate-50 disabled:text-slate-400 disabled:shadow-none"
                             >
                               次へ
@@ -1101,7 +1149,8 @@ export default function StepEditor({
                           onClick={() =>
                             setReplaceTargetIdx((cur) => (cur === imgIdx ? null : imgIdx))
                           }
-                          className={`inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3.5 py-2 text-sm font-semibold shadow-sm transition active:scale-[0.98] ${
+                          disabled={popupImages.includes(imgUrl)}
+                          className={`inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3.5 py-2 text-sm font-semibold shadow-sm transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 ${
                             replaceTargetIdx === imgIdx
                               ? 'border-slate-950 bg-slate-950 text-white'
                               : 'border-slate-300 bg-white text-slate-900 hover:border-slate-400 hover:bg-slate-50'
@@ -1116,18 +1165,23 @@ export default function StepEditor({
                         <button
                           type="button"
                           onClick={() => openAnnotation(imgIdx)}
-                          className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-slate-300 bg-white px-3.5 py-2 text-sm font-semibold text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 active:scale-[0.98]"
-                          title={popupSupported ? '別ウィンドウで注釈を編集します' : undefined}
+                          className={`inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3.5 py-2 text-sm font-semibold shadow-sm transition active:scale-[0.98] ${
+                            popupImages.includes(imgUrl)
+                              ? 'border-amber-400 bg-amber-50 text-amber-900 hover:bg-amber-100'
+                              : 'border-slate-300 bg-white text-slate-900 hover:border-slate-400 hover:bg-slate-50'
+                          }`}
+                          title={popupImages.includes(imgUrl) ? '編集中の別ウィンドウを前に出します' : popupSupported ? '別ウィンドウで注釈を編集します' : undefined}
                         >
                           <svg className="brand-text h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536M4 20h4.5L19 9.5 14.5 5 4 15.5V20z" />
                           </svg>
-                          注釈
+                          {popupImages.includes(imgUrl) ? '注釈を編集中' : '注釈'}
                         </button>
                         <button
                           type="button"
                           onClick={() => removeImage(imgIdx)}
-                          className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-red-200 bg-white px-3.5 py-2 text-sm font-semibold text-red-600 shadow-sm transition hover:border-red-300 hover:bg-red-50 active:scale-[0.98]"
+                          disabled={popupImages.includes(imgUrl)}
+                          className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-red-200 bg-white px-3.5 py-2 text-sm font-semibold text-red-600 shadow-sm transition hover:border-red-300 hover:bg-red-50 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
                         >
                           <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 7h12M9 7V5h6v2m-7 3l.6 9h6.8l.6-9" />
